@@ -39,7 +39,10 @@ fn build(doc: &Document) -> Loaded {
         let Some(chunk) = &o.chunk else { continue };
         match scene::texture(chunk) {
             Ok(t) => {
-                let source_of = |embedded: Option<(u32, u32, Vec<u8>)>, file_name: Option<Vec<u8>>| match (embedded, file_name) {
+                let source_of = |embedded: Option<(u32, u32, Vec<u8>)>,
+                                 file_name: Option<Vec<u8>>| match (
+                    embedded, file_name,
+                ) {
                     (Some((width, height, rgba)), _) => TextureSource::Pixels {
                         width,
                         height,
@@ -440,11 +443,10 @@ fn smooth_normals(positions: &[[f32; 3]], faces: &[([u16; 3], u16)]) -> Vec<[f32
         .collect()
 }
 
-
 /// Breaks every loop in a parent table by dropping the parent of the loop's lowest-numbered object (a parent that is
 /// no object counts as none). One walk over each chain, each object visited once: linear in the table, whatever the
 /// chains' length (a hostile file may chain a hundred thousand objects).
-fn break_parent_loops(parent: &mut [Option<usize>]) {
+pub(crate) fn break_parent_loops(parent: &mut [Option<usize>]) {
     let n = parent.len();
     // 0 not seen, 1 on the chain being walked, 2 settled
     let mut state = vec![0u8; n];

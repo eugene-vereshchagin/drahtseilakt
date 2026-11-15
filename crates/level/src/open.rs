@@ -21,8 +21,13 @@ pub const VERSION: u64 = 1;
 pub const MAX_PARALLAX: f64 = 0.25;
 const MAX_JSON: u64 = 64 * 1024 * 1024;
 const MAX_BIN: u64 = 1024 * 1024 * 1024;
+/// The longest name a 2D frame keeps.
+const MAX_NAME: usize = 1024;
 const FLOAT: u64 = 5126;
 const UINT: u64 = 5125;
+/// glTF primitive modes: points (a mesh of vertices without faces) and triangles (the default).
+const POINTS: u64 = 0;
+const TRIANGLES: u64 = 4;
 
 /// Negates the entries of a column-major matrix that mix Z with another axis: S·M·S with S = diag(1, 1, -1, 1).
 fn flip_matrix(m: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
@@ -35,6 +40,29 @@ fn flip_matrix(m: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
         }
     }
     out
+}
+
+/// A number as JSON: itself when finite, else its name (`nan`, `inf`, `-inf`).
+fn number_or_name(x: f32) -> Value {
+    if x.is_finite() {
+        json!(x)
+    } else if x.is_nan() {
+        json!("nan")
+    } else if x > 0.0 {
+        json!("inf")
+    } else {
+        json!("-inf")
+    }
+}
+
+/// A number named by `number_or_name`.
+fn name_to_number(v: &Value) -> Option<f32> {
+    match v.as_str()? {
+        "nan" => Some(f32::NAN),
+        "inf" => Some(f32::INFINITY),
+        "-inf" => Some(f32::NEG_INFINITY),
+        _ => None,
+    }
 }
 
 fn blend_name(b: Blend) -> &'static str {
@@ -113,6 +141,18 @@ pub fn export_textures(
     dir: &Path,
     textures: &[Texture],
     remap: &[usize],
+) -> Result<(), String> {
+    export_slots(level, dir, textures, remap, &[])
+}
+
+/// `export_textures` with the further slots of textures (an animation's frames): each `(image, slots)` names the
+/// images that are that image's slots after the first, in order (written in its extras).
+pub fn export_slots(
+    level: &Level,
+    dir: &Path,
+    textures: &[Texture],
+    remap: &[usize],
+    slots: &[(usize, Vec<usize>)],
 ) -> Result<(), String> {
     let tex = |t: Option<usize>| t.and_then(|i| remap.get(i).copied());
     let mut bin: Vec<u8> = Vec::new();
@@ -217,6 +257,9 @@ pub fn export_textures(
             if let Some(k) = t.color_key {
                 v["extras"] = json!({"drahtseilakt": {"color_key": k}});
             }
+            if let Some((_, more)) = slots.iter().find(|s| s.0 == i) {
+                v["extras"]["drahtseilakt"]["slots"] = json!(more);
+            }
             v
         })
         .collect();
@@ -230,9 +273,20 @@ pub fn export_textures(
         .map(|o| {
             let m = flip_matrix(&o.matrix);
             let flat: Vec<f32> = m.iter().flatten().copied().collect();
-            let mut v = json!({"name": o.name, "matrix": flat, "extras": {"drahtseilakt": {"visible": o.visible}}});
+            // JSON has no number that is not finite: such a matrix (a map's object the game plays all the same) is
+            // kept whole in the extras, its entries named, and glTF's has 0 for them
+            let finite: Vec<f32> = flat.iter().map(|x| if x.is_finite() { *x } else { 0.0 }).collect();
+            let mut v = json!({"name": o.name, "matrix": finite, "extras": {"drahtseilakt": {"visible": o.visible}}});
+            if flat.iter().any(|x| !x.is_finite()) {
+                v["extras"]["drahtseilakt"]["matrix"] =
+                    json!(flat.iter().map(|x| number_or_name(*x)).collect::<Vec<_>>());
+            }
             if let Some(s) = o.sprite {
                 v["extras"]["drahtseilakt"]["sprite"] = json!({"mode": s.mode, "size": s.size, "offset": s.offset});
+            }
+            // the object it follows (Set Parent in the map); the matrix stays the world's, so it is no glTF child
+            if let Some(p) = o.parent {
+                v["extras"]["drahtseilakt"]["parent"] = json!(p);
             }
             if let Some(mesh) = o.mesh.and_then(|i| mesh_index.get(i).copied().flatten()) {
                 v["mesh"] = json!(mesh);
@@ -268,6 +322,19 @@ pub fn export_textures(
     });
     if let Some(s) = scripts {
         doc["scenes"][0]["extras"]["drahtseilakt"]["scripts"] = s;
+    }
+    if !level.frames.is_empty() {
+        let fin = |a: [f32; 4]| a.map(|x| if x.is_finite() { x } else { 0.0 });
+        let frames: Vec<Value> = level
+            .frames
+            .iter()
+            .take(crate::MAX_FRAMES)
+            .map(|f| {
+                json!({"name": f.name, "rect": fin(f.rect), "uv": fin(f.uv), "z_order": f.z_order,
+                    "material": f.material, "visible": f.visible})
+            })
+            .collect();
+        doc["scenes"][0]["extras"]["drahtseilakt"]["frames"] = json!(frames);
     }
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
@@ -545,10 +612,11 @@ fn settings_from(v: &Value) -> Result<crate::Settings, String> {
     })
 }
 
-/// A mesh the open format writes: one with vertices and faces (an empty one is left out, so the meshes read back
-/// are the written ones, in their order).
+/// A mesh the open format writes: one with vertices (an empty one is left out, so the meshes read back are the
+/// written ones, in their order). A mesh of vertices without faces (a particle emitter's points) is written as one
+/// primitive of points.
 pub fn written(m: &Mesh) -> bool {
-    !m.positions.is_empty() && m.parts.iter().any(|p| !p.indices.is_empty())
+    !m.positions.is_empty()
 }
 
 /// One mesh as glTF, its data pushed into the buffer; None for a mesh without faces.
@@ -631,6 +699,10 @@ fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Opt
             prim["material"] = json!(mat);
         }
         prims.push(prim);
+    }
+    if prims.is_empty() {
+        // vertices without faces: glTF's points (mode 0), no indices and no material
+        prims.push(json!({"attributes": attributes, "mode": POINTS}));
     }
     let mut mesh = json!({"name": m.name, "primitives": prims});
     if !channels.is_empty() {
@@ -792,6 +864,58 @@ fn color_key_of(v: &serde_json::Value) -> Option<[u8; 3]> {
     Some(k)
 }
 
+/// The 2D frames of the scene's extras (none when absent); a malformed one, more than `MAX_FRAMES` or a material that
+/// is not there refuses the level.
+fn frames_from(v: &Value, materials: usize) -> Result<Vec<crate::Frame>, String> {
+    if v.is_null() {
+        return Ok(Vec::new());
+    }
+    let list = v.as_array().ok_or("frames must be a list")?;
+    if list.len() > crate::MAX_FRAMES {
+        return Err("too many frames".into());
+    }
+    let bad = || "a frame is malformed".to_owned();
+    let four = |a: &Value| -> Result<[f32; 4], String> {
+        let a = a.as_array().filter(|a| a.len() == 4).ok_or_else(bad)?;
+        let mut out = [0.0f32; 4];
+        for (o, x) in out.iter_mut().zip(a) {
+            *o = x.as_f64().ok_or_else(bad)? as f32;
+            if !o.is_finite() {
+                return Err(bad());
+            }
+        }
+        Ok(out)
+    };
+    list.iter()
+        .map(|f| {
+            let name = f["name"].as_str().ok_or_else(bad)?;
+            if name.len() > MAX_NAME {
+                return Err(bad());
+            }
+            let material = match &f["material"] {
+                Value::Null => None,
+                m => Some(
+                    m.as_u64()
+                        .and_then(|m| usize::try_from(m).ok())
+                        .filter(|&m| m < materials)
+                        .ok_or("a frame's material is not there")?,
+                ),
+            };
+            Ok(crate::Frame {
+                name: name.to_owned(),
+                rect: four(&f["rect"])?,
+                uv: four(&f["uv"])?,
+                z_order: f["z_order"]
+                    .as_i64()
+                    .and_then(|z| i32::try_from(z).ok())
+                    .ok_or_else(bad)?,
+                material,
+                visible: f["visible"].as_bool().ok_or_else(bad)?,
+            })
+        })
+        .collect()
+}
+
 /// A sprite's placement from the object's extras, if it is one and its numbers are sound.
 fn sprite_of(v: &serde_json::Value) -> Option<crate::Sprite> {
     let pair = |k: &str| -> Option<[f32; 2]> {
@@ -910,6 +1034,28 @@ fn import_from(
             source: TextureSource::LevelFile(dir.join(uri)),
             color_key: color_key_of(&img["extras"]["drahtseilakt"]["color_key"]),
         });
+    }
+    // a texture's further slots: other images of the level, at most MAX_SLOTS - 1 of them
+    for (i, img) in arr("images").iter().enumerate() {
+        let listed = &img["extras"]["drahtseilakt"]["slots"];
+        if listed.is_null() {
+            continue;
+        }
+        let bad = || format!("image {i}: its slots are not other images of the level");
+        let list = listed
+            .as_array()
+            .filter(|l| l.len() < nmo::scene::MAX_SLOTS)
+            .ok_or_else(bad)?;
+        let mut sources = Vec::with_capacity(list.len());
+        for k in list {
+            let k = k
+                .as_u64()
+                .and_then(|k| usize::try_from(k).ok())
+                .filter(|&k| k != i)
+                .ok_or_else(bad)?;
+            sources.push(level.textures.get(k).ok_or_else(bad)?.source.clone());
+        }
+        level.texture_slots.push((i, sources));
     }
     let tex_image: Vec<Option<usize>> = arr("textures")
         .iter()
@@ -1036,6 +1182,19 @@ fn import_from(
             if p["attributes"] != *attr {
                 return Err("primitives of one mesh must share their vertices".into());
             }
+            // a mesh of points has its vertices only: one primitive, no indices, no material
+            if p.get("mode").is_some_and(|m| *m != json!(TRIANGLES)) {
+                if p["mode"] != json!(POINTS)
+                    || prims.len() != 1
+                    || p.get("indices").is_some()
+                    || p.get("material").is_some()
+                {
+                    return Err(
+                        "a primitive must be triangles, or the points of a mesh alone".into(),
+                    );
+                }
+                continue;
+            }
             let (bytes, count) = r.accessor(
                 p["indices"].as_u64().ok_or("primitive without indices")?,
                 UINT,
@@ -1119,13 +1278,22 @@ fn import_from(
 
     for n in arr("nodes") {
         let mut m = [[0.0f32; 4]; 4];
-        let flat = n["matrix"].as_array().ok_or("node without matrix")?;
+        // the whole matrix of the extras, when it has entries that are not finite; glTF's otherwise
+        let whole = &n["extras"]["drahtseilakt"]["matrix"];
+        let (flat, named) = match whole.as_array() {
+            Some(a) => (a, true),
+            None => (n["matrix"].as_array().ok_or("node without matrix")?, false),
+        };
         if flat.len() != 16 {
             return Err("node matrix must have 16 numbers".into());
         }
         for (k, v) in flat.iter().enumerate() {
             if let Some(slot) = m.get_mut(k / 4).and_then(|c| c.get_mut(k % 4)) {
-                *slot = v.as_f64().ok_or("matrix entry is not a number")? as f32;
+                *slot = match v.as_f64() {
+                    Some(x) => x as f32,
+                    None if named => name_to_number(v).ok_or("matrix entry is not a number")?,
+                    None => return Err("matrix entry is not a number".into()),
+                };
             }
         }
         level.objects.push(Object {
@@ -1141,6 +1309,27 @@ fn import_from(
                 .unwrap_or(true),
             sprite: sprite_of(&n["extras"]["drahtseilakt"]["sprite"]),
         });
+    }
+    // the objects' parents, once every object is there: one that is no other object refuses the level, a loop is
+    // broken as a map's is
+    let count = level.objects.len();
+    let mut parents: Vec<Option<usize>> = Vec::with_capacity(count);
+    for (i, n) in arr("nodes").iter().enumerate() {
+        let p = &n["extras"]["drahtseilakt"]["parent"];
+        parents.push(if p.is_null() {
+            None
+        } else {
+            let p = p
+                .as_u64()
+                .and_then(|p| usize::try_from(p).ok())
+                .filter(|&p| p < count && p != i)
+                .ok_or("a node's parent is no other node")?;
+            Some(p)
+        });
+    }
+    crate::from_nmo::break_parent_loops(&mut parents);
+    for (o, p) in level.objects.iter_mut().zip(parents) {
+        o.parent = p;
     }
 
     let groups = doc["scenes"][0]["extras"]["drahtseilakt"]["groups"]
@@ -1167,6 +1356,7 @@ fn import_from(
     level.sky = x["sky"].as_str().map(str::to_owned);
     level.start_ball = x["start_ball"].as_str().map(str::to_owned);
     level.settings = settings_from(&x["settings"])?;
+    level.frames = frames_from(&x["frames"], level.materials.len())?;
     if !x["scripts"].is_null() {
         let counts = [
             level.objects.len(),

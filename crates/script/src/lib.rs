@@ -488,10 +488,10 @@ pub struct Graph {
     /// For each IO, the links leaving it.
     pub links_from: Vec<Vec<Id>>,
     /// Objects with a priority other than 0 (identifier 0x40 of a behavioural object): higher runs its scripts
-    /// first. Not in the open format yet (every object 0 there).
+    /// first. The open format keeps them (`priorities`).
     pub priorities: Vec<(Id, i32)>,
     /// Scripts and objects the scene starts deactivated (their saved activity says so, docs/ck-runtime.md); every
-    /// other one starts active (a map's file mostly saves no activity at all). Not in the open format yet.
+    /// other one starts active (a map's file mostly saves no activity at all). The open format keeps them (`start_off`).
     pub start_off: Vec<Id>,
     /// The members the file gives each group (by group index, as `ObjKind::Group` counts them), of any kind: entities,
     /// meshes, materials, behaviours. A group missing here (or empty) starts with the host's level members.

@@ -1388,7 +1388,7 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
     // the levels' texture and model packs (packs.rs): the extended mode's choice, the command line's for one run; ours
     // and the level's own parts otherwise (the classic mode always). An export keeps the level's own (the copy's
     // textures) unless `--textures` asks for a pack in it.
-    let (textures, models) = if o.export.is_some() {
+    let (textures, models) = if o.export.is_some() || !o.convert_audit.is_empty() {
         (Some(gamedata::packs::ORIGINAL.to_owned()), None)
     } else {
         (setting("textures"), setting("models"))
@@ -1398,7 +1398,7 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
         o.models.clone().or(models).as_deref(),
     );
     // the one Look picks the textures (a `--textures` pack of this run wins); the shapes follow it per level
-    if o.textures.is_none() && o.export.is_none() {
+    if o.textures.is_none() && o.export.is_none() && o.convert_audit.is_empty() {
         crate::look::start(setting("look").as_deref(), setting("textures").as_deref());
     }
     // an original level named on the command line is drawn in the look too (the window, screenshots, videos); a run
@@ -1437,6 +1437,19 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
             start_packs(o.textures.as_deref(), o.models.as_deref());
         };
         return crate::audit::run(&o.audit, &data, o.audit_csv.as_deref(), &prepare);
+    }
+    if !o.convert_audit.is_empty() {
+        let out = o
+            .convert_out
+            .clone()
+            .unwrap_or_else(|| std::env::temp_dir().join("convert-audit"));
+        return crate::convert_audit::run(
+            &o.convert_audit,
+            &data,
+            &out,
+            o.ticks.unwrap_or(3000),
+            &o,
+        );
     }
     if !o.audit_report.is_empty() {
         // as a new player has it, like --audit: the report says what the game gives, the same on every machine
@@ -1640,6 +1653,70 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
         game.fast_forward(tick);
     }
     window(game, data, &o, None)
+}
+
+/// For the converter's audit (convert_audit.rs): the game on `o.source` without a window, stepped `ticks` ticks with
+/// `keys(tick)`, and a hash of each part of what is where after every tick (convert_audit::PARTS: the ball, the rules,
+/// the objects the scripts move, the loose bodies, the modules' parts). Stops early when the run ends.
+pub(crate) fn states(
+    o: &Options,
+    data: &Data,
+    ticks: u64,
+    keys: &dyn Fn(u64) -> u8,
+) -> Result<Vec<[u64; 5]>, String> {
+    use std::hash::{Hash, Hasher};
+    let data = data.for_source(&o.source);
+    let mut game = Game::new(o, &data)?;
+    let objects = game.level.level.objects.len();
+    let mut out = Vec::new();
+    let bits = |h: &mut std::collections::hash_map::DefaultHasher, v: &[f32]| {
+        for x in v {
+            x.to_bits().hash(h);
+        }
+    };
+    while game.sim.tick < ticks && !game.sim.game_over {
+        let t = game.sim.tick;
+        // lives without end, so the fixed keys play the whole run however often the ball falls
+        game.sim.lives = game.sim.lives.max(3);
+        game.tick(keys(t));
+        let s = &game.sim;
+        let mut h = [(); 5].map(|()| std::collections::hash_map::DefaultHasher::new());
+        let b = &s.ball;
+        bits(&mut h[0], &b.position.to_array());
+        bits(&mut h[0], &b.velocity.to_array());
+        bits(&mut h[0], &b.spin.to_array());
+        bits(&mut h[0], &b.rotation.to_array());
+        (b.kind as u8, b.on_ground).hash(&mut h[0]);
+        (s.sector, s.lives, s.points, s.finished, s.game_over).hash(&mut h[1]);
+        (&s.taken, &s.unseen).hash(&mut h[1]);
+        bits(&mut h[1], &s.camera.position.to_array());
+        bits(&mut h[1], &s.camera.target.to_array());
+        for i in 0..objects {
+            if let Some(m) = s.script_object_matrix(i) {
+                i.hash(&mut h[2]);
+                bits(&mut h[2], &m.to_cols_array());
+            }
+        }
+        for &(i, body) in s.loose() {
+            if let Some(st) = s.world().state(body) {
+                i.hash(&mut h[3]);
+                bits(&mut h[3], &st.pos.to_array());
+                bits(&mut h[3], &st.rot.to_array());
+            }
+        }
+        for m in s.module_bodies() {
+            if let Some(st) = s.world().state(m.body) {
+                m.body.hash(&mut h[4]);
+                bits(&mut h[4], &st.pos.to_array());
+                bits(&mut h[4], &st.rot.to_array());
+            }
+        }
+        out.push(h.map(|h| h.finish()));
+        if game.sim.finished {
+            break;
+        }
+    }
+    Ok(out)
 }
 
 /// The game in its window (`pilot`: the test player plays it, with --watch).
