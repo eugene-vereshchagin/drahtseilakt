@@ -29,6 +29,19 @@ const CLEAR_RISE: f32 = 0.85;
 const CELL: f32 = 24.0;
 const MAX_CELLS: usize = 512;
 
+/// A picture decoded with its sides capped at `side` before any pixel is decoded (a file's header may claim any size;
+/// checking the sides after decoding would already have allocated them).
+fn decode_capped(bytes: &[u8], side: u32) -> Option<image::DynamicImage> {
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(side);
+    limits.max_image_height = Some(side);
+    reader.limits(limits);
+    reader.decode().ok()
+}
+
 /// The land as its files give it.
 pub struct Land {
     /// World units a side, the grid centred on its middle.
@@ -75,7 +88,7 @@ pub fn load(name: &str, file: impl Fn(&str) -> Option<std::path::PathBuf>) -> Op
         }
     }
     let (extent, lo, hi) = (extent?, lo?, hi?);
-    let grid = image::load_from_memory(&read("LandHeight.png")?).ok()?;
+    let grid = decode_capped(&read("LandHeight.png")?, MAX_GRID)?;
     if grid.width() != grid.height() || !(2..=MAX_GRID).contains(&grid.width()) {
         return None;
     }
@@ -86,7 +99,7 @@ pub fn load(name: &str, file: impl Fn(&str) -> Option<std::path::PathBuf>) -> Op
         .into_iter()
         .map(|q| lo + (hi - lo) * f32::from(q) / 65535.0)
         .collect();
-    let img = image::load_from_memory(&read("LandColor.jpg")?).ok()?;
+    let img = decode_capped(&read("LandColor.jpg")?, MAX_TEX)?;
     if img.width() > MAX_TEX || img.height() > MAX_TEX || img.width() == 0 || img.height() == 0 {
         return None;
     }
