@@ -718,7 +718,7 @@ class Track:
             self.skip = L.CHECK_LEN / 2
             self.pending = {"n": self.checkpoints, "at": self.pos.copy(), "width": self.width,
                             "fwd": self.fwd(), "back": back, "along": self.along}
-            bottom_reset = self.pos + np.array([0.0, L.CHECK_RESET - L.check_bowl(self.width)[-1][1], 0.0])
+            bottom_reset = self.pos + np.array([0.0, L.CHECK_RESET - L.check_bowl()[-1][1], 0.0])
             self.sector += 1
             self.pilot.begin(bottom_reset, self.sector)
         elif cmd == "finish":

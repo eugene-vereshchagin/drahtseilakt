@@ -23,16 +23,27 @@ import levelkit as L  # noqa: E402
 import ownkit as K  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels", "Parts_Test")
+OUT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels", "drahtseilakt", "Parts_Test")
 # Where the stretches of each safety lie (z of the first; the next 40 further each)
 SAFETY_Z = 80.0
 
 
+# The necks between the start's and the checkpoints' pieces and the wide floors: 12 wide, 7 long.
+NECK, NECK_LEN = 12.0, 7.0
+CP = L.CHECK_LEN / 2
+
+
 def build():
+    def neck(name, x0):
+        b.slab(name, (x0, -L.DEPTH, -NECK / 2), (x0 + NECK_LEN, 0, NECK / 2), sector=0)
+
     b = L.LevelBuilder(OUT, seed=101)
-    b.start((0.0, 0.0, 0.0), width=20.0)
-    # sector 1: x 10..130, 40 wide
-    b.slab("S1_Floor", (10, -L.DEPTH, -20), (125, 0, 20), sector=0)
+    # the start and the checkpoints are pieces of their own, as the original's: a neck NECK wide runs on from each
+    # (levelcheck.check_pads: no floor beside them), the wide floors beyond it
+    b.start((0.0, 0.0, 0.0), width=NECK)
+    neck("S1_Neck_In", L.START_RADIUS)
+    # sector 1: x 17..123.5, 40 wide
+    b.slab("S1_Floor", (L.START_RADIUS + NECK_LEN, -L.DEPTH, -20), (130 - CP - NECK_LEN, 0, 20), sector=0)
     b.extra_point(1, (25, 0, 0), 1)
     b.box(1, (40, 0, -12), 1)
     b.box(2, (46, 0, -12), 1)
@@ -46,9 +57,11 @@ def build():
     # the crate stands on the floor 4.6 under its frame, the stone on it
     b.module("P_Modul_34", 1, K.pose((112, 4.6, 14)), 1)
     b.trafo("Stone", 1, (120, 0, 0), 1)
-    b.checkpoint(1, (130, 0, 0), width=40.0)
-    # sector 2: x 130..262, 60 wide
-    b.slab("S2_Floor", (135, -L.DEPTH, -30), (255, 0, 30), sector=0)
+    neck("S1_Neck_Out", 130 - CP - NECK_LEN)
+    b.checkpoint(1, (130, 0, 0), width=NECK)
+    neck("S2_Neck_In", 130 + CP)
+    # sector 2: x 142..248, 60 wide
+    b.slab("S2_Floor", (130 + CP + NECK_LEN, -L.DEPTH, -30), (260 - CP - NECK_LEN, 0, 30), sector=0)
     b.trafo("Paper", 1, (142, 0, 0), 2)
     b.module("P_Modul_18", 1, K.pose((165, 0.6, 12)), 2)
     b.module("P_Modul_17", 1, K.pose((185, 4.5, -18)), 2)
@@ -62,9 +75,11 @@ def build():
     b.module("P_Modul_26", 1, K.pose((222, 3.0, -15)), 2)
     b.module("P_Modul_08", 1, K.pose((242, 1.2, 15)), 2)
     b.extra_point(2, (200, 0, 0), 2)
-    b.checkpoint(2, (260, 0, 0), width=60.0)
-    # sector 3: x 262..390, 60 wide, bays over the void on either side
-    b.slab("S3_Floor", (265, -L.DEPTH, -30), (390, 0, 30), sector=0)
+    neck("S2_Neck_Out", 260 - CP - NECK_LEN)
+    b.checkpoint(2, (260, 0, 0), width=NECK)
+    neck("S3_Neck_In", 260 + CP)
+    # sector 3: x 272..390, 60 wide, bays over the void on either side
+    b.slab("S3_Floor", (260 + CP + NECK_LEN, -L.DEPTH, -30), (390, 0, 30), sector=0)
     b.trafo("Wood", 1, (274, 0, 0), 3)
     # the plate bridge from the floor's edge (z 30) to a pad 14.8 further, its x along +z
     b.module("P_Modul_29", 1, K.pose((290, 0, 36.6), (0, 0, 1)), 3)

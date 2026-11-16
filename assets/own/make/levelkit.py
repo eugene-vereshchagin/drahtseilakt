@@ -116,8 +116,18 @@ SLAB, REPEAT, BRICK = 5.0, 20.0, 10.0
 START_BOWL = [(0.0, 0.0), (3.05, 0.21), (4.87, 0.5), (6.35, 0.85), (7.5, 1.25)]
 START_RADIUS, START_DEEP, START_RESET = 10.0, 5.0, 3.65
 CHECK_BOWL = [(0.0, 0.0), (2.03, 0.22), (3.24, 0.51), (4.23, 0.86), (5.0, 1.02)]
-CHECK_LEN, CHECK_RESET, CHECK_FLAMES = 10.0, 3.33, 7.0
+CHECK_LEN, CHECK_RESET, CHECK_FLAMES = 11.0, 3.33, 7.0
 CUP_R, CUP_UP = 2.0, 0.3
+# The start's and the checkpoints' pieces, as the original's (measured on its 13 levels, numbers only): each is a piece
+# of its own, its whole top drawn with the checkpoint's plate (Floor_Top_Checkpoint), the bowl in its middle and the
+# flames on its tips; the floors come in and go on through its ends and nothing else lies beside it, so the way runs
+# through the bowl, never round or back past it. A checkpoint's piece is 9.84 along the way and 18 across (its flames
+# at ±7 across, on its two tips), the floors joining its ends 10.8 wide; ours is CHECK_LEN along (the bowl's rim
+# PAD_RIM in from its ends) and as far across as the flame cups reach. The start's is 18.5 by 16 round its bowl of 7.5,
+# the four flames on its corners and one floor going on from it, none behind: ours is the hull of its rim (START_PAD)
+# and its cups, narrowing to the neck the first floor runs on from (START_RADIUS ahead).
+PAD_RIM = 0.5
+START_PAD = START_BOWL[-1][0] + PAD_RIM
 # Rails, measured on the original's: two tubes 0.6 thick, their middles 3.9 apart (the ball, 4 across, sits deep
 # between them, its middle 1.22 over theirs). Ours lie on the floor they leave (the tubes' undersides level with its
 # top: the ball drops 0.48 onto them, not 1.08 as onto the original's, sunk 0.6 deeper), and where a floor runs on from
@@ -383,12 +393,59 @@ def orient(m):
                 idx[t + 1], idx[t + 2] = c, b
 
 
-def check_bowl(width):
-    """A checkpoint's bowl on a way `width` wide: the measured one, smaller on a narrow way (its rim half a unit in
-    from the edges) and its depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper
-    bowl does not roll out of it)."""
-    k = min(CHECK_BOWL[-1][0], width / 2 - 0.5) / CHECK_BOWL[-1][0]
-    return [(r * k, h * k) for r, h in CHECK_BOWL]
+def check_bowl():
+    """A checkpoint's bowl: the measured one, whatever the way's width (the piece is its own, as wide as its cups)."""
+    return list(CHECK_BOWL)
+
+
+def pad_outline(circles, front, back, front_at, back_at=None):
+    """The outline of a start's or a checkpoint's piece ((ahead, left) about its middle, counter-clockwise from the
+    front edge's right corner, seen round the middle): the convex hull of `circles` ((ahead, left, radius): its rim,
+    its flame cups) and of its edges where floors meet it, `front` at `front_at` ahead and `back` at `back_at` (None:
+    no edge there), each a list of distances to the left (the floor's join_points, negated). Every point of an edge
+    is a corner of the outline (the floor's cross-section points). Returns the outline and the indices k of its edges
+    outer[k]-outer[k+1] on the front and on the back."""
+    pts = []
+    for ca, cl, r in circles:
+        for k in range(48):
+            a = 2 * math.pi * k / 48
+            pts.append((ca + r * math.cos(a), cl + r * math.sin(a)))
+    edges = [(front_at, sorted(front))] + ([(back_at, sorted(back))] if back_at is not None else [])
+    for at, lfts in edges:
+        pts += [(at, lfts[0]), (at, lfts[-1])]
+    hull = _convex_hull(pts)
+    # the edges' inner points between their corners, then all in order of their angle round the middle
+    for at, lfts in edges:
+        hull = [p for p in hull if abs(p[0] - at) > 1e-9] + [(at, lft) for lft in lfts]
+    hull.sort(key=lambda p: math.atan2(p[1], p[0]) % (2 * math.pi))
+    # start at the front edge's right corner
+    k0 = hull.index((front_at, sorted(front)[0]))
+    outer = hull[k0:] + hull[:k0]
+    n = len(outer)
+
+    def on(at):
+        return {k for k in range(n) if abs(outer[k][0] - at) < 1e-9 and abs(outer[(k + 1) % n][0] - at) < 1e-9}
+
+    return outer, on(front_at), (on(back_at) if back_at is not None else set())
+
+
+def _convex_hull(pts):
+    """The convex hull of 2-d points, counter-clockwise (Andrew's monotone chain), collinear points left out."""
+    p = sorted(set((round(x, 9), round(y, 9)) for x, y in pts))
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lo, hi = [], []
+    for q in p:
+        while len(lo) >= 2 and cross(lo[-2], lo[-1], q) <= 1e-12:
+            lo.pop()
+        lo.append(q)
+    for q in reversed(p):
+        while len(hi) >= 2 and cross(hi[-2], hi[-1], q) <= 1e-12:
+            hi.pop()
+        hi.append(q)
+    return lo[:-1] + hi[:-1]
 
 
 def ring_frames(path, headings=None, scales=None):
@@ -703,6 +760,9 @@ class LevelBuilder:
         self.route = {}
         self.intended = set()
         self.drops = []
+        # the start's and the checkpoints' pieces, for levelcheck.check_pads: (node, middle of its top, ahead, its
+        # outline, the floors' lanes: (from, to) ahead and the half width across where a floor may run on from it)
+        self.pads = []
         self.seed = seed
         # the level's behaviour graphs (scriptkit.Graph.json(); open-format.md, "Scripts"); None: no scripts
         self.scripts = None
@@ -1073,9 +1133,11 @@ class LevelBuilder:
         the middle), flame cups at `cups` ((ahead, left)). The edges in `joins` (by index: outer[k] to outer[k+1])
         are where a stretch of track runs on from the platform: there the platform has no side down to the track's
         depth (the track's own sides go on from its sides), and its corners are the track's (join_points), so the
-        two share every vertex. The bowl is drawn with the checkpoint's floor (its rings round a grate at its middle,
-        the outer ring at its rim), the platform round it with the track's slabs, mapped as the track's (across, and
-        along by `along`, the distance along the track at the middle)."""
+        two share every vertex. The whole top is drawn with the checkpoint's plate, as the original's piece (one
+        plate, none of a floor's slabs on it): the bowl with its rings round a grate at its middle (the outer ring at
+        its rim), the top from the rim out with the plate's stone beyond the ring, each outline point mapped to the
+        texture's edge in its direction. The sides are mapped as the track's, along by `along` (the distance along the
+        track at the middle). Returns the bowl's bottom and the piece's node."""
         c = np.asarray(centre, np.float64)
         f = np.asarray(fwd, np.float64)
         f = f / np.linalg.norm(f)
@@ -1085,7 +1147,7 @@ class LevelBuilder:
         bottom = c - up * deep
         tex = rb * 64 / 62  # the texture's half side, its outer ring's edge (62 of 64) at the rim
         m = K.Mesh(name)
-        plate, top, side = self.mat_ids["plate"], self.mat_ids["top"], self.mat_ids["side"]
+        plate, side = self.mat_ids["plate"], self.mat_ids["side"]
         angles = [2 * math.pi * k / 64 for k in range(64)]
 
         def at(r, a, h):
@@ -1094,8 +1156,11 @@ class LevelBuilder:
         def uv_bowl(r, a):
             return (0.5 + r * math.cos(a) / (2 * tex), 0.5 + r * math.sin(a) / (2 * tex))
 
-        def uv_top(ahead, lft):
-            return (-lft / SLAB + 0.5, (along + ahead) / REPEAT)
+        def uv_edge(ahead, lft):
+            # the texture's edge (half a texel in) in the point's direction from the middle
+            a = math.atan2(lft, ahead)
+            reach = (1.0 - 0.5 / 64) / max(abs(math.cos(a)), abs(math.sin(a)))
+            return (0.5 + reach * math.cos(a) / 2, 0.5 + reach * math.sin(a) / 2)
 
         for k in range(len(angles)):
             a0, a1 = angles[k], angles[(k + 1) % len(angles)]
@@ -1110,9 +1175,9 @@ class LevelBuilder:
                     continue
                 m.face(plate, q, uv, normal=nrm if nrm[1] >= 0 else -nrm)
         # the top round the bowl: from the rim out to the outline, one triangle fan zipped between the two loops
-        inner = [(a, m.vertex(at(rb, a, deep), up, uv_top(rb * math.cos(a), rb * math.sin(a)))) for a in angles]
+        inner = [(a, m.vertex(at(rb, a, deep), up, uv_bowl(rb, a))) for a in angles]
         world = [c + f * x + left * z for x, z in outer]
-        outer_v = [(math.atan2(z, x) % (2 * math.pi), m.vertex(w, up, uv_top(x, z))) for (x, z), w in zip(outer, world)]
+        outer_v = [(math.atan2(z, x) % (2 * math.pi), m.vertex(w, up, uv_edge(x, z))) for (x, z), w in zip(outer, world)]
         # each outline edge's point nearest the middle: where the fan hands over to its next corner
         feet = []
         for k, (x0, z0) in enumerate(outer):
@@ -1121,7 +1186,7 @@ class LevelBuilder:
             t = min(max(-(x0 * dx + z0 * dz) / max(dx * dx + dz * dz, 1e-12), 0.0), 1.0)
             feet.append(math.atan2(z0 + t * dz, x0 + t * dx) % (2 * math.pi))
         for t in zipper(inner, outer_v, feet):
-            m.tri(top, *t)
+            m.tri(plate, *t)
         # the sides round the outline: down to the track's depth (none where a track runs on), then to the platform's
         run = 0.0
         n = len(outer)
@@ -1149,40 +1214,37 @@ class LevelBuilder:
             p = c + f * ahead + left * lft
             K.cylinder(m, side, p - up * (START_DEEP - 1.0), up, CUP_R, START_DEEP - 1.0 + CUP_UP,
                        seg=24, cap_mat=plate, vscale=SLAB)
-        self.add(name, m, groups=self._floor_groups("stone"))
-        return bottom
+        node = self.add(name, m, groups=self._floor_groups("stone"))
+        return bottom, node
 
     def start(self, at, width=14.0, join=None, along=-START_RADIUS):
-        """The start: a round platform with a bowl in its middle the ball sits in, four flame cups round it and a neck
-        as wide as the track leaving along +X (to 10 ahead), the stand-in of PS_FourFlames in the bowl's bottom and
-        the first reset point over it. `at` is the platform's top centre (the floor's height round the bowl); `join`
-        the first stretch's join_points when it runs on from the neck's front edge. Returns the reset point."""
-        R = START_RADIUS
-        hw = min(width, 2 * R) / 2
-        neck = math.sqrt(max(R * R - hw * hw, 0.0))
+        """The start, as the original's: a piece of its own round its bowl (the ball sits in it), its top the
+        checkpoint's plate, the hull of its rim and its four flame cups narrowing to a neck whose front edge,
+        START_RADIUS ahead along +X, is as wide as the first floor's flat (join) or the track; nothing behind or beside
+        it. The stand-in of PS_FourFlames stands in the bowl's bottom and the first reset point over it. `at` is the
+        piece's top centre (the floor's height round the bowl); `join` the first stretch's join_points when it runs on
+        from the neck's front edge. Returns the reset point."""
+        hw = min(width, 2 * START_RADIUS) / 2
         front = [-x for x in (join or [-hw, hw])]
-        outer = [(R, lft) for lft in sorted(front)]
-        outer.append((neck, hw))
-        meet = math.atan2(hw, neck)
-        steps = 48
-        for k in range(1, steps):
-            a = meet + (2 * math.pi - 2 * meet) * k / steps
-            outer.append((R * math.cos(a), R * math.sin(a)))
-        outer.append((neck, -hw))
-        joins = set(range(len(front) - 1)) if join else set()
-        bottom = self.bowl_piece("Start_Platform", at, (1, 0, 0), START_BOWL, outer, joins,
-                                 [(sa * 6.1, sl * 7.3) for sa in (-1, 1) for sl in (-1, 1)], along)
-        # the start stands on a stone tower going down into the haze (only drawn), a cornice of brick under its edge
+        cups = [(sa * 6.1, sl * 7.3) for sa in (-1, 1) for sl in (-1, 1)]
+        outer, joins, _ = pad_outline([(0.0, 0.0, START_PAD)] + [(ca, cl, CUP_R) for ca, cl in cups], front, None,
+                                      START_RADIUS)
+        bottom, node = self.bowl_piece("Start_Platform", at, (1, 0, 0), START_BOWL, outer, joins if join else set(),
+                                       cups, along)
+        self.pads.append((node, np.asarray(at, np.float64), np.array([1.0, 0.0, 0.0]), outer,
+                          [(START_RADIUS, math.inf, hw)]))
+        # the start stands on a stone tower going down into the haze (only drawn), a cornice of brick under its rim
         tower = K.Mesh("Start_Tower")
         x, y, z = at
-        K.cylinder(tower, self.mat_ids["post"], (x, y - START_DEEP - COLUMN_DEPTH, z), (0, 1, 0), START_RADIUS - 0.8,
+        K.cylinder(tower, self.mat_ids["post"], (x, y - START_DEEP - COLUMN_DEPTH, z), (0, 1, 0), START_PAD - 0.8,
                    COLUMN_DEPTH - TUCK, seg=32, vscale=SLAB)
-        K.cylinder(tower, self.mat_ids["border"], (x, y - START_DEEP - 1.4, z), (0, 1, 0), START_RADIUS + 0.3, 1.4,
+        K.cylinder(tower, self.mat_ids["border"], (x, y - START_DEEP - 1.4, z), (0, 1, 0), START_PAD, 1.4,
                    seg=32, vscale=BRICK)
         self.add("Start_Tower", tower)
-        for sa in (-1, 1):
-            for sl in (-1, 1):
-                self.lantern((x + sa * 9.0, y, z + sl * 9.0), (sa * 0.7071, 0.0, sl * 0.7071))
+        # a lantern beyond each flame cup, on the piece's side
+        for ca, cl in cups:
+            d = np.array([ca, 0.0, cl]) / math.hypot(ca, cl)
+            self.lantern(tuple(np.asarray(at, np.float64) + np.array([ca, 0.0, cl]) + d * (CUP_R + 0.6)), tuple(d))
         # its z axis points back at the camera (-X): x axis (0, 0, 1)
         self.placeholder("PS_FourFlames_01", ["PS_Levelstart"], K.pose(tuple(bottom), (0, 0, 1)), (-8, 0, -7),
                          (8, 6, 7))
@@ -1223,37 +1285,31 @@ class LevelBuilder:
         return self.add(name, m)
 
     def checkpoint(self, n, at, width=14.0, fwd=(1, 0, 0), back=None, front=None, along=0.0):
-        """Checkpoint n (1, 2...) at `at` (the floor's top, the track along `fwd`, a multiple of 90 degrees): a piece
-        of floor CHECK_LEN long and as wide as the track with the checkpoint's bowl in its middle, two flame cups
-        across the way (at ±7 to the sides, as the original's flames), the stand-in of PC_TwoFlames in the bowl's
-        bottom (its z axis across the way, where its flames stand) and the next sector's reset point over it. The
-        floors before and after end at the piece; `back` and `front` are their join_points where they run on from
-        it. Returns the reset point."""
+        """Checkpoint n (1, 2...) at `at` (the floor's top, the track along `fwd`, a multiple of 90 degrees), as the
+        original's: a piece of its own, CHECK_LEN along the way, its top the checkpoint's plate, the bowl in its middle
+        and two flame cups across the way on its tips (at ±7 to the sides, as the original's flames); the floors
+        before and after end at its ends, as wide there as their flat (`back` and `front`: their join_points where
+        they run on from it) or the track, and nothing else lies beside it: the way goes through the bowl. The stand-in
+        of PC_TwoFlames stands in the bowl's bottom (its z axis across the way, where its flames stand) and the next
+        sector's reset point over it. Returns the reset point."""
         f = np.asarray(fwd, np.float64)
         f /= np.linalg.norm(f)
         left = np.array([-f[2], 0.0, f[0]])
         hw, hl = width / 2, CHECK_LEN / 2
-        bowl = check_bowl(width)
-        # counter-clockwise from the front edge's right corner: the front edge, the left side, the back edge, the
-        # right side (the sides cut every 2.5 for the triangles' shape)
-        fr_l = sorted(-x for x in (front or [-hw, hw]))
-        bk_l = sorted((-x for x in (back or [-hw, hw])), reverse=True)
-        cuts = max(1, int(round(CHECK_LEN / 2.5)))
-        outer = [(hl, lft) for lft in fr_l]
-        outer += [(hl - CHECK_LEN * k / cuts, hw) for k in range(1, cuts)]
-        outer += [(-hl, lft) for lft in bk_l]
-        outer += [(-hl + CHECK_LEN * k / cuts, -hw) for k in range(1, cuts)]
-        joins = set()
-        if front:
-            joins |= set(range(len(fr_l) - 1))
-        if back:
-            b0 = len(fr_l) + cuts - 1
-            joins |= set(range(b0, b0 + len(bk_l) - 1))
-        bottom = self.bowl_piece(f"Checkpoint_{n:02d}", at, f, bowl, outer, joins,
-                                 [(0.0, -CHECK_FLAMES), (0.0, CHECK_FLAMES)], along)
+        bowl = check_bowl()
+        fr_l = [-x for x in (front or [-hw, hw])]
+        bk_l = [-x for x in (back or [-hw, hw])]
+        cups = [(0.0, -CHECK_FLAMES), (0.0, CHECK_FLAMES)]
+        outer, fj, bj = pad_outline([(0.0, 0.0, bowl[-1][0] + PAD_RIM)] + [(ca, cl, CUP_R) for ca, cl in cups],
+                                    fr_l, bk_l, hl, -hl)
+        joins = (fj if front else set()) | (bj if back else set())
+        bottom, node = self.bowl_piece(f"Checkpoint_{n:02d}", at, f, bowl, outer, joins, cups, along)
+        self.pads.append((node, np.asarray(at, np.float64), f, outer, [(hl, math.inf, hw), (-math.inf, -hl, hw)]))
+        # a lantern beside the floor going on from it (or the one coming in), just off its end
         c = np.asarray(at, np.float64)
+        side = hl + 1.5 if front or not back else -hl - 1.5
         for sl in (-1.0, 1.0):
-            self.lantern(tuple(c + f * (hl - 1.0) + left * sl * (hw + 0.6)), tuple(left * sl))
+            self.lantern(tuple(c + f * side + left * sl * (hw + 0.6)), tuple(left * sl))
         self.placeholder(f"PC_TwoFlames_{n:02d}", ["PC_Checkpoints"], K.pose(tuple(bottom), tuple(f)), (-4, 0, -8),
                          (4, 6, 8))
         reset = tuple(bottom + np.array([0.0, CHECK_RESET, 0.0]))

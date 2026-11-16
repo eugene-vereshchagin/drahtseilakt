@@ -10,6 +10,10 @@ written, and each finding is named with its coordinates):
   check_shortcuts   no floor of a later part of the route can be reached from an earlier one by falling, by a flight
                     off an edge at speed, or by the updraft of a fan (a conservative estimate: FLIGHT_V and gravity),
                     unless the description marks the landing as intended (`drop`);
+  check_pads        the start and every checkpoint stand on a piece of their own, as the original's: no other floor's
+                    top lies beside the piece (within PAD_REACH of its outline, PAD_HEIGHT above or below its top),
+                    only the floors running on from its ends, no wider there than the way; so the way goes through
+                    the bowl, never round it or back past it;
   check_coplanar    no two drawn faces (of two objects, or of two materials of one) lie in one plane facing one way
                     and overlap: the depth buffer cannot tell them apart and the picture flickers between their
                     textures as the view moves (z-fighting). Faces back to back (a floor's end against the next
@@ -119,6 +123,16 @@ def _in_tri_xz(px, pz, t, grow):
     s = 1.0
     return (u * area2 / max(lb, 1e-9) >= -grow) & (v * area2 / max(la, 1e-9) >= -grow) \
         & ((1.0 - u - v) * area2 / max(lc, 1e-9) >= -grow) & (s > 0)
+
+
+# Pads: how far round a start's or a checkpoint's piece no other floor may lie (across: the flame cups' reach and
+# a ball's width beyond it), and within what height of its top (a floor far under or over it is not a way round).
+PAD_REACH = 6.0
+PAD_HEIGHT = 4.0
+PAD_STEP = 0.5
+# The widest way that may run on from a piece: half of it no more than the flame cups' middles are across (7; the
+# original's floors join its checkpoints 10.8 wide, the piece 18 across), so the cups stand out beside the way.
+PAD_LANE = 7.0
 
 
 # --- 1. seams -------------------------------------------------------------------------------------------------------
@@ -610,10 +624,93 @@ def check_coplanar(b):
         raise ValueError(f"{len(per)} pairs of faces overlap in one plane (they flicker: z-fighting), e.g. {shown}")
 
 
+def pad_detours(b):
+    """The places beside a start's or a checkpoint's piece where another floor's top lies (check_pads): for each
+    piece, (its name, the point, the other floor's name). The piece's ends may have floors running on from them
+    (its lanes: along the way past the end, no wider than the half width given), nothing else may lie within
+    PAD_REACH of its outline at its height (PAD_HEIGHT)."""
+    out = []
+    pads = getattr(b, "pads", [])
+    if not pads:
+        return out
+    floors = _floors(b, railings=False)
+    tops = []
+    for i in floors:
+        t, up = _tris_of(b, i)
+        if len(t):
+            tops.append((i, t[up > 0.3]))
+    for node, c, f, outer, lanes in pads:
+        left = np.array([-f[2], 0.0, f[0]])
+        poly = np.asarray(outer, np.float64)
+        lo, hi = poly.min(0) - PAD_REACH, poly.max(0) + PAD_REACH
+        aa, ll = np.meshgrid(np.arange(lo[0], hi[0] + 1e-9, PAD_STEP), np.arange(lo[1], hi[1] + 1e-9, PAD_STEP))
+        aa, ll = aa.ravel(), ll.ravel()
+        # within PAD_REACH of the outline (inside it or out)
+        near = np.zeros(len(aa), bool)
+        n = len(poly)
+        inside = np.ones(len(aa), bool)
+        for k in range(n):
+            p0, p1 = poly[k], poly[(k + 1) % n]
+            d = p1 - p0
+            L2 = max(float(d @ d), 1e-12)
+            t = np.clip(((aa - p0[0]) * d[0] + (ll - p0[1]) * d[1]) / L2, 0.0, 1.0)
+            near |= np.hypot(aa - p0[0] - t * d[0], ll - p0[1] - t * d[1]) <= PAD_REACH
+            # strictly inside (a floor's end on the piece's edge is a join, not an overlap)
+            inside &= (d[0] * (ll - p0[1]) - d[1] * (aa - p0[0])) / math.sqrt(L2) > 0.01
+        ok = np.zeros(len(aa), bool)
+        for a0, a1, half in lanes:
+            ok |= (aa >= a0 - 1e-6) & (aa <= a1 + 1e-6) & (np.abs(ll) <= half + 1e-6)
+        want = (near & ~ok) | inside
+        px = c[0] + aa * f[0] + ll * left[0]
+        pz = c[2] + aa * f[2] + ll * left[2]
+        for i, t in tops:
+            if i == node or not len(t):
+                continue
+            box = (t[:, :, 0].max(1) >= px.min() - 1) & (t[:, :, 0].min(1) <= px.max() + 1) \
+                & (t[:, :, 2].max(1) >= pz.min() - 1) & (t[:, :, 2].min(1) <= pz.max() + 1) \
+                & (np.abs(t[:, :, 1] - c[1]).min(1) <= PAD_HEIGHT + 3)
+            for tri in t[box]:
+                hit = want & _in_tri_xz(px, pz, tri, -0.01)
+                if not hit.any():
+                    continue
+                a, bb, cc = tri
+                d = (bb[0] - a[0]) * (cc[2] - a[2]) - (cc[0] - a[0]) * (bb[2] - a[2])
+                if abs(d) < 1e-12:
+                    continue
+                u = ((px - a[0]) * (cc[2] - a[2]) - (cc[0] - a[0]) * (pz - a[2])) / d
+                v = ((bb[0] - a[0]) * (pz - a[2]) - (px - a[0]) * (bb[2] - a[2])) / d
+                y = a[1] + u * (bb[1] - a[1]) + v * (cc[1] - a[1])
+                hit &= np.abs(y - c[1]) <= PAD_HEIGHT
+                if hit.any():
+                    k = int(np.argmax(hit))
+                    out.append((b.nodes[node]["name"], np.array([px[k], y[k], pz[k]]), b.nodes[i]["name"],
+                                (float(aa[k]), float(ll[k]))))
+                    want &= ~hit
+    return out
+
+
+def check_pads(b):
+    wide = sorted({(b.nodes[node]["name"], 2 * half) for node, c, f, outer, lanes in getattr(b, "pads", [])
+                   for a0, a1, half in lanes if half > PAD_LANE + 1e-6})
+    if wide:
+        raise ValueError(f"{len(wide)} ways run on from a start's or a checkpoint's piece wider than {2 * PAD_LANE:g} "
+                         "(the piece's flame cups would stand in the way; narrow it before, `width`): "
+                         + "; ".join(f"{name} {w:g} wide" for name, w in wide))
+    found = pad_detours(b)
+    if found:
+        per = {}
+        for pad, p, other, (ahead, across) in found:
+            per.setdefault((pad, other), (p, ahead, across))
+        shown = "; ".join(f"{other} beside {pad} at {_fmt(p)} ({a:.1f} ahead, {c:.1f} across)"
+                          for (pad, other), (p, a, c) in list(per.items())[:SHOW])
+        raise ValueError(f"{len(per)} floors lie beside a start's or a checkpoint's piece (a way round it), e.g. "
+                         f"{shown}")
+
+
 def check_all(b):
     """Runs the checks; returns the messages of those that fail (empty: all pass)."""
     msgs = []
-    for fn in (check_seams, check_scenery, check_shortcuts, check_reachable, check_coplanar):
+    for fn in (check_seams, check_scenery, check_shortcuts, check_reachable, check_pads, check_coplanar):
         try:
             fn(b)
         except ValueError as e:
