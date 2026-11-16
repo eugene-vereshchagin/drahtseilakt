@@ -894,7 +894,15 @@ class LevelBuilder:
         self.add(name, top, groups=self._floor_groups("metal") + self.sector(sector))
         # only drawn: the collar, the shaft and its floor, the block's sides
         m = K.Mesh(name + "_Shaft")
-        K.cylinder(m, self.mat_ids["rail"], tuple(c - up * 0.02), up, hole + 0.35, 0.2, seg=seg, r_top=hole + 0.2)
+        # the collar: its outside and a flat ring on top round the hole, open over the hole (with the frustum's caps
+        # a steel disc 0.18 over the grille covered it: the grille was never seen)
+        K.cylinder(m, self.mat_ids["rail"], tuple(c - up * 0.02), up, hole + 0.35, 0.2, seg=seg, r_top=hole + 0.2,
+                   caps=False)
+        for k in range(seg):
+            a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
+            ring = [P(math.cos(a) * r, math.sin(a) * r, 0.18) for a, r in
+                    ((a0, hole), (a0, hole + 0.2), (a1, hole + 0.2), (a1, hole))]
+            m.face(self.mat_ids["rail"], ring, normal=(0, 1, 0))
         for k in range(seg):
             a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
             p0 = P(math.cos(a0) * hole, math.sin(a0) * hole, 0)
