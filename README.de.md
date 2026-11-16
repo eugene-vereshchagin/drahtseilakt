@@ -83,6 +83,12 @@ stimmt. Die Commits tragen beide Namen.
 
 Dateien, die aus OpenBallance übernommen wurden (GPL-3.0, emdzej und Mitwirkende), sind in ihren Kopfzeilen gekennzeichnet; das Crate `ivp` ist der Physik-Port.
 
+Alles in einem Download, was nicht für Drahtseilakt geschrieben wurde, mit seiner Lizenz (das Ursprungsprojekt,
+Schriften, Quellen der Texturen, Klänge und Musik, die mitgelieferten Community-Level und ihre Autoren, jedes in das
+Programm kompilierte Crate), steht in [THIRD-PARTY.md](THIRD-PARTY.md), das neben `LICENSE` mitgeliefert wird.
+`tools/third_party.py` erzeugt die Crate-Liste offline aus `Cargo.lock` neu, und ein Test schlägt bei einer
+Abhängigkeit ohne GPL-3.0-kompatible Lizenz fehl.
+
 Drahtseilakt steht unter der GPL-3.0, wie OpenBallance, mit dem es begann. Es braucht deine eigene Kopie des
 Spiels und liefert nie Daten von Ballance aus. (Solange dieses Repository privat ist, hält `levels/` eine
 Sicherung der Originallevel für die Entwicklung; das öffentliche Repository enthält sie nicht.) Ballance ist

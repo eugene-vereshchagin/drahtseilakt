@@ -65,6 +65,10 @@ F3 后退数秒，R 重新开始，`[` 和 `]` 让游戏变慢和重新加快，
 
 从 OpenBallance（GPL-3.0，emdzej 及贡献者）移植的文件在其文件头中注明了这一点；`ivp` crate 是物理引擎的移植。
 
+下载包中所有并非为 Drahtseilakt 编写的内容及其许可证（上游项目、字体、纹理来源、音效和音乐、随附的社区关卡及其作者、
+编译进程序的每个 crate）都列在 [THIRD-PARTY.md](THIRD-PARTY.md) 中，该文件与 `LICENSE` 一同随附。
+`tools/third_party.py` 可离线从 `Cargo.lock` 重新生成 crate 列表；若某个依赖没有与 GPL-3.0 兼容的许可证，测试会失败。
+
 Drahtseilakt 以 GPL-3.0 许可证发布，与它起步时所基于的 OpenBallance 相同。它需要你自己的
 游戏拷贝，并且从不分发 Ballance 的数据。（在本仓库保持私有期间，`levels/` 中保存着原版关卡的
 备份，供开发使用；公开仓库中不会包含它。）Ballance 版权所有 © 2004 Cyparade /
