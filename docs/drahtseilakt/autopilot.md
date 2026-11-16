@@ -327,28 +327,24 @@ before it rolls back between them). Level 13
 another way in this view: the plank at z 686 that his ball knocks over in passing rammed down, the ball stopping 2
 units short at the serpentine's crossing z 721 so the crate stays under it and stone 18 rolls over untouched, the
 crate pressed under the crossings z 713 and 705 closed-loop with each crossing awaited, and on the beam a press
-east after his launch keys so the paper ball is in the second fan's slot before the stone) passes sectors 1 and 2
+east after his launch keys so the paper ball is in the second fan's slot before the stone) was found to pass sectors 1 and 2
 from the start when run with the level's plan: `--autopilot --plan hints/Level_13.plan --hints hints/Level_13-45.txt`.
 Without `--plan` the way found is another (2255 points instead of 2530) and the ball stands at the end of sector 1;
 everything the run reads is in `hints/` (no route, replay or learned table comes from the data folder), and it
-plays tick for tick the same from an empty data folder as from one full of earlier runs. In sector 3 (2026-11-16)
-the crates of the channel are taken apart the same way: the first rammed west with the owner's run followed at gain 3
-(his ram is a diagonal push, weaker in this view), the second and third rammed from a run-up (`goto`, `hold`,
-`press` at up to 10; the second's press cut short at 110 ticks), the third on a line a little north of its middle,
-so that it goes south-west into its pocket as in his run; the ride down the channel is split in two `pass` steps
-(one was longer than the 20 s a run may stand without a step on); the four swinging sacks (z -822 to -852) are taken
-in the owner's one pass, his run followed (`trace`) from the stone transformer to the paper one (10 s, as his, where
-waiting for each sack's swing took 35 s), and the paper ball is let off that transformer slowly (faster, it ran off
-the floor's south edge at z -871). Not through yet: all ten stone balls rolling down the channel (on the same
-schedule in every run) must reach the queue before CP3 (-648, -288, -1125), to make the floor the ball rolls over.
-In the owner's run the ball is in the channel at 0:55.5, just ahead of the lead stone, and waits at the channel's
-end, where each stone running into it is turned east into the queue. Here the ball comes into the channel at 0:59.8,
-1.5 s behind the lead stone, and rolls on in the stones' convoy at their pace: the three stones ahead of it and one
-more fall at the sacks, three run off the channel's end before the ball is there (2:18.5, his 1:36.7), and three make
-the queue. Sectors 4 and 5 fail in this view when begun at their checkpoints: in sector 4 the owner's diagonal kick off
-the raft into the first fan (x -134) cannot be given here (an arrow along the view's axis is the most along a world
-diagonal), so the ball falls behind the raft and is shut in at x 51; in sector 5 the `round` up the helix (340,
--614.5) is too weak (the original's push on average) and the ball falls off. Level 13 is not finished yet.
+plays tick for tick the same from an empty data folder as from one full of earlier runs. Checked again on
+2026-11-16 from an empty data folder, it does not get through sector 2 from the start (with the binary and hints of
+that merge too): at its end the paper ball rolls behind stone 18 down the rails instead of on it (the owner's ball is
+on its front) and falls into the gap at z 585 that the owner jumps at 9 to 12; a faster `full` push off, before the
+stone or after it has fallen, did not jump it. Sectors 3, 4 and 5 are through when begun at their checkpoints, with
+`full` steps (above) where the owner's push was diagonal: in sector 3 the crates rammed `full` along the axes (crate
+40 east straight from his run, no run-up), the paper transformer and the way round to the channel's mouth `full`, so
+the ball is in the channel ahead of the lead stone (0:58.2, his 0:58.0); his run followed from z -753 to the stone
+transformer (1:14.45, his 1:14.32), so the four swinging sacks are where his were and no stone falls there; at the
+channel's end his run followed, then the ball held still while the last stone comes: all ten stones in the queue,
+CP3 at 2:44.93 (his 2:44.92). In sector 4 his north-east kick off the raft into the first fan (x -134) is given as
+its two parts, `full` north then `full` east (22 ticks each, then his run on): CP4 at 2:04.48 (his 2:04.18). In
+sector 5 the push onto the helix and the `round` up it are `full`: the level finished from its checkpoint in 1:54.17
+with no ball lost. Level 13 is not finished from the start yet (sector 2's gap).
 
 ## The speedrun style
 
