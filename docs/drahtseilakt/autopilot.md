@@ -194,7 +194,7 @@ Directions are world directions (X east, Z north as the level is built), so a hi
 view is turned; the arrows are chosen for the view at each tick. A hint file is untrusted: its size (64 KiB),
 the number of hints (256) and steps (64 a hint) and every number are capped, a replay is a plain file name beside
 it, and a malformed line refuses the whole file with its line number. `HINTS_TRACE=1` prints the ball every ten
-ticks while a hint drives.
+ticks while a hint drives. To compare two runs, `DRAHTSEILAKT_DUMP_STATE=S:T,...` (or `@N`, a game tick) with `--replay --headless` prints the whole simulation state at T on sector S's clock (the ticks since its modules entered the physics, the clock `until` waits for): the ball, every module's and trigger's state, every loose body and module part with its physics core, the physics' random generator.
 
 ## Watching it play
 
@@ -360,6 +360,19 @@ lost at x 50 to 60. Riding the raft until it is where his was, then following on
 misses the fan from it; rolled into the fan by `pass` steps, the ball drops into the gap under it. Level 13 is not
 finished from the start yet (sector 3's crate 40 and sector 4's second fan in a run on).
 Later on 2026-11-16 sector 4 was synced on the raft as the owner waits for it: after each fan's landing the ball stops and `await`s the raft's lead ball where it was as he left, then his run is traced on (his kick into the third fan split `full` north and east): from CP3, CP4 at 2:04.22 (his 2:04.18). Run on from sector 3 the await ends within 4 ticks of that state, but the ball still lands low after the second fan. For crate 40 the new `ram` step (a body rammed through its middle from a run-up, closed on where it is), a sync on the stone transformer's hold and a stop before the press all failed from CP3 already (the crate jams, or the paper ball is a second late for the stones); `ride` kept ahead of stone 18's middle passes sector 2 from CP1 4 s sooner but from the start never clears the gap. From an empty data folder the run is as before: dead in sector 3 at crate 40.
+
+Compared state for state (2026-11-16, `DRAHTSEILAKT_DUMP_STATE`, see "Hint files"), the run on from the start and the start at CP3
+differ in sector 3 in: the ball (it comes over the checkpoint rolling, a start puts it there still), the sector's loose
+bodies and the modules' proximity tests by one tick (at a checkpoint the loose bodies enter a tick before the modules,
+a `--sector` start puts both in at once), the four sacks' swing (its step count runs from the level's start: 38 against
+139, the other parity), the physics' shared random generator and sleep test countdown (when resting bodies freeze, so
+crate 42 settles 0.15 units and 1.7 degrees otherwise), and the ball's orientation. The stone transformer makes the
+ball state equal (the same place, at rest), and a trace begun in it starts as the ball is let go: from there the two
+runs agree to 0.0002 for 130 ticks, but ramming crate 38 (box on box) makes that 1 to 2 units within 50 ticks, so crate
+40 jams in one run and not the other. Equal states cannot be made there (the orientation and the random generator are
+not the hints'); every variant tried from the release (trace from it at ticks 2322 to 2328, a hold to the sector's
+clock after it) jams crate 40 from CP3 as well. The crate puzzle needs steps whose outcome does not depend on such
+small differences.
 
 ## The speedrun style
 
