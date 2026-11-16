@@ -116,6 +116,9 @@ CLOUD_SCATTERED = 0.45
 # so the columns and the supports, which reach far down (COLUMN_DEPTH), fade out of sight instead of ending.
 FOG_DENSITY, FOG_BELOW, FOG_DEPTH = 0.0011, 12.0, 150.0
 COLUMN_DEPTH = 240.0
+# A shaft under a cornice (a column, a tower's) stops this short of the cornice's top, inside it: two faces in one plane
+# flicker where they overlap (levelcheck.py, check_coplanar).
+TUCK = 0.5
 SKY_DIR = os.path.join(OWN, "Textures", "Sky")
 # Rails' supports: a saddle under both tubes (its bar RAIL_SADDLE under their middles, below the ball riding between
 # them) on a column down into the haze, about every RAIL_SUPPORT of rails (the DSL picks where: not near their ends,
@@ -436,6 +439,12 @@ def track_sweep(m, mats, path, widths, along, safety, surface, caps=(True, True)
                 m.tri(mats["side"], ids[t3[0]], ids[t3[2]], ids[t3[1]])
 
 
+def rail_in(width):
+    """How far in from a way's edge its railing stands: RAIL_IN, nearer the edge on a way too narrow for it to leave
+    MIN_FREE beside a railing on one side (a stone lane 6 wide with a corner's railing: 0.325)."""
+    return max(RAIL_R, min(RAIL_IN, width - MIN_FREE - RAIL_R - 0.005))
+
+
 def free_width(width, safety, railings=(False, False), surface="stone"):
     """The room a way leaves the ball across at the height of its middle (BALL_R over the floor): between its
     borders, between its railings' rails, or its whole width."""
@@ -444,7 +453,7 @@ def free_width(width, safety, railings=(False, False), surface="stone"):
     lo, hi = min(xs), max(xs)
     if safety == "border":
         lo, hi = lo + BORDER_W, hi - BORDER_W
-    inset = RAIL_IN + RAIL_R
+    inset = rail_in(width) + RAIL_R
     if railings[0]:
         lo = max(lo, -width / 2 + inset)
     if railings[1]:
@@ -813,7 +822,7 @@ class LevelBuilder:
         rail = self.mat_ids["rail"]
         for k in sides:
             sgn = -1.0 if k == 0 else 1.0
-            off = [sgn * (w / 2 - RAIL_IN) for w in widths]
+            off = [sgn * (w / 2 - rail_in(w)) for w in widths]
             base = [p + s_ * o + u * top_height(w, safety, o, surface)
                     for (p, f, s_, u, t), o, w in zip(fr, off, widths)]
             for run in self._rail_runs(base):
@@ -835,13 +844,14 @@ class LevelBuilder:
             K.box(m, self.mat_ids["rail"], (x + lo[0], y, z + lo[1]), (x + hi[0], y + 0.3, z + hi[1]))
         return self.add(name, m)
 
-    def fan_block(self, name, at, fwd, sector=0, half=2.5, hole=1.8, depth=3.1):
+    def fan_block(self, name, at, fwd, sector=0, half=2.5, hole=1.8, depth=3.1, sides=True):
         """The fan's own block, as the original's levels set every fan (their floor round a fan is a 5 x 5 tile of
         material Modul18_Top with a round hole of radius 1.8 and a grille, Modul18_Gitter, over it at the floor's
         top, the fan sunk 3 under it): a square tile with a round hole whose top is `at` (the middle), a steel
         collar round the hole, a shaft down to a floor, and the grille over the hole, which the ball rolls over (it
-        is a floor) and the updraft blows through. Its sides are drawn (a block standing alone shows them). `fwd`:
-        the way's heading (the block's sides along it)."""
+        is a floor) and the updraft blows through. Its sides are drawn (a block standing alone shows them; `sides`
+        False where a floor stands round it, whose own sides would lie in their planes). `fwd`: the way's heading (the
+        block's sides along it)."""
         f = np.asarray(fwd, np.float64)
         f = f / np.linalg.norm(f)
         lft = np.array([-f[2], 0.0, f[0]])
@@ -850,16 +860,17 @@ class LevelBuilder:
         if "fan_grille" not in self.mat_ids:
             n = 256
             v, u = np.mgrid[0:n, 0:n] / n
-            # steel bars: a ring at the rim, two rings inside and bars across both ways, the rest open
+            # as the original's grille reads (measured on its picture): a square grid of flat grey bars, seven each
+            # way, a quarter of their pitch wide (8 to the hole's width), a dark solid hub over the fan's axle, 0.27 of
+            # the radius; the rest open. No rings, no shine: a dull steel grate over the dark shaft.
             r = np.hypot(u - 0.5, v - 0.5) * 2
-            bars = (np.abs(((u * 9) % 1) - 0.5) > 0.38) | (np.abs(((v * 9) % 1) - 0.5) > 0.38)
-            rings = (np.abs(r - 0.97) < 0.03) | (np.abs(r - 0.62) < 0.025) | (np.abs(r - 0.3) < 0.025)
-            hub = r < 0.1
-            solid = bars | rings | hub
-            shade = 0.55 + 0.25 * K.value_noise(n, n, (16, 16), 11)
-            rgb = np.stack([shade * 0.93, shade * 0.95, shade], -1)
+            bars = (np.abs(((u * 8) % 1) - 0.5) > 0.375) | (np.abs(((v * 8) % 1) - 0.5) > 0.375)
+            hub = r < 0.27
+            solid = bars | hub
+            shade = np.where(hub, 0.32, 0.52) * (0.96 + 0.08 * K.value_noise(n, n, (16, 16), 11))
+            rgb = np.stack([shade, shade, shade * 1.02], -1)
             K.save_png(self.tex, "Fan_Grille.png", rgb, solid.astype(np.float64))
-            self.mat("fan_grille", "Fan_Grille.png", diffuse=1.0, emissive=0.3, specular=0.6, power=30,
+            self.mat("fan_grille", "Fan_Grille.png", diffuse=1.0, emissive=0.3, specular=0.15, power=10,
                      alpha="MASK", cutoff=0.5, double_sided=True)
         P = lambda a, s, h: c + f * a + lft * s + up * h  # noqa: E731
         seg = 24
@@ -891,7 +902,7 @@ class LevelBuilder:
             m.face(self.mat_ids["side"], [p0, p1, p1 - up * depth, p0 - up * depth])
         m.face(self.mat_ids["side"], [P(-hole, -hole, -depth), P(-hole, hole, -depth), P(hole, hole, -depth),
                                       P(hole, -hole, -depth)], normal=(0, 1, 0))
-        for s0, s1 in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))):
+        for s0, s1 in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))) if sides else ():
             a, b = P(s0[0] * half, s0[1] * half, 0), P(s1[0] * half, s1[1] * half, 0)
             m.face(self.mat_ids["side"], [b, a, a - up * (depth + 0.4), b - up * (depth + 0.4)])
         self.add(name + "_Shaft", m)
@@ -1118,7 +1129,7 @@ class LevelBuilder:
         tower = K.Mesh("Start_Tower")
         x, y, z = at
         K.cylinder(tower, self.mat_ids["post"], (x, y - START_DEEP - COLUMN_DEPTH, z), (0, 1, 0), START_RADIUS - 0.8,
-                   COLUMN_DEPTH, seg=32, vscale=SLAB)
+                   COLUMN_DEPTH - TUCK, seg=32, vscale=SLAB)
         K.cylinder(tower, self.mat_ids["border"], (x, y - START_DEEP - 1.4, z), (0, 1, 0), START_RADIUS + 0.3, 1.4,
                    seg=32, vscale=BRICK)
         self.add("Start_Tower", tower)
@@ -1160,7 +1171,7 @@ class LevelBuilder:
         """A stone column hanging under the floor from `top` down `depth`: only for the look (no physics)."""
         x, y, z = top
         m = K.Mesh(name)
-        K.cylinder(m, self.mat_ids["post"], (x, y - DEPTH - depth, z), (0, 1, 0), r, depth, seg=12, vscale=SLAB)
+        K.cylinder(m, self.mat_ids["post"], (x, y - DEPTH - depth, z), (0, 1, 0), r, depth - TUCK, seg=12, vscale=SLAB)
         K.cylinder(m, self.mat_ids["border"], (x, y - DEPTH - 1.2, z), (0, 1, 0), r * 1.35, 1.2, seg=12)
         return self.add(name, m)
 

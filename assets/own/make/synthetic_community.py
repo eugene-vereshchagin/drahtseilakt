@@ -9,6 +9,8 @@ levels, each built for real with our own content and shown beside a plain floor 
   as a converted map's are): Rotate, a progression driving Set Position (a shuttle, and a lift that is a real floor),
   Text Display by proximity, 3D Text, a portal (Box Box Intersection moving the ball), a particle fountain, an
   animated texture (Set Texture on a timer), Show/Hide and Set Diffuse blinking, a crate made a body by Physicalize;
+  then the sticky ball of the BallSticky mod (our `sticky` kind: its transformer, a slope it climbs and the wooden
+  ball does not, its loose ball);
 - over all of it, from the gate on: another sky, fog and light (TT Sky, Set Fog, Set Light Color), switched by the
   ball's distance, so the community part looks different from the classic one.
 
@@ -125,6 +127,27 @@ sign "Script: Physicalize (push it)"
 exhibit crate
 floor 20
 width 12
+floor 16
+# the sticky ball: no level of the original has it, nor any of the converted community maps; it is BallSticky's (a
+# BML mod: its ball and transformer, our `sticky` kind, docs/drahtseilakt/mods.md). What it does that no other ball
+# does: pushed from rest it climbs a slope of 40 degrees (up to 43), which the wooden ball rolls back down
+sign "BallSticky (mod): P_Trafo_Sticky"
+trafo sticky
+floor 16
+sign "Sticky ball: climbs a slope of 40 (wood rolls back)"
+check comm-sticky : ball sticky 8 0 0 ; go 30 0 8.4 3 1200 ; reach 30 0 8.4 3 ; kind sticky ; kept
+check comm-sticky-wood : ball wood 8 0 0 ; go 30 0 8.4 3 1200 ; away 30 0 8.4 4
+floor 10
+floor 10 up 8.4
+width 16
+floor 12
+sign "P_Ball_Sticky (BallSticky's loose ball)"
+loose sticky side 3 ahead 10
+floor 14
+width 12
+floor 6
+sign "P_Trafo_Wood"
+trafo wood
 floor 16
 """
 

@@ -1360,8 +1360,9 @@ def spinner_look(name, arm, paddle, paint, iron, hub, steel, bolts, target):
 
 def fan_look(name, hub, blade, tip, steel, brass):
     """The fan as drawn (everything turns with the rotor, so everything but the blades is round about the axle): a
-    hub with a brass nose, four broad twisted blades of painted sheet with brass tips, a turned shroud ring round
-    them with a brass lip, and a guard of two wire rings on four struts."""
+    hub with a brass nose, four broad twisted blades of painted sheet with brass tips and a turned shroud ring round
+    them. No guard of its own: the level's grille over the shaft is the guard (as the original's fan has it), and a
+    guard of wire rings turning just under the grille, at its height, drew a second grid through the grille."""
     m = k.Mesh(name)
     k.cylinder(m, hub, (0, 0.08, 0), (0, 1, 0), 0.4, 0.8, seg=16)
     k.cylinder(m, brass, (0, 0.88, 0), (0, 1, 0), 0.4, 0.2, seg=16, r_top=0.14)
@@ -1375,13 +1376,6 @@ def fan_look(name, hub, blade, tip, steel, brass):
                    d * r1 - s * c1 + up(0.5 + p1), d * r0 - s * c0 + up(0.5 + p0)]
             m.face(tip if r1 > 1.4 else blade, pts)
     annulus(m, hub, (0, 0.02, 0), (0, 1, 0), 1.68, 1.8, 1.0, seg=36, turns=10.0)
-    annulus(m, brass, (0, 1.02, 0), (0, 1, 0), 1.66, 1.82, 0.08, seg=36, turns=10.0)
-    for r in (0.75, 1.2):
-        annulus(m, steel, (0, 1.02, 0), (0, 1, 0), r - 0.035, r + 0.035, 0.08, seg=28)
-    for b in range(4):
-        t = math.pi / 2 * b + math.pi / 4
-        d, s = (math.cos(t), 0, math.sin(t)), (-math.sin(t), 0, math.cos(t))
-        k.obox(m, steel, (1.03 * d[0], 1.05, 1.03 * d[2]), [d, (0, 1, 0), s], (0.65, 0.03, 0.035))
     return m
 
 
