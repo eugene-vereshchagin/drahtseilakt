@@ -31,6 +31,9 @@
 //                           behind at least, going on without a stop), then on through it no faster than V for T
 //                           ticks (or until the ball stops), kept to the line through its middle as the body moves;
 //                           closed on the body, not on fixed coordinates
+//   until X Y Z N [T]       keep the ball on the point until the sector's clock (ticks since its modules entered
+//                           the physics) reaches N (T ticks at most, 1800): a puzzle begun at the same moment of the
+//                           sector from a checkpoint start and run on from the sector before
 //   full STEP               the step pushed as hard as the arrows of the view as it is allow: on a 45-degree map
 //                           its pushes are otherwise the original's on average (`in_view`), here two arrows along
 //                           an axis of the world (1.41 times) and one along a diagonal; not before turn, cross,
@@ -75,6 +78,8 @@ const RAM_RUNUP_TICKS: u64 = 600;
 const RAM_ON_LINE: f32 = 1.0;
 const RAM_DRIFT: f32 = 4.0;
 const BECOME_TICKS: u64 = 1200;
+/// The ticks an until step waits at most when the hint does not say.
+const UNTIL_TICKS: u64 = 1800;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
@@ -126,6 +131,10 @@ pub enum Step {
     Hold(Vec3, u64),
     /// Keep the ball on the point until the current sector's objects have entered the physics (at most so many ticks).
     Sync(Vec3, u64),
+    /// Keep the ball on the point until the current sector's clock (the ticks since its modules entered the
+    /// physics, `Sim::sector_clock`) reaches the number, for so many ticks at most: a puzzle begun at the same
+    /// moment of the sector however early the ball came, from a checkpoint start or run on from the sector before.
+    Until(Vec3, u64, u64),
     /// Roll through the point without stopping, no faster than the speed (a corner, a rail's end, a transformer
     /// rolled into on the way), for so many ticks at most.
     Pass(Vec3, f32, u64),
@@ -615,6 +624,15 @@ fn step(words: &[&str]) -> Result<Step, String> {
             };
             Step::Sync(p, n)
         }
+        "until" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let clock = ticks(w.next())?;
+            let n = match w.next() {
+                Some(t) => ticks(Some(t))?,
+                None => UNTIL_TICKS,
+            };
+            Step::Until(p, clock, n)
+        }
         "along" => {
             let speed = num(w.next())?;
             if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
@@ -1007,7 +1025,8 @@ fn step_point(step: &Step) -> Option<Vec3> {
         | Step::Pass(p, _, _)
         | Step::Press(p, _, _, _)
         | Step::Hold(p, _)
-        | Step::Sync(p, _) => Some(p),
+        | Step::Sync(p, _)
+        | Step::Until(p, _, _) => Some(p),
         _ => None,
     }
 }
@@ -1737,6 +1756,9 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
         }
         Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
         Step::Sync(p, n) => (t < *n && sim.sector_entering()).then(|| towards(*p)),
+        Step::Until(p, clock, n) => {
+            (t < *n && sim.sector_clock().is_none_or(|c| c < *clock)).then(|| towards(*p))
+        }
         Step::Cross(d, p, r) => {
             if t == 0 {
                 run.pushes = cross_plan(sim, *d, *p, *r);
@@ -2027,6 +2049,22 @@ mod tests {
             Step::Sync(Vec3::new(1.0, 2.0, 3.0), GOTO_TICKS)
         );
         assert_eq!(h[0].steps[1], Step::Sync(Vec3::new(1.0, 2.0, 3.0), 40));
+    }
+
+    #[test]
+    fn an_until_step_parses_capped_and_with_its_default_ticks() {
+        let h = parse("at 0 0 0 r 5 : until 1 2 3 500 ; until 1 2 3 500 40").unwrap();
+        let p = Vec3::new(1.0, 2.0, 3.0);
+        assert_eq!(h[0].steps[0], Step::Until(p, 500, UNTIL_TICKS));
+        assert_eq!(h[0].steps[1], Step::Until(p, 500, 40));
+        for bad in [
+            "at 0 0 0 r 5 : until 1 2 3",
+            "at 0 0 0 r 5 : until 1 2 3 -5",
+            "at 0 0 0 r 5 : until 1 2 3 99999999",
+            "at 0 0 0 r 5 : until 1 2 3 10 99999999",
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
