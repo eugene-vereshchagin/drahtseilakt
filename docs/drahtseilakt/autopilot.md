@@ -156,8 +156,19 @@ One file a level: `hints/<level>.txt` in the game's data folder (`hints/Level_01
 use; they hold no game data. A hint a line, `#` begins a comment:
 
 ```
-at X Y Z r R [sector N] [kind wood|stone|paper|sticky] : STEP ; STEP ; ...
+at X Y Z r R [sector N] [kind wood|stone|paper|sticky] [retry N] : STEP ; STEP ; ...
 ```
+
+`retry N` (1 to 50) marks a hint whose outcome hangs on differences too small to write steps against (a crate
+rammed onto another, a moving part met at its phase): a player tries such a place again. Before the hint fires the
+run is saved; when it fails (its ball lost, standing still or off course while it runs, or a `check` not met), the
+run goes back to that save and the hint runs again, varied and seeded (reproducible): a start delay of up to 3
+ticks a try (15 at most) with no arrows, `pass` and `press` points moved up to 0.3 across, speeds up to 6% faster
+or slower, pushes up to 3 ticks longer or shorter, a `trace`'s gain up to 15% off and its recorded way moved across as the points are (a closed-loop trace would pull every try back onto the same line) (the full width from the fourth
+try). Each try counts against `--rewinds` (0: none), the run kept holds only the try that got through, and after
+N tries again the failure is taken as it comes. The summary lists the tries each such hint took (`retries: line L:
+N tries`). Written as a step, `retry N` does the same from that step on (the run saved as the next step begins;
+the variation is of the steps after it, the delay before the first of them). Hints without it run as before.
 
 When the ball comes within R of the point (in that sector, as that ball), the steps run in order, once a life;
 then the test player finds its place on the way again (past the transformers, when the hint made the ball over: the plan's
@@ -187,6 +198,9 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 | `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
 | `until X Y Z N [T]` | keep the ball on the point until the sector's clock (the ticks since its modules entered the physics: at its checkpoint, at a `--sector N` start or again after a lost ball) reaches N (T ticks at most, 1800): a puzzle begun at the same moment of the sector, its moving things where they were, whether the run began at the checkpoint or came on from the sector before |
+| `check X Y Z D [T]` | the hint's success condition: the ball within D of the point now or, giving no arrows, within T ticks; not met, the hint has failed (one marked `retry` is tried again, another just ends there) |
+| `retry N [W]` | from here on the hint is tried again up to N times when it fails, as `retry N` before the `:` does from its start: the run is saved as the next step begins (a stretch before it that always works is not played again); with W, its `pass` and `press` points (and a `ram`'s line) are moved up to W across instead of 0.3 (2 at most): a ram whose outcome hangs on where it meets the body |
+| `before N` | a success condition in time: the sector's clock (as `until` counts it) not past N as the hint comes here, else the hint has failed (a convoy of balls or a moving part met too late; the log prints the clock) |
 | `full STEP` | the step (one that pushes: not `turn`, `cross`, `trace` or `wait`) pushed as hard as the arrows of the view as it is allow, instead of the original's push on average: on a 45-degree map two arrows along an axis of the world (1.41 times), one along a diagonal (see "Modified originals"); on the original levels the same as without |
 | `trace FILE FROM TO [GAIN]` | the same stretch of a recorded run followed closed-loop: the replay is run once as the hints load, for the ball's place and speed at each tick; then each tick the player's arrows are the feed-forward plus a pull (times GAIN, 1 by default, 0 for none) toward the recorded place and speed at the matching point (matched by progress along the run, kept near one tick a tick so the run's waits stay waits), turned into the arrow set nearest it in the view now (the part missed carried to the next tick). Over 4 units off the run, it steers to the run's way 30 ticks ahead until it is on it again, and after 10 s lost gives the ball back to the autopilot. Unlike `replay`, it holds when the ball arrives a little different (a chain of sectors: `sync` first, then `trace`) |
 
@@ -373,6 +387,16 @@ runs agree to 0.0002 for 130 ticks, but ramming crate 38 (box on box) makes that
 not the hints'); every variant tried from the release (trace from it at ticks 2322 to 2328, a hold to the sector's
 clock after it) jams crate 40 from CP3 as well. The crate puzzle needs steps whose outcome does not depend on such
 small differences.
+
+With the hints' tries again (2026-11-16, `retry`, `check`, `before` in "Hint files"): the gap z 585 hint is tried
+again from its start (from the start: through on the 2nd try), sector 3 from before crate 38's ram (`retry 50 2`, a
+check that crate 40 went and `before 3530` at the channel's mouth, where the CP3 start comes at 3468), sector 4 from
+the kick off the raft. From CP3 and from CP4 each passes on its first try, as before. Run on from the start, crate 40
+jams in nearly every try (the saves the old going back reached were after the ram, the jam showed only some 40 s
+later, and the steps after a save replayed as written, the closed-loop trace pulling each try onto the same ram);
+in five runs of 41 to 51 varied tries five got through the crates, all 3.5 to 6 s late at the channel's mouth, so
+the stone convoy is ahead and the queue at CP3 stays short. Level 13 is still not finished from the start: the run on
+meets the crates in another state, which the ram's line does not make up for.
 
 ## The speedrun style
 

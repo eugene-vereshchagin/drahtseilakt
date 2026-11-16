@@ -80,6 +80,18 @@ const RAM_DRIFT: f32 = 4.0;
 const BECOME_TICKS: u64 = 1200;
 /// The ticks an until step waits at most when the hint does not say.
 const UNTIL_TICKS: u64 = 1800;
+/// How often a hint marked `retry N` may be tried again at most (each try is a rewind, counted against `--rewinds`).
+pub const MAX_RETRY: u32 = 50;
+/// The variation of a hint's try again (`Runner::vary`) at its widest (from the fourth try on): a start delay of up to
+/// this many ticks with no arrows, a pass or press point moved up to this far across, speeds up to this share
+/// faster or slower, a push held up to this many ticks longer or shorter, a trace's gain up to this share off.
+const VARY_DELAY: u32 = 15;
+pub const VARY_POINT: f32 = 0.3;
+/// How far across a `retry` step may let its points be moved at most (`retry N W`).
+const MAX_VARY_POINT: f32 = 2.0;
+const VARY_SPEED: f32 = 0.06;
+const VARY_PUSH: u32 = 3;
+const VARY_GAIN: f32 = 0.15;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
@@ -145,6 +157,17 @@ pub enum Step {
     /// Go round the upright axis through the point (x, z) at the radius, at the speed (one way round or, negative,
     /// the other), for so many ticks or until the ball is above the point's height: up a helix of rails.
     Round(Vec3, f32, f32, u64),
+    /// The hint's success condition: the ball within the distance of the point, now or, giving no arrows, within so
+    /// many ticks. Not met, the hint has failed (a hint marked `retry` is tried again from its start; another just
+    /// ends there).
+    Check(Vec3, f32, u64),
+    /// From here on the hint is tried again, up to so many times, when it fails (as `retry N` before the `:` does
+    /// from its start): the run is saved as the step after it begins. Its points are moved up to the distance
+    /// across (`VARY_POINT` by default).
+    Retry(u32, f32),
+    /// A success condition in time: the sector's clock (`Sim::sector_clock`) not past the number as the hint comes
+    /// here, else the hint has failed (a moving thing of the sector, a convoy of balls, met too late).
+    Before(u64),
 }
 
 /// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
@@ -371,6 +394,9 @@ pub struct Hint {
     pub full: Vec<bool>,
     /// The line it was read from, for the reports.
     pub line: usize,
+    /// How often the hint is tried again from its start, varied, when it fails (`retry N`; 0: never): the ball
+    /// lost, stuck or off course while it runs, or a `check` not met.
+    pub retry: u32,
 }
 
 fn kind_of(s: &str) -> Option<BallKind> {
@@ -392,6 +418,19 @@ fn num(s: Option<&str>) -> Result<f32, String> {
         Ok(v)
     } else {
         Err("a number out of range".into())
+    }
+}
+
+/// How often a hint is tried again (`retry N`): 1 to `MAX_RETRY`.
+fn retry_count(s: Option<&str>) -> Result<u32, String> {
+    let n: u32 = s
+        .ok_or("retry needs a count")?
+        .parse()
+        .map_err(|_| "not a retry count")?;
+    if (1..=MAX_RETRY).contains(&n) {
+        Ok(n)
+    } else {
+        Err(format!("retry is 1 to {MAX_RETRY} tries"))
     }
 }
 
@@ -450,7 +489,13 @@ fn full_step(words: &[&str]) -> Result<(bool, Step), String> {
     let s = step(rest)?;
     if matches!(
         s,
-        Step::Turn(_) | Step::Cross(..) | Step::Trace(..) | Step::Wait(_)
+        Step::Turn(_)
+            | Step::Cross(..)
+            | Step::Trace(..)
+            | Step::Wait(_)
+            | Step::Check(..)
+            | Step::Retry(..)
+            | Step::Before(_)
     ) {
         return Err("\"full\" is for a step that pushes in the original's view".into());
     }
@@ -633,6 +678,30 @@ fn step(words: &[&str]) -> Result<Step, String> {
             };
             Step::Until(p, clock, n)
         }
+        "retry" => {
+            let n = retry_count(w.next())?;
+            let width = match w.next() {
+                Some(v) => num(Some(v))?,
+                None => VARY_POINT,
+            };
+            if !(0.0..=MAX_VARY_POINT).contains(&width) {
+                return Err(format!("retry moves points 0 to {MAX_VARY_POINT} across"));
+            }
+            Step::Retry(n, width)
+        }
+        "before" => Step::Before(ticks(w.next())?),
+        "check" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let d = num(w.next())?;
+            if !(d > 0.0 && d <= MAX_LEAD) {
+                return Err(format!("check is within 0 to {MAX_LEAD} units"));
+            }
+            let n = match w.next() {
+                Some(t) => ticks(Some(t))?,
+                None => 0,
+            };
+            Step::Check(p, d, n)
+        }
         "along" => {
             let speed = num(w.next())?;
             if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
@@ -706,7 +775,7 @@ fn hint(line: &str, number: usize) -> Result<Hint, String> {
     if !(radius > 0.0 && radius <= MAX_RADIUS) {
         return Err("the radius is out of range".into());
     }
-    let (mut sector, mut kind) = (None, None);
+    let (mut sector, mut kind, mut retry) = (None, None, 0);
     while let Some(k) = w.next() {
         match k {
             "sector" => {
@@ -723,6 +792,7 @@ fn hint(line: &str, number: usize) -> Result<Hint, String> {
             "kind" => {
                 kind = Some(kind_of(w.next().ok_or("kind needs a ball")?).ok_or("not a ball kind")?)
             }
+            "retry" => retry = retry_count(w.next())?,
             other => return Err(format!("unknown condition \"{other}\"")),
         }
     }
@@ -745,6 +815,7 @@ fn hint(line: &str, number: usize) -> Result<Hint, String> {
         steps,
         full,
         line: number,
+        retry,
     })
 }
 
@@ -1026,7 +1097,8 @@ fn step_point(step: &Step) -> Option<Vec3> {
         | Step::Press(p, _, _, _)
         | Step::Hold(p, _)
         | Step::Sync(p, _)
-        | Step::Until(p, _, _) => Some(p),
+        | Step::Until(p, _, _)
+        | Step::Check(p, _, _) => Some(p),
         _ => None,
     }
 }
@@ -1060,6 +1132,11 @@ pub struct Runner {
     /// course, and its further steps are no getting on (the test player goes back from there as from a way that
     /// stands still).
     off_course: bool,
+    /// The hint (by index) whose `check` was not met, until the test player takes it (`take_failed`).
+    failed: Option<usize>,
+    /// A `retry` step reached (the hint's index and the tries it allows), until the test player takes it
+    /// (`take_mark`) to save the run there.
+    mark: Option<(usize, u32, f32)>,
 }
 
 impl Runner {
@@ -1166,6 +1243,114 @@ impl Runner {
         }
     }
 
+    /// The hint that fires for the ball as it is now, if none runs (`all`: as for a new ball, none fired yet).
+    fn due(&self, sim: &Sim, all: bool) -> Option<usize> {
+        let pos = sim.ball.position;
+        self.hints.iter().enumerate().position(|(i, h)| {
+            (all || !self.fired.get(i).copied().unwrap_or(true))
+                && h.at.distance(pos) <= h.radius
+                && h.sector.is_none_or(|s| s == sim.sector + 1)
+                && h.kind.is_none_or(|k| k == sim.ball.kind)
+        })
+    }
+
+    /// The hint that would fire on the next tick (`input`), if any: the test player saves the run before a hint
+    /// marked `retry`, to try it again from there.
+    pub fn would_fire(&self, sim: &Sim) -> Option<usize> {
+        if self.running.is_some() || sim.is_dying() {
+            return None;
+        }
+        // (a ball lost since the last tick: every hint may fire again)
+        let all = self.lives.is_some_and(|l| sim.lives < l);
+        self.due(sim, all)
+    }
+
+    /// The hint running now (its index), if any.
+    pub fn running_hint(&self) -> Option<usize> {
+        self.running.as_ref().map(|r| r.hint)
+    }
+
+    /// How often the hint at index `i` is tried again when it fails (0: never).
+    pub fn retry_of(&self, i: usize) -> u32 {
+        self.hints.get(i).map_or(0, |h| h.retry)
+    }
+
+    /// The line of the hint at index `i`, for the reports.
+    pub fn line_of(&self, i: usize) -> usize {
+        self.hints.get(i).map_or(0, |h| h.line)
+    }
+
+    /// The hint whose `check` was not met since the last call, if any.
+    pub fn take_failed(&mut self) -> Option<usize> {
+        self.failed.take()
+    }
+
+    /// A `retry` step reached since the last call, if any: the hint's index, the tries it allows and how far across
+    /// its points may be moved.
+    pub fn take_mark(&mut self) -> Option<(usize, u32, f32)> {
+        self.mark.take()
+    }
+
+    /// The hint at index `i` varied for its try number `attempt` (from 1) again, seeded (reproducible): a start delay
+    /// of a few ticks with no arrows (moving parts met at another phase), its pass and press points and its traces' recorded way moved a little
+    /// across, its speeds a little faster or slower, its pushes held a little longer or shorter, its traces' gain a
+    /// little off. The wider the more tries, all within the `VARY_*` caps; only its steps from index `from` on (where
+    /// it is tried again from) change, and the delay comes before step `from` (when that step runs, it is begun
+    /// again after the delay).
+    pub fn vary(&mut self, i: usize, from: usize, attempt: u32, seed: u32, width: f32) {
+        let width = width.clamp(0.0, MAX_VARY_POINT);
+        let Some(h) = self.hints.get_mut(i) else {
+            return;
+        };
+        let mut seed = seed | 1;
+        // (a share -1..1 of a cap)
+        let mut unit = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            (seed % 2001) as f32 / 1000.0 - 1.0
+        };
+        let s = attempt.min(4) as f32 / 4.0;
+        let scale = |v: f32, u: f32| (v * (1.0 + VARY_SPEED * s * u)).clamp(0.5, MAX_PRESS_SPEED);
+        for step in h.steps.iter_mut().skip(from) {
+            match step {
+                Step::Pass(p, v, _) | Step::Press(p, _, v, _) => {
+                    p.x += width * s * unit();
+                    p.z += width * s * unit();
+                    *v = scale(*v, unit());
+                }
+                Step::Ram(_, _, _, v, _, side) => {
+                    *v = scale(*v, unit());
+                    *side = (*side + width * s * unit()).clamp(-MAX_PRESS_OFFSET, MAX_PRESS_OFFSET);
+                }
+                Step::Along(v, _) => *v = scale(*v, unit()),
+                Step::Round(_, _, v, _) => *v = scale(v.abs(), unit()).copysign(*v),
+                Step::Push(_, n) | Step::Air(_, n) => {
+                    let d = (VARY_PUSH as f32 * s * unit()).round() as i64;
+                    *n = n.saturating_add_signed(d).max(1);
+                }
+                Step::Track(t) => {
+                    t.gain = (t.gain * (1.0 + VARY_GAIN * s * unit())).clamp(0.0, 4.0);
+                    // the recorded way moved across as a whole, as a pass point is (a closed-loop trace would
+                    // otherwise pull every try back onto the same line: a ram along it the same each time)
+                    let shift = Vec3::new(width * s * unit(), 0.0, width * s * unit());
+                    t.pos.iter_mut().for_each(|p| *p += shift);
+                }
+                Step::Trace(_, _, _, g) => {
+                    *g = (*g * (1.0 + VARY_GAIN * s * unit())).clamp(0.0, 4.0)
+                }
+                _ => {}
+            }
+        }
+        let delay = u64::from(start_delay(unit(), attempt));
+        if delay > 0 && from <= h.steps.len() && h.steps.len() < MAX_STEPS * 2 {
+            h.steps.insert(from, Step::Wait(delay));
+            if from < h.full.len() {
+                h.full.insert(from, false);
+            }
+        }
+    }
+
     /// One more hint, made while playing (the test player's own, from the run it follows).
     pub fn add(&mut self, hint: Hint) {
         if self.hints.len() < MAX_HINTS * 4 {
@@ -1188,13 +1373,7 @@ impl Runner {
             return None;
         }
         if self.running.is_none() {
-            let pos = sim.ball.position;
-            let i = self.hints.iter().enumerate().position(|(i, h)| {
-                !self.fired.get(i).copied().unwrap_or(true)
-                    && h.at.distance(pos) <= h.radius
-                    && h.sector.is_none_or(|s| s == sim.sector + 1)
-                    && h.kind.is_none_or(|k| k == sim.ball.kind)
-            })?;
+            let i = self.due(sim, false)?;
             if let Some(f) = self.fired.get_mut(i) {
                 *f = true;
             }
@@ -1242,6 +1421,61 @@ impl Runner {
                 .and_then(|h| h.full.get(run.step))
                 .is_some_and(|f| *f);
             let step = adjust(step, run.flowed, self.zone.cap);
+            // a retry mark: the run is saved here (by the test player, `take_mark`), and on at once
+            if let Step::Retry(n, width) = *step {
+                self.mark = Some((run.hint, n, width));
+                run.step += 1;
+                self.begin(sim);
+                continue;
+            }
+            // in time or not: on at once, or the hint has failed here
+            if let Step::Before(c) = *step {
+                let clock = sim.sector_clock();
+                let late = clock.is_some_and(|k| k > c);
+                if !self.quiet {
+                    eprintln!(
+                        "  before {c}: the sector's clock at {}{}",
+                        clock.map_or_else(|| "-".to_owned(), |k| k.to_string()),
+                        if late {
+                            ", late: the hint has failed"
+                        } else {
+                            ""
+                        }
+                    );
+                }
+                if late {
+                    let hint = run.hint;
+                    self.running = None;
+                    self.ended = true;
+                    self.failed = Some(hint);
+                    return None;
+                }
+                run.step += 1;
+                self.begin(sim);
+                continue;
+            }
+            // a check not met: the hint has failed here
+            if let Step::Check(p, d, n) = *step
+                && sim.ball.position.distance(p) > d
+                && sim.tick.saturating_sub(run.start) >= n
+            {
+                let hint = run.hint;
+                if !self.quiet {
+                    let b = sim.ball.position;
+                    eprintln!(
+                        "  check not met at tick {}: ball ({:.1} {:.1} {:.1}), {:.1} from its point",
+                        sim.tick,
+                        b.x,
+                        b.y,
+                        b.z,
+                        b.distance(p)
+                    );
+                }
+                self.running = None;
+                self.ended = true;
+                self.failed = Some(hint);
+                return None;
+            }
             if let Some(i) = drive(&step, run, sim) {
                 let i = in_view(&step, i, full, run, sim);
                 // HINTS_TRACE: the ball every ten ticks while a hint drives, to write hints by
@@ -1412,6 +1646,12 @@ fn nearest_body(sim: &Sim, at: Vec3, parts: bool) -> usize {
         .map_or(usize::MAX, |n| n.0)
 }
 
+/// A try's start delay in ticks: wider the more tries (`attempt` from 1), `u` a share -1..1.
+fn start_delay(u: f32, attempt: u32) -> u32 {
+    let most = attempt.saturating_mul(3).min(VARY_DELAY);
+    ((u + 1.0) / 2.0 * most as f32).round() as u32
+}
+
 /// The waits before a cross step's push, its lengths and the coasts after it that are tried (ticks), how long the
 /// push off goes on, and how long the ball is let settle before it is judged.
 const CROSS_WAITS: std::ops::RangeInclusive<u64> = 0..=150;
@@ -1477,8 +1717,12 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     let t = sim.tick.saturating_sub(run.start);
     // (the arrows of the original's view: `in_view` gives their push in the view as it is)
     let quarter = Facing::of(&sim.camera).straight();
-    // (a chain of pass steps is a line; any other step between them breaks it)
-    if !matches!(step, Step::Pass(..)) {
+    // (a chain of pass steps is a line; any other step between them breaks it, but a condition or a retry mark, which
+    // drives nothing)
+    if !matches!(
+        step,
+        Step::Pass(..) | Step::Check(..) | Step::Retry(..) | Step::Before(_)
+    ) {
         run.passed = None;
     }
     let ball = &sim.ball;
@@ -1525,6 +1769,9 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             (t < *n && !(run.flown && ball.on_ground)).then(|| arrows(*d, quarter))
         }
         Step::Wait(n) => (t < *n).then_some(0),
+        // (the ball not there yet: no arrows while the check waits for it)
+        Step::Check(p, d, n) => (ball.position.distance(*p) > *d && t < *n).then_some(0),
+        Step::Retry(..) | Step::Before(_) => None,
         Step::Turn(n) => {
             // a press every fourth tick, released between
             let presses = u64::from(n.unsigned_abs());
@@ -2405,5 +2652,127 @@ mod tests {
         assert!(parse("at 0 0 0 r 1 : full wait 5").is_err());
         assert!(parse("at 0 0 0 r 1 : full turn 1").is_err());
         assert!(parse("at 0 0 0 r 1 : full").is_err());
+    }
+
+    #[test]
+    fn a_retry_mark_and_a_check_step_parse_capped() {
+        let h = parse(
+            "at 0 0 0 r 1 sector 2 retry 8 : pass 1 0 5 6 ; check 3 0 4 1.5 120 ; check 3 0 4 2",
+        )
+        .unwrap();
+        assert_eq!(h[0].retry, 8);
+        assert_eq!(h[0].sector, Some(2));
+        assert_eq!(
+            h[0].steps[1],
+            Step::Check(Vec3::new(3.0, 0.0, 4.0), 1.5, 120)
+        );
+        assert_eq!(h[0].steps[2], Step::Check(Vec3::new(3.0, 0.0, 4.0), 2.0, 0));
+        assert_eq!(parse("at 0 0 0 r 1 : wait 1").unwrap()[0].retry, 0);
+        assert_eq!(
+            parse("at 0 0 0 r 1 : wait 1 ; retry 7 ; wait 2").unwrap()[0].steps[1],
+            Step::Retry(7, VARY_POINT)
+        );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : before 3500").unwrap()[0].steps[0],
+            Step::Before(3500)
+        );
+        for bad in [
+            "at 0 0 0 r 1 retry 0 : wait 1",
+            "at 0 0 0 r 1 retry 51 : wait 1",
+            "at 0 0 0 r 1 retry -1 : wait 1",
+            "at 0 0 0 r 1 retry : wait 1",
+            "at 0 0 0 r 1 retry 1e9 : wait 1",
+            "at 0 0 0 r 1 : check 1 2 3",
+            "at 0 0 0 r 1 : check 1 2 3 0",
+            "at 0 0 0 r 1 : check 1 2 3 51",
+            "at 0 0 0 r 1 : check 1 2 3 1 99999999",
+            "at 0 0 0 r 1 : check 1 2 3 1 5 6",
+            "at 0 0 0 r 1 : full check 1 2 3 1",
+            "at 0 0 0 r 1 : wait 1 ; retry 0",
+            "at 0 0 0 r 1 : wait 1 ; retry 51",
+            "at 0 0 0 r 1 : wait 1 ; full retry 3",
+            "at 0 0 0 r 1 : wait 1 ; retry 3 2.5",
+            "at 0 0 0 r 1 : wait 1 ; retry 3 -1",
+            "at 0 0 0 r 1 : wait 1 ; retry 3 1 1",
+            "at 0 0 0 r 1 : before",
+            "at 0 0 0 r 1 : before -5",
+            "at 0 0 0 r 1 : before 99999999",
+            "at 0 0 0 r 1 : full before 5",
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_hint_tried_again_is_varied_reproducibly_within_its_caps() {
+        let text = "at 0 0 0 r 1 retry 5 : full pass 10 0 0 8 ; press 0 0 10 0 0 6 90 ; push 1 0 20 ; \
+                    ram 5 0 5 1 0 10 9 100 ; hold 1 0 1 30 ; trace run.replay 0 10 2";
+        let base = parse(text).unwrap();
+        let varied = |attempt, seed| {
+            let mut r = Runner::new(base.clone());
+            r.vary(0, 0, attempt, seed, VARY_POINT);
+            r.hints.remove(0)
+        };
+        // the same try and seed: the same variation (a run is reproducible); another seed: another
+        assert_eq!(varied(2, 77), varied(2, 77));
+        assert_ne!(varied(2, 77), varied(2, 78));
+        for seed in 1..200 {
+            let h = varied(9, seed);
+            // a start delay of a few ticks with no arrows, or none; the steps otherwise as written, within the caps
+            let rest = match h.steps.first() {
+                Some(Step::Wait(d)) => {
+                    assert!(*d <= u64::from(VARY_DELAY));
+                    assert_eq!(h.full.len(), base[0].full.len() + 1);
+                    assert!(!h.full[0] && h.full[1]);
+                    &h.steps[1..]
+                }
+                _ => &h.steps[..],
+            };
+            assert_eq!(rest.len(), base[0].steps.len());
+            for (a, b) in rest.iter().zip(&base[0].steps) {
+                match (a, b) {
+                    (Step::Pass(p, v, n), Step::Pass(q, w, m))
+                    | (Step::Press(p, _, v, n), Step::Press(q, _, w, m)) => {
+                        assert!(
+                            (p.x - q.x).abs() <= VARY_POINT + 1e-4
+                                && (p.z - q.z).abs() <= VARY_POINT + 1e-4
+                        );
+                        assert_eq!(p.y, q.y);
+                        assert!((v / w - 1.0).abs() <= VARY_SPEED + 1e-4);
+                        assert_eq!(n, m);
+                    }
+                    (Step::Push(d, n), Step::Push(e, m)) => {
+                        assert_eq!(d, e);
+                        assert!(n.abs_diff(*m) <= u64::from(VARY_PUSH));
+                    }
+                    (Step::Ram(p, d, k, v, n, side), Step::Ram(q, e, l, w, m, _)) => {
+                        assert_eq!((p, d, k, n), (q, e, l, m));
+                        assert!((v / w - 1.0).abs() <= VARY_SPEED + 1e-4);
+                        assert!(side.abs() <= VARY_POINT + 1e-4);
+                    }
+                    (Step::Trace(_, _, _, g), Step::Trace(_, _, _, h)) => {
+                        assert!((g / h - 1.0).abs() <= VARY_GAIN + 1e-4);
+                    }
+                    _ => assert_eq!(a, b),
+                }
+            }
+        }
+        // the first try again varies least: its start delay is 3 ticks at most
+        for seed in 1..50 {
+            if let Some(Step::Wait(d)) = varied(1, seed).steps.first() {
+                assert!(*d <= 3);
+            }
+        }
+        // no such hint: nothing happens
+        let mut r = Runner::new(base.clone());
+        r.vary(7, 0, 1, 1, VARY_POINT);
+        assert_eq!(r.hints, base);
+        // varied from a step on: the steps before it as written, the delay before it
+        let mut r = Runner::new(base.clone());
+        r.vary(0, 2, 4, 5, VARY_POINT);
+        assert_eq!(r.hints[0].steps[..2], base[0].steps[..2]);
+        assert!(
+            matches!(r.hints[0].steps[2], Step::Wait(_)) || r.hints[0].steps[2] != base[0].steps[2]
+        );
     }
 }

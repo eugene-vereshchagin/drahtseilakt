@@ -1850,6 +1850,7 @@ impl Pilot {
                 ],
                 full: Vec::new(),
                 line: 0,
+                retry: 0,
             });
         } else {
             while self
@@ -1934,6 +1935,7 @@ impl Pilot {
             ],
             full: Vec::new(),
             line: 0,
+            retry: 0,
         };
         // tried on a copy: it must keep the ball and end further along the way
         let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
@@ -2020,6 +2022,7 @@ impl Pilot {
                 steps,
                 full: Vec::new(),
                 line: 0,
+                retry: 0,
             };
             // tried on a copy first: some bridges are lowered by a lever, not knocked over, and a charge at them
             // throws the ball off; it must keep the ball and get on
@@ -2090,6 +2093,7 @@ impl Pilot {
                 ],
                 full: Vec::new(),
                 line: 0,
+                retry: 0,
             };
             let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
             let mut s = sim.clone();
@@ -2135,6 +2139,7 @@ impl Pilot {
             ],
             full: Vec::new(),
             line: 0,
+            retry: 0,
         })
     }
 
@@ -2169,6 +2174,7 @@ impl Pilot {
             ],
             full: Vec::new(),
             line: 0,
+            retry: 0,
         })
     }
 
@@ -3539,6 +3545,27 @@ impl<T: Clone> Rewinds<T> {
         self.total
     }
 
+    /// Whether the run goes back at all (`--rewinds` is not 0).
+    pub fn enabled(&self) -> bool {
+        self.max_total > 0
+    }
+
+    /// One going back of a hint's own (`retry`), counted against the cap: whether it may be taken (`--rewinds 0`
+    /// never goes back).
+    pub fn take_one(&mut self) -> bool {
+        if self.total >= self.max_total {
+            return false;
+        }
+        self.total += 1;
+        true
+    }
+
+    /// The run went back to `tick` on its own (a hint tried again): the states saved after it were on the failed
+    /// course and are not gone back to.
+    pub fn drop_after(&mut self, tick: u64) {
+        self.saves.retain(|s| s.0 <= tick);
+    }
+
     /// The states saved so far are not gone back to (a stretch driven by hand since: it is kept).
     pub fn forget(&mut self) {
         self.saves.clear();
@@ -3877,6 +3904,61 @@ mod tests {
             assert_eq!(p.hints.at().map(|a| a.1), Some(1), "on the wait");
             assert_eq!(p.hints.off_course(), off, "a pass to height {y}");
         }
+    }
+
+    #[test]
+    fn a_hints_check_fails_it_when_not_met_and_a_retry_hint_is_seen_before_it_fires() {
+        for (check, failed) in [("check 6 2 0 3 60", false), ("check 30 2 0 1 30", true)] {
+            let (mut p, mut sim) = flat_pilot(
+                &format!("at 0 2 0 r 10 retry 3 : pass 6 2 0 5 40 ; {check} ; wait 200"),
+                "",
+            );
+            // before its first tick the hint is about to fire, and is marked to be tried again
+            assert_eq!(p.hints.would_fire(&sim), Some(0));
+            assert_eq!(p.hints.retry_of(0), 3);
+            let _ = drive(&mut p, &mut sim, 150, 0);
+            assert_eq!(p.hints.would_fire(&sim), None, "fired once a life");
+            assert_eq!(p.hints.take_mark(), None, "no mark in it");
+            if failed {
+                assert_eq!(p.hints.take_failed(), Some(0));
+                assert_eq!(p.hints.running_hint(), None, "a failed hint ends");
+            } else {
+                assert_eq!(p.hints.take_failed(), None);
+                assert_eq!(p.hints.at(), Some((0, 2)), "on the wait after the check");
+            }
+            assert_eq!(p.hints.take_failed(), None, "taken once");
+        }
+    }
+
+    #[test]
+    fn a_retry_step_marks_where_the_hint_is_tried_again_from() {
+        let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : wait 5 ; retry 4 ; wait 50", "");
+        let _ = drive(&mut p, &mut sim, 3, 0);
+        assert_eq!(p.hints.take_mark(), None, "not there yet");
+        let _ = drive(&mut p, &mut sim, 5, 0);
+        assert_eq!(p.hints.take_mark(), Some((0, 4, 0.3)));
+        // on at once: the step after it runs
+        assert_eq!(p.hints.at(), Some((0, 2)));
+        assert_eq!(p.hints.take_mark(), None, "taken once");
+    }
+
+    #[test]
+    fn a_hints_own_tries_count_against_the_cap_and_drop_the_saves_after() {
+        let mut r: Rewinds<u32> = Rewinds::new(2);
+        assert!(r.enabled());
+        for t in [400, 520, 640] {
+            r.save(t, t as u32);
+        }
+        r.drop_after(520);
+        assert_eq!(
+            r.saves.iter().map(|s| s.0).collect::<Vec<_>>(),
+            vec![400, 520]
+        );
+        assert!(r.take_one() && r.take_one());
+        assert!(!r.take_one(), "capped");
+        assert_eq!(r.total(), 2);
+        let mut never: Rewinds<u32> = Rewinds::new(0);
+        assert!(!never.enabled() && !never.take_one());
     }
 
     #[test]

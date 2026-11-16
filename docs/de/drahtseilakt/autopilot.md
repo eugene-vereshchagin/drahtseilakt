@@ -173,8 +173,21 @@ Datei, die `--hints FILE` nennt. Die bisher geschriebenen Hinweise liegen im Rep
 Replays, die sie benutzen; sie enthalten keine Spieldaten. Ein Hinweis je Zeile, `#` beginnt einen Kommentar:
 
 ```
-at X Y Z r R [sector N] [kind wood|stone|paper|sticky] : SCHRITT ; SCHRITT ; ...
+at X Y Z r R [sector N] [kind wood|stone|paper|sticky] [retry N] : SCHRITT ; SCHRITT ; ...
 ```
+
+`retry N` (1 bis 50) markiert einen Hinweis, dessen Ausgang an Unterschieden hängt, die zu klein sind, um Schritte
+dagegen zu schreiben (eine Kiste auf eine andere gerammt, ein bewegtes Teil in seiner Phase getroffen): ein Spieler
+versucht so eine Stelle noch einmal. Bevor der Hinweis auslöst, wird der Lauf gesichert; scheitert er (die Kugel
+verloren, stehend oder vom Kurs ab, während er läuft, oder ein `check` nicht erfüllt), geht der Lauf zu dieser
+Sicherung zurück und der Hinweis läuft erneut, variiert und geseedet (reproduzierbar): eine Startverzögerung bis 3
+Takte je Versuch (höchstens 15) ohne Pfeile, `pass`- und `press`-Punkte bis 0.3 quer verschoben, Geschwindigkeiten
+bis 6% schneller oder langsamer, Stöße bis 3 Takte länger oder kürzer, die Verstärkung eines `trace` bis 15% daneben und sein aufgezeichneter Weg quer verschoben wie die Punkte (ein geregelter `trace` zöge sonst jeden Versuch auf dieselbe Linie zurück)
+(die volle Breite ab dem vierten Versuch). Jeder Versuch zählt gegen `--rewinds` (0: keiner), der behaltene Lauf
+enthält nur den gelungenen Versuch, und nach N erneuten Versuchen wird das Scheitern hingenommen. Die
+Zusammenfassung nennt die Versuche jedes solchen Hinweises (`retries: line L: N tries`). Als Schritt geschrieben tut `retry N`
+dasselbe von diesem Schritt an (der Lauf gesichert, wenn der nächste Schritt beginnt; variiert werden die Schritte
+danach, die Verzögerung kommt vor den ersten davon). Hinweise ohne die Marke laufen wie bisher.
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,
 einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat: die Transformatoren
@@ -203,6 +216,9 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 | `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
 | `until X Y Z N [T]` | die Kugel auf dem Punkt halten, bis die Uhr des Sektors (die Takte, seit seine Module in die Physik kamen: an seinem Checkpoint, bei einem Start mit `--sector N` oder neu nach einer verlorenen Kugel) N erreicht (höchstens T Takte, 1800): ein Rätsel im selben Augenblick des Sektors begonnen, seine beweglichen Dinge, wo sie waren, ob der Lauf am Checkpoint begann oder aus dem Sektor davor kam |
+| `check X Y Z D [T]` | die Erfolgsbedingung des Hinweises: die Kugel jetzt oder, ohne Pfeile, binnen T Takten höchstens D vom Punkt; nicht erfüllt, ist der Hinweis gescheitert (einer mit `retry` wird erneut versucht, ein anderer endet einfach dort) |
+| `retry N [W]` | von hier an wird der Hinweis bis zu N-mal erneut versucht, wenn er scheitert, wie `retry N` vor dem `:` es von seinem Anfang an tut: der Lauf wird gesichert, wenn der nächste Schritt beginnt (eine Strecke davor, die immer gelingt, wird nicht wiederholt); mit W werden seine `pass`- und `press`-Punkte (und die Linie eines `ram`) bis W statt 0.3 quer verschoben (höchstens 2): ein Rammen, dessen Ausgang davon abhängt, wo es den Körper trifft |
+| `before N` | eine Erfolgsbedingung in der Zeit: die Uhr des Sektors (wie `until` sie zählt) nicht über N, wenn der Hinweis hierher kommt, sonst ist er gescheitert (ein Zug von Kugeln oder ein bewegtes Teil zu spät getroffen; das Protokoll gibt die Uhr aus) |
 | `full STEP` | der Schritt (einer, der schiebt: nicht `turn`, `cross`, `trace` oder `wait`) schiebt so stark, wie die Pfeile der Ansicht, wie sie ist, erlauben, statt im Mittel mit dem Schub des Originals: auf einer 45-Grad-Karte zwei Pfeile entlang einer Weltachse (1,41-mal), einer diagonal (siehe „Modifizierte Originale“); auf den Originallevels dasselbe wie ohne |
 | `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
@@ -403,6 +419,17 @@ klemmt im einen Lauf, im anderen nicht. Gleiche Zustände sind dort nicht zu err
 liegen nicht bei den Hinweisen); jede Variante ab dem Loslassen (trace ab Takt 2322 bis 2328, ein Halten bis zur Uhr
 des Sektors danach) klemmt Kiste 40 auch ab CP3. Das Kistenrätsel braucht Schritte, deren Ausgang von so kleinen
 Unterschieden nicht abhängt.
+
+Mit den erneuten Versuchen der Hinweise (2026-11-16, `retry`, `check`, `before` unter „Hinweisdateien“): der
+Hinweis an der Lücke z 585 wird von seinem Anfang an erneut versucht (vom Start: im 2. Versuch durch), Sektor 3 von
+vor dem Rammen der Kiste 38 (`retry 50 2`, eine Prüfung, dass Kiste 40 wegging, und `before 3530` an der Rinnenmündung,
+wo der CP3-Start bei 3468 ankommt), Sektor 4 vom Stoß vom Floß. Von CP3 und von CP4 aus geht jeder im ersten Versuch
+durch, wie zuvor. Vom Start durchgespielt klemmt Kiste 40 in fast jedem Versuch (das alte Zurückgehen erreichte nur
+Sicherungen nach dem Rammen, das Klemmen zeigte sich erst etwa 40 s später, und die Schritte nach einer Sicherung
+liefen wie geschrieben, der geregelte `trace` zog jeden Versuch auf dasselbe Rammen); in fünf Läufen mit 41 bis 51
+variierten Versuchen kamen fünf durch die Kisten, alle 3,5 bis 6 s zu spät an der Rinnenmündung, sodass der Zug der
+Steinkugeln vorn ist und die Reihe an CP3 zu kurz bleibt. Level 13 ist vom Start noch nicht fertig: der Lauf trifft
+die Kisten in einem anderen Zustand, den die Linie des Rammens nicht ausgleicht.
 
 ## Der Speedrun-Stil
 
