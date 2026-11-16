@@ -34,6 +34,10 @@
 //   until X Y Z N [T]       keep the ball on the point until the sector's clock (ticks since its modules entered
 //                           the physics) reaches N (T ticks at most, 1800): a puzzle begun at the same moment of the
 //                           sector from a checkpoint start and run on from the sector before
+//   guard X Y Z DX DZ R N T keep the ball by the point as a deflector: the loose body within R of it that is nearest
+//                           and has not gone on is met from the side opposite (DX, DZ), so it is turned that way
+//                           (the ball kept within `GUARD_LEASH` of the point); done when N bodies have gone on (past
+//                           the point along the direction, or dropped below it) or after T ticks
 //   full STEP               the step pushed as hard as the arrows of the view as it is allow: on a 45-degree map
 //                           its pushes are otherwise the original's on average (`in_view`), here two arrows along
 //                           an axis of the world (1.41 times) and one along a diagonal; not before turn, cross,
@@ -80,6 +84,14 @@ const RAM_DRIFT: f32 = 4.0;
 const BECOME_TICKS: u64 = 1200;
 /// The ticks an until step waits at most when the hint does not say.
 const UNTIL_TICKS: u64 = 1800;
+/// A guard: how many bodies it may wait for at most, how far from its point it lets the ball go to meet one, how far
+/// behind a body's middle it puts the ball (a little under two balls' radii, so it leans on it), and when a body has
+/// gone on: this far past the point along the direction, or this far below it.
+const MAX_GUARD_BODIES: u32 = 64;
+const GUARD_LEASH: f32 = 4.0;
+const GUARD_BEHIND: f32 = 3.6;
+const GUARD_PAST: f32 = 3.0;
+const GUARD_DROP: f32 = 2.5;
 /// How often a hint marked `retry N` may be tried again at most (each try is a rewind, counted against `--rewinds`).
 pub const MAX_RETRY: u32 = 50;
 /// The variation of a hint's try again (`Runner::vary`) at its widest (from the fourth try on): a start delay of up to
@@ -172,6 +184,12 @@ pub enum Step {
     /// distance of the second now, else the hint has failed (a crate rammed into its pocket, judged where it came to
     /// be rather than by where the ball is).
     Placed(Vec3, Vec3, f32),
+    /// Keep the ball by the point as a deflector for the loose bodies that come to it: the nearest within the radius
+    /// that has not gone on is met from the side opposite the direction (the ball a body's size behind it, kept
+    /// within `GUARD_LEASH` of the point), so it is turned the direction's way; done when so many bodies have gone
+    /// on (past the point along the direction, or dropped below it), or after so many ticks. A queue of balls each
+    /// turned into a side way, whatever its exact path.
+    Guard(Vec3, Vec3, f32, u32, u64),
 }
 
 /// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
@@ -695,6 +713,25 @@ fn step(words: &[&str]) -> Result<Step, String> {
             Step::Retry(n, width)
         }
         "before" => Step::Before(ticks(w.next())?),
+        "guard" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let dir = direction(w.next(), w.next())?;
+            let r = num(w.next())?;
+            if !(1.0..=MAX_LEAD).contains(&r) {
+                return Err(format!(
+                    "guard watches 1 to {MAX_LEAD} units round its point"
+                ));
+            }
+            let n: u32 = w
+                .next()
+                .ok_or("guard needs a count of bodies")?
+                .parse()
+                .map_err(|_| "not a count of bodies")?;
+            if !(1..=MAX_GUARD_BODIES).contains(&n) {
+                return Err(format!("guard waits for 1 to {MAX_GUARD_BODIES} bodies"));
+            }
+            Step::Guard(p, dir, r, n, ticks(w.next())?)
+        }
         "placed" => {
             let at = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
@@ -1097,6 +1134,8 @@ struct Running {
     /// What the arrows given in a view off whole quarters left of the original's push, carried to the next tick
     /// (`in_view`).
     carry: Vec3,
+    /// The loose bodies (by object) a guard step has seen go on.
+    gone: Vec<usize>,
 }
 
 /// A step ending with the ball this far below its point has lost it to a floor beneath (`Runner::off_course`).
@@ -1112,6 +1151,7 @@ fn step_point(step: &Step) -> Option<Vec3> {
         | Step::Hold(p, _)
         | Step::Sync(p, _)
         | Step::Until(p, _, _)
+        | Step::Guard(p, ..)
         | Step::Check(p, _, _) => Some(p),
         _ => None,
     }
@@ -1226,13 +1266,20 @@ impl Runner {
         }
     }
 
-    /// Whether a running hint is playing a recorded run: a replay step gets on by itself however long it is.
+    /// Whether a running hint is playing a recorded run: a replay step gets on by itself however long it is. So does
+    /// a guard, waiting for the bodies it turns (its own ticks capped).
     pub fn replaying(&self) -> bool {
         self.running.as_ref().is_some_and(|r| {
             let step = self.hints.get(r.hint).and_then(|h| h.steps.get(r.step));
             matches!(
                 step,
-                Some(Step::Replay(..) | Step::Inputs(..) | Step::Trace(..) | Step::Track(..))
+                Some(
+                    Step::Replay(..)
+                        | Step::Inputs(..)
+                        | Step::Trace(..)
+                        | Step::Track(..)
+                        | Step::Guard(..)
+                )
             )
         })
     }
@@ -1419,6 +1466,7 @@ impl Runner {
                 residual: Vec3::ZERO,
                 lost_since: None,
                 carry: Vec3::ZERO,
+                gone: Vec::new(),
             });
             self.begin(sim);
         }
@@ -1578,6 +1626,7 @@ impl Runner {
         run.residual = Vec3::ZERO;
         run.lost_since = None;
         run.carry = Vec3::ZERO;
+        run.gone.clear();
         let step = self.hints.get(run.hint).and_then(|h| h.steps.get(run.step));
         if let Some(Step::Inputs(q, _)) = step {
             run.quarter = *q;
@@ -2043,6 +2092,44 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             Some(arrows(around * f + u * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Hold(p, n) => (t < *n).then(|| towards(*p)),
+        Step::Guard(p, dir, r, count, n) => {
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let world = sim.world();
+            // the bodies about the point: those gone on (past it along the direction, or dropped) counted once
+            let mut meet: Option<(f32, Vec3, Vec3)> = None;
+            for &(object, body) in sim.loose() {
+                let Some(st) = world.state(body) else {
+                    continue;
+                };
+                let d = st.pos.distance(*p);
+                if d > *r || run.gone.contains(&object) {
+                    continue;
+                }
+                if flat(st.pos - *p).dot(*dir) > GUARD_PAST || st.pos.y < p.y - GUARD_DROP {
+                    if run.gone.len() < MAX_GUARD_BODIES as usize {
+                        run.gone.push(object);
+                    }
+                    continue;
+                }
+                if meet.is_none_or(|m| d < m.0) {
+                    meet = Some((d, st.pos, st.vel));
+                }
+            }
+            if t >= *n || run.gone.len() >= *count as usize {
+                return None;
+            }
+            // met from behind it (the side opposite the direction), as far out from the point as the leash lets
+            let (to, with) = match meet {
+                Some((_, pos, vel)) => {
+                    let to = flat(pos - *dir * GUARD_BEHIND - *p).clamp_length_max(GUARD_LEASH);
+                    (*p + to, flat(vel))
+                }
+                None => (*p, Vec3::ZERO),
+            };
+            let off = flat(to - ball.position);
+            let rel = flat(ball.velocity) - with;
+            Some(arrows(off.clamp_length_max(6.0) - 0.8 * rel, quarter))
+        }
         Step::Sync(p, n) => (t < *n && sim.sector_entering()).then(|| towards(*p)),
         Step::Until(p, clock, n) => {
             (t < *n && sim.sector_clock().is_none_or(|c| c < *clock)).then(|| towards(*p))
@@ -2744,6 +2831,30 @@ mod tests {
             "at 0 0 0 r 1 : before -5",
             "at 0 0 0 r 1 : before 99999999",
             "at 0 0 0 r 1 : full before 5",
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_guard_step_parses_capped() {
+        assert_eq!(
+            parse("at 0 0 0 r 1 : guard 1 2 3 0 2 8 10 3600").unwrap()[0].steps[0],
+            Step::Guard(Vec3::new(1.0, 2.0, 3.0), Vec3::Z, 8.0, 10, 3600)
+        );
+        assert!(parse("at 0 0 0 r 1 : full guard 1 2 3 1 0 8 10 3600").is_ok());
+        for bad in [
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 10",
+            "at 0 0 0 r 1 : guard 1 2 3 0 0 8 10 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 0.5 10 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 51 10 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 0 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 65 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 -1 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 1e9 60",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 10 99999999",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 8 10 60 7",
+            "at 0 0 0 r 1 : guard 1 2 3 1 0 nan 10 60",
         ] {
             assert!(parse(bad).is_err(), "{bad}");
         }
