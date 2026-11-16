@@ -912,6 +912,8 @@ pub struct Sim {
     prev_pose: (Vec3, Quat),
     /// Sector changes due: at a tick, a sector's objects or modules leave or enter the physics.
     sector_changes: Vec<SectorChange>,
+    /// The sector whose modules entered the physics last, and the tick: the sector's own clock (`sector_clock`).
+    sector_entered: Option<(usize, u64)>,
     /// The mods' rules on the run's events (modrt.rs): cloned, rewound and replayed with the run.
     pub mods: crate::modrt::SimMods,
     /// What the ball touched at the last tick (for the mods): whether, and whether something steep.
@@ -1466,6 +1468,7 @@ impl Sim {
             points_resume: 0,
             prev_pose: (ball.position, ball.rotation),
             sector_changes: Vec::new(),
+            sector_entered: None,
             mods: crate::modrt::SimMods::default(),
             touching: (false, false),
             frames: crate::hud::level_frames(level),
@@ -1583,6 +1586,14 @@ impl Sim {
             .any(|c| c.enter && c.sector == self.sector)
     }
 
+    /// The ticks since the current sector's modules entered the physics (at its checkpoint, a run begun there, or
+    /// again after a lost ball): the clock its own moving things keep, the same however the ball came there. `None`
+    /// before they have entered.
+    pub fn sector_clock(&self) -> Option<u64> {
+        let (s, t) = self.sector_entered?;
+        (s == self.sector && !self.sector_entering()).then(|| self.tick.saturating_sub(t))
+    }
+
     /// The number of sectors (at least 1).
     pub fn sector_count(&self) -> usize {
         self.rules
@@ -1666,6 +1677,101 @@ impl Sim {
 
     pub fn loose(&self) -> &[(usize, usize)] {
         &self.loose
+    }
+
+    /// The whole simulation state as text, one item a line, for comparing two runs at the same point
+    /// (`DRAHTSEILAKT_DUMP_STATE`, app.rs): the ball, the run's own counters, every module's and trigger's state,
+    /// then every loose body and module part (named by `name` of its object) with its physics core. Diagnostic
+    /// only: the order and form are stable within one build, not a file format.
+    pub fn dump_state(&self, name: &dyn Fn(usize) -> String) -> String {
+        let mut s = String::new();
+        let mut line = |k: &str, v: String| {
+            s.push_str(k);
+            s.push(' ');
+            s.push_str(&v);
+            s.push('\n');
+        };
+        line("tick", self.tick.to_string());
+        line("sector", self.sector.to_string());
+        line("sector_clock", format!("{:?}", self.sector_clock()));
+        line("lives", self.lives.to_string());
+        line("ball", format!("{:?}", self.ball));
+        line(
+            "ball_core",
+            self.world.dump_body(0).unwrap_or_else(|| "out".into()),
+        );
+        line(
+            "camera",
+            format!(
+                "quarter {} yaw {} base {} lift {}",
+                self.camera.quarter, self.camera.yaw, self.camera.base, self.camera.lift
+            ),
+        );
+        line(
+            "input",
+            format!(
+                "prev {} push_keys {} turn {}",
+                self.prev_input, self.push_keys, self.turn
+            ),
+        );
+        line("spawn_point", format!("{:?}", self.spawn_point));
+        line("hold", format!("{:?}", self.hold));
+        line("trafo_anim", format!("{:?}", self.trafo_anim));
+        line("dying", format!("{:?}", self.dying));
+        line("sector_changes", format!("{:?}", self.sector_changes));
+        line("sector_balls", format!("{:?}", self.sector_balls));
+        line(
+            "clocks",
+            format!(
+                "points_clock {} points_resume {} depth_from {} touching {:?}",
+                self.points_clock, self.points_resume, self.depth_from, self.touching
+            ),
+        );
+        line("world", self.world.dump_world());
+        for (k, ms) in self.module_sectors.iter().enumerate() {
+            for (j, m) in ms.iter().enumerate() {
+                line(&format!("module_sector {k} #{j}"), format!("{m:?}"));
+            }
+        }
+        for w in &self.wake_triggers {
+            line("wake", format!("{w:?}"));
+        }
+        for f in &self.finishes {
+            line("finish", format!("{f:?}"));
+        }
+        for u in &self.updrafts {
+            line("updraft", format!("{u:?}"));
+        }
+        for w in &self.swings {
+            line("swing", format!("{w:?}"));
+        }
+        for b in &self.breaks {
+            line("break", format!("{b:?}"));
+        }
+        for e in &self.extras {
+            line("extra", format!("{e:?}"));
+        }
+        line("flying", format!("{:?}", self.flying));
+        let mut bodies: Vec<(String, usize)> = self
+            .loose
+            .iter()
+            .map(|&(o, b)| (format!("loose {}", name(o)), b))
+            .chain(
+                self.module_bodies
+                    .iter()
+                    .map(|m| (format!("part {}", m.object), m.body)),
+            )
+            .collect();
+        bodies.sort();
+        for (n, b) in bodies {
+            let st = self
+                .world
+                .state(b)
+                .map_or_else(|| "out".to_string(), |st| format!("{st:?}"));
+            let core = self.world.dump_body(b).unwrap_or_default();
+            line(&n, format!("{st}\n      {core}"));
+        }
+        s
     }
 
     /// One tick, with the mods' rules around it (modrt.rs): the start's and the tick's before it, the events' after.
@@ -2595,6 +2701,9 @@ impl Sim {
             .collect();
         self.sector_changes.retain(|c| c.tick > tick);
         for c in due {
+            if c.modules && c.enter {
+                self.sector_entered = Some((c.sector, tick));
+            }
             if c.modules {
                 let insts = self
                     .module_sectors

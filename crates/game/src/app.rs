@@ -1548,8 +1548,40 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
         let edges = crate::autopilot::level_edges(&game.level.level, &game.modules);
         let mut near_edges = crate::edges::EdgeStats::default();
         let mut script_lines = 0usize;
+        // The whole simulation state at given points, for comparing two runs (sim.rs dump_state), with
+        // DRAHTSEILAKT_DUMP_STATE set: a comma-separated list of `S:T` (sector S, 1 the first, at T on its clock:
+        // the ticks since its modules entered, sim.rs sector_clock) or `@N` (the game's tick N).
+        let dump_at: Vec<(Option<usize>, u64)> = std::env::var("DRAHTSEILAKT_DUMP_STATE")
+            .map(|v| {
+                v.split(',')
+                    .filter_map(|p| match p.trim().strip_prefix('@') {
+                        Some(t) => Some((None, t.parse().ok()?)),
+                        None => {
+                            let (s, t) = p.trim().split_once(':')?;
+                            Some((Some(s.parse().ok()?), t.parse().ok()?))
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         while game.sim.tick < end && !game.sim.finished && !game.sim.game_over {
             game.tick(0);
+            if !dump_at.is_empty() {
+                let (sector, clock) = (game.sim.sector + 1, game.sim.sector_clock());
+                if dump_at.iter().any(|&(s, t)| match s {
+                    Some(s) => s == sector && Some(t) == clock,
+                    None => t == game.sim.tick,
+                }) {
+                    let objects = &game.level.level.objects;
+                    let name = |o: usize| objects.get(o).map_or("?".into(), |ob| ob.name.clone());
+                    println!(
+                        "=== state sector {sector} +{} tick {}\n{}=== end",
+                        clock.unwrap_or(0),
+                        game.sim.tick,
+                        game.sim.dump_state(&name)
+                    );
+                }
+            }
             // what the map's scripts did this tick
             if let Some(s) = &game.sim.scripts {
                 while let Some((t, line)) = s.log.get(script_lines) {

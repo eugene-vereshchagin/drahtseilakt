@@ -186,6 +186,7 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `ride X Y Z QX QY QZ D T [A]` | keep the ball over the loose body or module part nearest X Y Z until it is within D of QX QY QZ (T ticks at most); with A, A units ahead of its middle along the way it goes (behind, negative; 4 at most): on the front of a ball rolling down rails, not on its top |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 | `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
+| `until X Y Z N [T]` | keep the ball on the point until the sector's clock (the ticks since its modules entered the physics: at its checkpoint, at a `--sector N` start or again after a lost ball) reaches N (T ticks at most, 1800): a puzzle begun at the same moment of the sector, its moving things where they were, whether the run began at the checkpoint or came on from the sector before |
 | `full STEP` | the step (one that pushes: not `turn`, `cross`, `trace` or `wait`) pushed as hard as the arrows of the view as it is allow, instead of the original's push on average: on a 45-degree map two arrows along an axis of the world (1.41 times), one along a diagonal (see "Modified originals"); on the original levels the same as without |
 | `trace FILE FROM TO [GAIN]` | the same stretch of a recorded run followed closed-loop: the replay is run once as the hints load, for the ball's place and speed at each tick; then each tick the player's arrows are the feed-forward plus a pull (times GAIN, 1 by default, 0 for none) toward the recorded place and speed at the matching point (matched by progress along the run, kept near one tick a tick so the run's waits stay waits), turned into the arrow set nearest it in the view now (the part missed carried to the next tick). Over 4 units off the run, it steers to the run's way 30 ticks ahead until it is on it again, and after 10 s lost gives the ball back to the autopilot. Unlike `replay`, it holds when the ball arrives a little different (a chain of sectors: `sync` first, then `trace`) |
 
@@ -193,7 +194,7 @@ Directions are world directions (X east, Z north as the level is built), so a hi
 view is turned; the arrows are chosen for the view at each tick. A hint file is untrusted: its size (64 KiB),
 the number of hints (256) and steps (64 a hint) and every number are capped, a replay is a plain file name beside
 it, and a malformed line refuses the whole file with its line number. `HINTS_TRACE=1` prints the ball every ten
-ticks while a hint drives.
+ticks while a hint drives. To compare two runs, `DRAHTSEILAKT_DUMP_STATE=S:T,...` (or `@N`, a game tick) with `--replay --headless` prints the whole simulation state at T on sector S's clock (the ticks since its modules entered the physics, the clock `until` waits for): the ball, every module's and trigger's state, every loose body and module part with its physics core, the physics' random generator.
 
 ## Watching it play
 
@@ -359,6 +360,19 @@ lost at x 50 to 60. Riding the raft until it is where his was, then following on
 misses the fan from it; rolled into the fan by `pass` steps, the ball drops into the gap under it. Level 13 is not
 finished from the start yet (sector 3's crate 40 and sector 4's second fan in a run on).
 Later on 2026-11-16 sector 4 was synced on the raft as the owner waits for it: after each fan's landing the ball stops and `await`s the raft's lead ball where it was as he left, then his run is traced on (his kick into the third fan split `full` north and east): from CP3, CP4 at 2:04.22 (his 2:04.18). Run on from sector 3 the await ends within 4 ticks of that state, but the ball still lands low after the second fan. For crate 40 the new `ram` step (a body rammed through its middle from a run-up, closed on where it is), a sync on the stone transformer's hold and a stop before the press all failed from CP3 already (the crate jams, or the paper ball is a second late for the stones); `ride` kept ahead of stone 18's middle passes sector 2 from CP1 4 s sooner but from the start never clears the gap. From an empty data folder the run is as before: dead in sector 3 at crate 40.
+
+Compared state for state (2026-11-16, `DRAHTSEILAKT_DUMP_STATE`, see "Hint files"), the run on from the start and the start at CP3
+differ in sector 3 in: the ball (it comes over the checkpoint rolling, a start puts it there still), the sector's loose
+bodies and the modules' proximity tests by one tick (at a checkpoint the loose bodies enter a tick before the modules,
+a `--sector` start puts both in at once), the four sacks' swing (its step count runs from the level's start: 38 against
+139, the other parity), the physics' shared random generator and sleep test countdown (when resting bodies freeze, so
+crate 42 settles 0.15 units and 1.7 degrees otherwise), and the ball's orientation. The stone transformer makes the
+ball state equal (the same place, at rest), and a trace begun in it starts as the ball is let go: from there the two
+runs agree to 0.0002 for 130 ticks, but ramming crate 38 (box on box) makes that 1 to 2 units within 50 ticks, so crate
+40 jams in one run and not the other. Equal states cannot be made there (the orientation and the random generator are
+not the hints'); every variant tried from the release (trace from it at ticks 2322 to 2328, a hold to the sector's
+clock after it) jams crate 40 from CP3 as well. The crate puzzle needs steps whose outcome does not depend on such
+small differences.
 
 ## The speedrun style
 

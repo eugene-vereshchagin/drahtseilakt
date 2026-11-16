@@ -202,6 +202,7 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `ride X Y Z QX QY QZ D T [A]` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte); mit A um A Einheiten vor seiner Mitte in seiner Fahrtrichtung (dahinter, negativ; höchstens 4): vorn auf einer Kugel, die Schienen hinabrollt, nicht oben auf ihr |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 | `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
+| `until X Y Z N [T]` | die Kugel auf dem Punkt halten, bis die Uhr des Sektors (die Takte, seit seine Module in die Physik kamen: an seinem Checkpoint, bei einem Start mit `--sector N` oder neu nach einer verlorenen Kugel) N erreicht (höchstens T Takte, 1800): ein Rätsel im selben Augenblick des Sektors begonnen, seine beweglichen Dinge, wo sie waren, ob der Lauf am Checkpoint begann oder aus dem Sektor davor kam |
 | `full STEP` | der Schritt (einer, der schiebt: nicht `turn`, `cross`, `trace` oder `wait`) schiebt so stark, wie die Pfeile der Ansicht, wie sie ist, erlauben, statt im Mittel mit dem Schub des Originals: auf einer 45-Grad-Karte zwei Pfeile entlang einer Weltachse (1,41-mal), einer diagonal (siehe „Modifizierte Originale“); auf den Originallevels dasselbe wie ohne |
 | `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
@@ -209,7 +210,7 @@ Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebau
 von der Drehung der Ansicht ab; die Pfeile werden in jedem Takt zur Ansicht gewählt. Eine Hinweisdatei ist nicht
 vertrauenswürdig: ihre Größe (64 KiB), die Zahl der Hinweise (256) und Schritte (64 je Hinweis) und jede Zahl sind
 begrenzt, ein Replay ist ein einfacher Dateiname daneben, und eine fehlerhafte Zeile weist die ganze Datei mit ihrer
-Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein Hinweis lenkt.
+Zeilennummer ab. `HINTS_TRACE=1` gibt die Kugel alle zehn Takte aus, solange ein Hinweis lenkt. Zum Vergleich zweier Läufe gibt `DRAHTSEILAKT_DUMP_STATE=S:T,...` (oder `@N`, ein Takt des Spiels) mit `--replay --headless` den ganzen Zustand der Simulation bei T auf der Uhr von Sektor S aus (die Takte, seit seine Module in die Physik kamen, die Uhr, auf die `until` wartet): die Kugel, den Zustand jedes Moduls und Auslösers, jeden losen Körper und Modulteil mit seinem Physikkern, den Zufallsgenerator der Physik.
 
 ## Ihm beim Spielen zusehen
 
@@ -388,6 +389,20 @@ Floß fahren, bis es steht, wo seins stand, dann folgen, gibt beiden Starts dens
 den Ventilator; mit `pass`-Schritten hineingerollt fällt die Kugel in die Lücke darunter. Vom Start ist Level 13 noch
 nicht geschafft (Kiste 40 in Sektor 3 und der zweite Ventilator in Sektor 4 in einem Zug).
 Später am 2026-11-16 wurde Sektor 4 auf das Floß synchronisiert, wie der Besitzer darauf wartet: nach jeder Landung hinter einem Ventilator hält die Kugel und wartet (`await`) auf die vordere Kugel des Floßes dort, wo sie war, als er losfuhr, dann wird sein Lauf weiter verfolgt (sein Stoß in den dritten Ventilator aufgeteilt in `full` nach Norden und Osten): ab CP3 CP4 in 2:04.22 (seiner 2:04.18). In einem Zug ab Sektor 3 endet das Warten innerhalb von 4 Ticks desselben Zustands, aber nach dem zweiten Ventilator landet die Kugel trotzdem zu tief. Für Kiste 40 scheiterten der neue Schritt `ram` (ein Körper mit Anlauf durch seine Mitte gerammt, nach seiner jetzigen Lage), ein Abgleich am Halt im Steinumwandler und ein Halt vor dem Stoß schon ab CP3 (die Kiste klemmt, oder die Papierkugel kommt eine Sekunde zu spät zu den Steinen); `ride` vor der Mitte von Stein 18 schafft Sektor 2 ab CP1 4 s schneller, vom Start aber nie die Lücke. Aus einem leeren Datenordner ist der Lauf wie zuvor: tot in Sektor 3 an Kiste 40.
+
+Zustand für Zustand verglichen (2026-11-16, `DRAHTSEILAKT_DUMP_STATE`, siehe oben) unterscheiden sich der Lauf vom Start und
+der Start an CP3 in Sektor 3 in: der Kugel (sie kommt rollend über den Checkpoint, ein Start setzt sie still hin), den
+losen Körpern des Sektors und den Nähetests der Module um einen Takt (an einem Checkpoint kommen die losen Körper einen
+Takt vor den Modulen, ein Start mit `--sector` setzt beide zugleich ein), dem Schwingen der vier Säcke (seine
+Schrittzahl läuft vom Levelstart: 38 gegen 139, die andere Parität), dem gemeinsamen Zufallsgenerator der Physik und
+dem Zähler des Schlaftests (wann ruhende Körper einfrieren, daher liegt Kiste 42 um 0,15 Einheiten und 1,7 Grad
+anders) und der Drehlage der Kugel. Der Steintransformator macht die Kugel gleich (derselbe Ort, in Ruhe), und ein
+darin begonnener trace beginnt, wenn die Kugel losgelassen wird: von dort stimmen beide Läufe 130 Takte lang auf 0,0002
+überein, doch das Rammen von Kiste 38 (Kiste auf Kiste) macht daraus binnen 50 Takten 1 bis 2 Einheiten, und Kiste 40
+klemmt im einen Lauf, im anderen nicht. Gleiche Zustände sind dort nicht zu erreichen (Drehlage und Zufallsgenerator
+liegen nicht bei den Hinweisen); jede Variante ab dem Loslassen (trace ab Takt 2322 bis 2328, ein Halten bis zur Uhr
+des Sektors danach) klemmt Kiste 40 auch ab CP3. Das Kistenrätsel braucht Schritte, deren Ausgang von so kleinen
+Unterschieden nicht abhängt.
 
 ## Der Speedrun-Stil
 

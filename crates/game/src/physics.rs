@@ -1042,6 +1042,48 @@ impl World {
         self.physics.contacts_of(i as u32 + 1)
     }
 
+    /// The physics' world-wide state as text (the time, the shared random generator, the sleep test's countdown,
+    /// how many units are simulated or frozen), for the state dump (`DRAHTSEILAKT_DUMP_STATE`, app.rs).
+    pub fn dump_world(&self) -> String {
+        let p = &self.physics;
+        format!(
+            "time {:.6} time_code {} rng {:?} sleep_countdown {} active {} frozen {} revive {} joints {} gravity {} {:?}",
+            p.time(),
+            p.time_code,
+            p.rng,
+            p.env.sleep_countdown,
+            p.active.len(),
+            p.frozen.len(),
+            p.revive.len(),
+            p.joints.len(),
+            self.gravity,
+            self.gravity_xz
+        )
+    }
+
+    /// Body `i`'s whole physics core, its unit and its controllers as text, and its contact points, for the state
+    /// dump; `None` while it is out of the physics.
+    pub fn dump_body(&self, i: usize) -> Option<String> {
+        let id = (*self.handles.get(i)?)?;
+        let c = self.physics.cores.get(id)?;
+        let mut s = format!("core {c:?}");
+        if let Some(u) = self.physics.units.get(c.unit) {
+            s.push_str(&format!("\n      unit {u:?}"));
+        }
+        for &k in &c.controllers {
+            if let Some(ctl) = self.physics.controllers.get(k) {
+                s.push_str(&format!("\n      controller {ctl:?}"));
+            }
+        }
+        for cp in self.body_contacts(i) {
+            s.push_str(&format!(
+                "\n      contact types {:?} gap {:.5} pressure {:.5} normal {:?} point {:?}",
+                cp.types, cp.gap, cp.pressure, cp.normal, cp.point
+            ));
+        }
+        Some(s)
+    }
+
     pub fn state(&self, i: usize) -> Option<State> {
         let id = (*self.handles.get(i)?)?;
         let s: BodyState = self.physics.body_state(id);
