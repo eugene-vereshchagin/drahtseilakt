@@ -11,7 +11,7 @@ const MAX_VERTICES: usize = 1 << 20;
 const MAX_FACES: usize = 1 << 21;
 /// Material channels a mesh may have.
 pub const MAX_CHANNELS: usize = 16;
-const MAX_TEXTURE_SIDE: u32 = 8_192;
+pub(crate) const MAX_TEXTURE_SIDE: u32 = 8_192;
 
 fn malformed(what: &'static str) -> Error {
     Error::Malformed {
@@ -293,7 +293,7 @@ pub struct TextureSlot {
 /// The most slots of a texture that are read (the rest are ignored).
 pub const MAX_SLOTS: usize = 64;
 /// The most bytes of saved pixels read from one texture, all its slots together.
-const MAX_SLOT_BYTES: usize = 64 << 20;
+pub(crate) const MAX_SLOT_BYTES: usize = 64 << 20;
 
 pub fn texture(chunk: &Chunk) -> Result<Texture> {
     let mut tex = Texture {

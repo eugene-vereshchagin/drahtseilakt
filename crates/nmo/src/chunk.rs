@@ -55,6 +55,12 @@ impl Chunk {
 
     /// The fields saved under an identifier, if present.
     pub fn section(&self, identifier: u32) -> Option<Words<'_>> {
+        let range = self.section_range(identifier)?;
+        self.words.get(range).map(|w| Words { words: w, pos: 0 })
+    }
+
+    /// Where the fields saved under an identifier lie in `words` (the patcher rewrites them in place).
+    pub fn section_range(&self, identifier: u32) -> Option<std::ops::Range<usize>> {
         let mut i = 0usize;
         // Each step moves strictly forward, so a malicious list cannot loop.
         while let (Some(&id), Some(&next)) = (self.words.get(i), self.words.get(i.wrapping_add(1)))
@@ -62,10 +68,8 @@ impl Chunk {
             let next = next as usize;
             let end = if next == 0 { self.words.len() } else { next };
             if id == identifier {
-                return self
-                    .words
-                    .get(i.saturating_add(2)..end)
-                    .map(|w| Words { words: w, pos: 0 });
+                let start = i.saturating_add(2);
+                return (start <= end && end <= self.words.len()).then_some(start..end);
             }
             if next == 0 || next <= i {
                 return None;
