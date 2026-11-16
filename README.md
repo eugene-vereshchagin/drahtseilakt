@@ -76,6 +76,11 @@ that says what is right. The commits carry both names.
 
 Files ported from OpenBallance (GPL-3.0, emdzej and contributors) say so in their headers; the `ivp` crate is the physics port.
 
+Everything in a download that was not written for Drahtseilakt, with its licence (the upstream, fonts, texture
+sources, sounds and music, the shipped community levels and their authors, every crate compiled into the program),
+is listed in [THIRD-PARTY.md](THIRD-PARTY.md), which ships beside `LICENSE`. `tools/third_party.py` regenerates its
+crate list from `Cargo.lock` offline, and a test fails on a dependency without a GPL-3.0-compatible licence.
+
 Drahtseilakt is licensed under the GPL-3.0, like OpenBallance it began from. It needs your own copy of the
 game and never ships Ballance's data. (While this repository is private, `levels/` keeps a backup of the
 original levels for development; the public repository will not contain it.) Ballance is © 2004 Cyparade /

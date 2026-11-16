@@ -1,5 +1,5 @@
 # Drahtseilakt: builds and tests the Rust game (crates/, binary `drahtseilakt`) on Windows, Linux and macOS and
-# uploads each as a download laid out as installed: the program, assets/ (fonts, own, sounds), LICENSE, READMEs.
+# uploads each as a download laid out as installed: the program, assets/ (fonts, own, sounds), LICENSE, READMEs, CREDITS.md and THIRD-PARTY.md.
 # With `toolbox` checked it also builds the separate drahtseilakt-toolbox (a private repository: it needs the secret
 # TOOLBOX_TOKEN, a fine-grained token with read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox).
 #
@@ -77,7 +77,7 @@ jobs:
           cp -r assets "$d/"
           rm -f "$d/assets/sounds/system/prepare.py"
           rm -rf "$d/assets/own/make"
-          cp LICENSE README*.md "$d/"
+          cp LICENSE README*.md CREDITS.md THIRD-PARTY.md "$d/"
           if [ "$RUNNER_OS" != Windows ]; then
             # a tarball keeps the program executable (an artifact's zip does not)
             tar -czf "dist/drahtseilakt-${{ matrix.name }}.tar.gz" -C dist drahtseilakt
