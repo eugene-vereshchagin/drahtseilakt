@@ -397,7 +397,7 @@ jams in nearly every try (the saves the old going back reached were after the ra
 later, and the steps after a save replayed as written, the closed-loop trace pulling each try onto the same ram);
 in five runs of 41 to 51 varied tries five got through the crates, all 3.5 to 6 s late at the channel's mouth, so
 the stone convoy is ahead and the queue at CP3 stays short. Level 13 is still not finished from the start: the run on
-meets the crates in another state, which the ram's line does not make up for.
+meets the crates in another state, which the ram's line does not make up for. Later on 2026-11-16 the bay was compared at the moment its work begins (the run on handed over to the hints with `--replay --from`): crate 38, rammed by his trace, comes to lie 1.5 units further south and the press at crate 40, begun beside it, rubs it and meets crate 40 too slowly; crate 42 starts 3.3 degrees turned and turns on as it leaves its block. Rammed closed-loop and judged where they came to be (the `placed` step, a retry mark before each ram), both crates get into their pockets from either start (crate 42 in 26 of 31 tries from the start), but the rams take longer than the original's presses and the ball comes onto the stones' channel together with stone 21 (some 45 ticks late): the run behind the convoy is the one left open.
 
 ## The speedrun style
 

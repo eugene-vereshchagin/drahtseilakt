@@ -430,7 +430,7 @@ Sicherungen nach dem Rammen, das Klemmen zeigte sich erst etwa 40 s später, und
 liefen wie geschrieben, der geregelte `trace` zog jeden Versuch auf dasselbe Rammen); in fünf Läufen mit 41 bis 51
 variierten Versuchen kamen fünf durch die Kisten, alle 3,5 bis 6 s zu spät an der Rinnenmündung, sodass der Zug der
 Steinkugeln vorn ist und die Reihe an CP3 zu kurz bleibt. Level 13 ist vom Start noch nicht fertig: der Lauf trifft
-die Kisten in einem anderen Zustand, den die Linie des Rammens nicht ausgleicht.
+die Kisten in einem anderen Zustand, den die Linie des Rammens nicht ausgleicht. Später am 16.11.2026 wurde die Bucht im Moment verglichen, in dem die Arbeit an den Kisten beginnt (der Lauf vom Start mit `--replay --from` an die Hinweise übergeben): Kiste 38 liegt nach dem Rammen nach seiner Spur 1,5 Einheiten weiter südlich, und das Drücken gegen Kiste 40, neben ihr begonnen, streift sie und trifft Kiste 40 zu langsam; Kiste 42 steht 3,3 Grad gedreht und dreht sich weiter, wenn sie von ihrem Block gleitet. Geschlossen gerammt und danach beurteilt, wo sie hingekommen sind (der Schritt `placed`, eine Wiederholungsmarke vor jedem Rammen), kommen beide Kisten von beiden Starts in ihre Nischen (Kiste 42 in 26 von 31 Versuchen vom Start), aber das Rammen dauert länger als das Drücken des Originals, und die Kugel kommt zusammen mit Stein 21 in die Rinne der Steine (etwa 45 Ticks zu spät): offen bleibt die Fahrt hinter dem Zug.
 
 ## Der Speedrun-Stil
 
