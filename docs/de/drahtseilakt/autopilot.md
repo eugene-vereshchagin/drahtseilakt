@@ -359,11 +359,13 @@ Papierkugel vor dem Stein im Fach des zweiten Ventilators ist) schaffte damals d
 wenn er mit dem Plan des Levels läuft: `--autopilot --plan hints/Level_13.plan --hints hints/Level_13-45.txt`. Ohne
 `--plan` ist der gefundene Weg ein anderer (2255 Punkte statt 2530), und die Kugel bleibt am Ende von Sektor 1 stehen;
 alles, was der Lauf liest, liegt in `hints/` (weder Weg noch Wiederholungen noch die gelernte Tabelle kommen aus dem
-Datenordner), und mit leerem Datenordner läuft er Tick für Tick gleich wie mit einem voller früherer Läufe. Am 2026-11-16 mit leerem Datenordner erneut geprüft,
-kommt er vom Start nicht durch Sektor 2 (auch mit Programm und Hinweisen jenes Merges): an dessen Ende rollt die
-Papierkugel hinter Stein 18 die Schienen hinab statt auf ihm (die Kugel des Besitzers liegt vorn auf ihm) und fällt in
-die Lücke bei z 585, die der Besitzer mit 9 bis 12 überspringt; ein schnellerer `full`-Schub, vor dem Stein oder nach
-seinem Fall, sprang nicht hinüber. Die Sektoren 3, 4 und 5 gelingen, von ihren Kontrollpunkten begonnen, mit
+Datenordner), und mit leerem Datenordner läuft er Tick für Tick gleich wie mit einem voller früherer Läufe. Am 2026-11-16 mit leerem Datenordner erneut geprüft:
+der Lauf ist deterministisch (dasselbe Rezept zweimal, auch mit dem Programm jenes Merges, gibt eine byte-gleiche
+Wiederholung); durch Sektor 2 kommt er nur durch Zurückgehen: die Papierkugel rollt hinter Stein 18 die Schienen hinab
+statt auf ihm (die Kugel des Besitzers liegt vorn auf ihm) und fällt in die Lücke bei z 585, die der Besitzer mit 9
+bis 12 überspringt, und der 13. Versuch (zurück auf 3:23, die geseedete Variation) schafft sie, CP2 um 3:44.88 mit 3
+Leben. Mit `--rewinds 0` geht die Kugel dort verloren; ein schnellerer `full`-Schub, vor dem Stein oder nach seinem
+Fall, sprang nicht hinüber. Die Sektoren 3, 4 und 5 gelingen, von ihren Kontrollpunkten begonnen, mit
 `full`-Schritten (oben), wo der Schub des Besitzers diagonal war: in Sektor 3 die Kisten `full` entlang der Achsen
 gerammt (Kiste 40 nach Osten direkt aus seinem Lauf, ohne Anlauf), der Papiertransformator und der Weg herum zur
 Mündung des Kanals `full`, sodass die Kugel vor dem ersten Stein im Kanal ist (0:58.2, bei ihm 0:58.0); sein Lauf von
@@ -372,10 +374,18 @@ bei ihm und dort kein Stein fällt; am Ende des Kanals sein Lauf, dann hält die
 kommt: alle zehn Steine in der Schlange, CP3 um 2:44.93 (bei ihm 2:44.92). In Sektor 4 ist sein Kick nach Nordosten
 vom Floß in den ersten Ventilator (x -134) in seinen zwei Teilen gegeben, `full` nach Norden, dann `full` nach Osten
 (je 22 Ticks, danach sein Lauf): CP4 um 2:04.48 (bei ihm 2:04.18). In Sektor 5 sind der Schub auf die Spirale und
-`round` hinauf `full`: das Level vom Kontrollpunkt in 1:54.17 ohne verlorene Kugel geschafft. Von Sektor 3 an in einem Zug hält Sektor 4 noch
-nicht: der Kick bringt die Kugel durch den ersten Ventilator, danach landet sie aber tiefer als seine und geht bei x 50
-verloren (die Phasen der Module sind andere als bei einem Start an CP4). Vom Start ist Level 13 noch nicht geschafft
-(die Lücke in Sektor 2).
+`round` hinauf `full`: das Level vom Kontrollpunkt in 1:54.17 ohne verlorene Kugel geschafft. Vom Start (2026-11-16) stirbt der Lauf in
+Sektor 3 an Kiste 40: die Kugel kommt 0.2 bis 1 Einheit neben dem Weg des Starts am Kontrollpunkt zum Rammstoß (Kiste
+38, von seinem Lauf mit Verstärkung 3 gerammt, wird etwas anders gestoßen), trifft die Kiste südlich ihrer Mitte, die
+Kiste dreht sich und klemmt, die Kugel steht bei (-726.6, -219.4, -293.9); 30 Versuche zurück lösen sie nicht. Andere
+Rammlinien, ein `pass`-Punkt davor, Stillstehen am Eingang des Sektors vor seinem Lauf und ein `shove` nach dem
+Rammstoß brachen den Start an CP3 oder halfen nicht. Von Sektor 3 an in einem Zug geht Sektor 4 nach dem ersten
+Ventilator verloren: das Floß (vier lose Kugeln) ist am selben Ort wie bei einem Start an CP4 (auf 0.1), aber die
+Stelle des Trace in seinem Lauf hinkt 20 bis 30 Ticks nach, so kommt die Kugel 3 Einheiten nördlich an den zweiten
+Ventilator (x -76, z -1143), wird zu wenig gehoben und fällt auf den unteren Boden, verloren bei x 50 bis 60. Auf dem
+Floß fahren, bis es steht, wo seins stand, dann folgen, gibt beiden Starts denselben Zustand, verfehlt aber von dort
+den Ventilator; mit `pass`-Schritten hineingerollt fällt die Kugel in die Lücke darunter. Vom Start ist Level 13 noch
+nicht geschafft (Kiste 40 in Sektor 3 und der zweite Ventilator in Sektor 4 in einem Zug).
 
 ## Der Speedrun-Stil
 
