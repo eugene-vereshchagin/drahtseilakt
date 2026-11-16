@@ -283,8 +283,8 @@ alles Folgende gilt. Stand 2026-11-16: **erledigt**, **teilweise**, **offen**.
 - **Debug standardmäßig aus**: das Spiel eines Spielers startet ohne den Debug-Lauf; Sitzungsprotokolle werden nur in
   einem Debug-Lauf geschrieben; Gottmodus und die Debug-Schalter gibt es nur in Debug-Builds. **Teilweise**: Protokolle
   folgen dem Debug-Schalter, und der Gottmodus ist ein Entwicklungs-Mod, den ein Release-Paket nicht ausliefert
-  (`mods-dev/`); der Debug-Lauf ist bis zu dieser Aufräumarbeit noch standardmäßig an (`DEBUG_BY_DEFAULT` in main.rs),
-  und `--debug` funktioniert weiter in einem Release-Binary.
+  (`mods-dev/`); ein Release-Paket wird mit `DRAHTSEILAKT_RELEASE` gebaut (`scripts/make-portable.sh` ohne `--dev`) und startet ohne
+  Debug-Lauf; DEV-Builds gibt es nur für Linux, mit Debug-Lauf und Gottmodus. `--debug` funktioniert weiter in einem Release-Binary.
 - **Fuzzing des Mod-Formats** (`mod.txt`), wie bei jedem anderen Parser. **Offen** (vom Eigentümer zurückgestellt).
 - **Problemmeldungen**: *Problem melden* in den Optionen und in der Anleitung öffnet das Meldeformular im Browser.
   **Erledigt** 2026-11-16 (menu.md, „Die Anleitung“).

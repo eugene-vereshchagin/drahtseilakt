@@ -254,10 +254,12 @@ pub struct Options {
     pub no_save: bool,
 }
 
-/// Until the release, a played game is a debug run unless `--no-debug` says otherwise (the owner's decision,
-/// 2026-11-08: easier to start). Runs without a player (replays, headless, autopilot, video, screenshots) stay
-/// plain unless `--debug` is given, so recorded runs and tests are unchanged. The release cleanup sets this false.
-const DEBUG_BY_DEFAULT: bool = true;
+/// A played game built from the source tree is a debug run unless `--no-debug` says otherwise (the owner's decision,
+/// 2026-11-08: easier to start). A release package is built with `DRAHTSEILAKT_RELEASE` set
+/// (`scripts/make-portable.sh` without `--dev`, owner 2026-11-16: release builds for every system start without
+/// debug), and then a played game is plain unless `--debug` is given. Runs without a player (replays, headless,
+/// autopilot, video, screenshots) stay plain unless `--debug` is given, so recorded runs and tests are unchanged.
+const DEBUG_BY_DEFAULT: bool = option_env!("DRAHTSEILAKT_RELEASE").is_none();
 
 /// The options with nothing asked for.
 pub(crate) fn default_options() -> Options {

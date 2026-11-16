@@ -265,8 +265,9 @@ following hold. State as of 2026-11-16: **done**, **partly**, **open**.
   LICENSE and CREDITS.md exist; the summary is open.
 - **Debug off by default**: a player's game starts without the debug run; session logs are written only in a debug
   run; god mode and the debug switches exist only in debug builds. **Partly**: logs follow the debug switch and god
-  mode is a development mod a release package does not ship (`mods-dev/`); the debug run is still on by default until
-  this cleanup (`DEBUG_BY_DEFAULT` in main.rs), and `--debug` still works in a release binary.
+  mode is a development mod a release package does not ship (`mods-dev/`); a release package is built with `DRAHTSEILAKT_RELEASE`
+  (`scripts/make-portable.sh` without `--dev`) and starts without the debug run; DEV builds are Linux only and keep
+  it and god mode. `--debug` still works in a release binary.
 - **Fuzzing of the mod format** (`mod.txt`), like every other parser. **Open** (deferred by the owner).
 - **Problem reports**: *Report a problem* in Options and in the manual opens the issue form in the browser.
   **Done** 2026-11-16 (menu.md, "The manual").

@@ -83,7 +83,8 @@ if [ "$build" = 1 ]; then
         command -v x86_64-w64-mingw32-gcc >/dev/null || die "the windows target needs x86_64-w64-mingw32-gcc (MinGW)"
     fi
     say "building the game ($triple)"
-    (cd "$here" && VXMATH_FONT_DIR="$here/assets/fonts" cargo build --release --offline --target "$triple" -p drahtseilakt)
+    if [ "$dev" = 1 ]; then release_env=(); else release_env=(DRAHTSEILAKT_RELEASE=1); fi
+    (cd "$here" && env "${release_env[@]}" VXMATH_FONT_DIR="$here/assets/fonts" cargo build --release --offline --target "$triple" -p drahtseilakt)
     if [ "$with_toolbox" = 1 ]; then
         say "building the toolbox ($triple)"
         (cd "$toolbox" && cargo build --release --offline --target "$triple") \
