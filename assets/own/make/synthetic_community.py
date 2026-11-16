@@ -11,8 +11,10 @@ levels, each built for real with our own content and shown beside a plain floor 
   animated texture (Set Texture on a timer), Show/Hide and Set Diffuse blinking, a crate made a body by Physicalize;
   then the sticky ball of the BallSticky mod (our `sticky` kind: its transformer, a slope it climbs and the wooden
   ball does not, its loose ball);
-- over all of it, from the gate on: another sky, fog and light (TT Sky, Set Fog, Set Light Color), switched by the
-  ball's distance, so the community part looks different from the classic one.
+- on the last stretch, from its sign to the balloon (ENV_LEN): another sky, fog and light (TT Sky, Set Fog, Set Light
+  Color), switched by the ball's distance; the rest of the community part is lit as the classic one, so its floors and
+  exhibits look as they do there (owner, 2026-11-16: over the whole part the warm light and the sunset sky read as
+  darker textures).
 
 `LINES` is its description (leveldsl.py's language with the commands of `Community` below). Of the 13 converted
 community maps, only a glass floor (map 10), the fan's grate (the classic fan's), portals (map 05) and crates (the
@@ -32,12 +34,15 @@ import levelkit as L
 import ownkit as K
 import scriptkit as S
 
+# The stretch with another sky, fog and light (environment): the last of the way, the showcase's `floor 30` after
+# LINES (make_synthetic_level.FINISH) and the 22 to the balloon. At the end, so nothing after it is seen without the level's own fog:
+# leaving it, Set Fog's mode 0 switches all fog off, the level's own too (scripts.md), as Virtools' would.
+ENV_LEN = 30.0 + 22.0
+
 LINES = """
 # ---- sector 6: materials ---------------------------------------------------------------------------------------------
-environment
 floor 12
 sign "COMMUNITY 6: materials" ahead -6
-sign "TT Sky, Set Fog, Set Light Color" ahead 4
 floor 14
 sign "Material: alpha blend (glass)"
 exhibit glass
@@ -149,6 +154,9 @@ floor 6
 sign "P_Trafo_Wood"
 trafo wood
 floor 16
+# the finale: another sky, fog and light from here to the balloon (environment)
+sign "TT Sky, Set Fog, Set Light Color: to the end" ahead 4
+environment
 """
 
 # How far beside the way's middle the exhibits stand (the way is 12 wide there), and their columns' radius.
@@ -167,13 +175,13 @@ def _grid(n=TEX):
 
 
 class Community:
-    """The community part's commands: `environment` (the trigger of the other sky), `exhibit KIND` (an exhibit beside
-    the way at the cursor), `glassfloor L` (a translucent floor in the way)."""
+    """The community part's commands: `environment` (another sky, fog and light on the next ENV_LEN of the way),
+    `exhibit KIND` (an exhibit beside the way at the cursor), `glassfloor L` (a translucent floor in the way)."""
 
     def community_command(self, cmd, args, opts, line):
         if cmd == "environment":
-            # the community part begins here; its sky is set up when its end is known (community_finish)
-            self.comm_start = self.at()
+            # its script is written with the others (community_finish)
+            self.env_zone = (self.at(), self.at(ENV_LEN))
         elif cmd == "exhibit":
             getattr(self, "ex_" + args[0])()
         elif cmd == "glassfloor":
@@ -726,12 +734,12 @@ class Community:
     # --- the environment and the end ------------------------------------------------------------------------------
 
     def environment(self):
-        """Another sky, fog and light while the ball is in the community part: a proximity test of the ball against a
-        frame in the part's middle, as far as the part reaches (the gate behind, the balloon ahead)."""
+        """Another sky, fog and light while the ball is on the environment's stretch: a proximity test of the ball
+        against a frame in its middle, as far as the stretch reaches."""
         g = self.graph
-        start, end = self.comm_start, self.at(52.0)
+        start, end = self.env_zone
         centre = (start + end) / 2
-        reach = float(np.linalg.norm(end - start)) / 2 + 2.0
+        reach = float(np.linalg.norm(end - start)) / 2
         self.b.add("Comm_Environment", None, K.pose(tuple(centre)))
         marker = g.entity("Comm_Environment")
         prox, links = self.near_ball(marker, reach)

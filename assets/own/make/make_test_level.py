@@ -23,7 +23,7 @@ import levelkit as L  # noqa: E402
 import ownkit as K  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels", "drahtseilakt", "Parts_Test")
+OUT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels", "Parts_Test")
 # Where the stretches of each safety lie (z of the first; the next 40 further each)
 SAFETY_Z = 80.0
 

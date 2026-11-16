@@ -127,7 +127,9 @@ not in git.
   wooden, stone and paper balls); the transformers and the mechanics on the way (paper and the fan, seesaw,
   plate bridge, swing, stone shoving boxes, wood); stone and the puzzle modules on the way (flap wheel, board
   bridge, drawbridge, pushers, crate under its stone, the lift, a row of sacks, the turning arms).
-- **The gate** "COMMUNITY", past which the sky, the fog and the light change (a script).
+- **The gate** "COMMUNITY". The community part is lit as the classic one; only its last stretch, from its sign to
+  the balloon, has another sky, fog and light (a script: TT Sky, Set Fog, Set Light Color). Until 2026-11-16 the
+  whole part had them, and the owner read the warm light and the sunset sky as darker textures.
 - **Community**, two sectors: the materials community maps use (alpha blend, alpha test, additive glow, chrome and
   reflect texture coordinates, a double-sided sheet, unlit colour, a normal map with parallax, a second pass over a
   mesh, a 3D sprite, a glass floor on the way), then our own behaviour graphs (`assets/own/make/scriptkit.py` writes
@@ -348,8 +350,7 @@ distance along the way. The start's and the checkpoints' pieces are joined the s
 runs on have their corners at the floor's own cross-section points, and their tops are mapped as the track's. The test
 `our_floors_have_no_seams` (ownlevels.rs) checks the floors of every level the kit made (version 2 on, in level.gltf's
 `asset.generator`): wherever a floor's top ends, there is no other top beside it at its height
-(`the_seam_finder_sees_a_crack` checks the finder itself). A checkpoint on a narrow way has a smaller bowl, and its
-depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper bowl did not roll out of it).
+(`the_seam_finder_sees_a_crack` checks the finder itself).
 
 **Room, rails and clouds** (2026-11-03, after the owner played level 1): a way must leave the ball (radius 2) at least
 5.5 across at the height of its middle, between its borders or its railings' rails (levelkit.MIN_FREE); the kit
@@ -435,6 +436,20 @@ its rim; a checkpoint a piece of floor 10 long with a bowl of radius 5 sunk 1.26
 cups across the way, at ±7 to the sides, where the part's flames burn. The floors before and after a checkpoint end at
 its piece. Their frames and reset points stand in the bowls (the reset points 3.65 and 3.33 over the bottom, as the
 original's).
+
+**Checkpoints on a piece of their own** (2026-11-16, the owner: "in the original they never have a way round"). Measured
+on all 13 levels (55 checkpoints and 13 starts, numbers only): a checkpoint stands on a piece of its own, 9.84 along the
+way and 18 across, its whole top the checkpoint's plate (Floor_Top_Checkpoint), the bowl of radius 5 in its middle and
+the flames on its two tips; floors about 10.8 wide (5 of flat), or rails, come in and go on through its ends, and nothing else lies
+beside it, so the way goes through the bowl. The start is 18.5 by 16 round its bowl of 7.5, the four flames on its
+corners, one floor going on from it, nothing behind. Ours are built so (`levelkit.pad_outline`): a checkpoint's piece
+is 11 long (its bowl's rim 0.5 in from its ends) and as wide as the hull of its rim and its two flame cups (18), the
+start's the hull of its rim (radius 8) and its four cups narrowing to the neck the first floor runs on from; their
+tops are drawn with the plate whole, the bowl always the measured one. `levelcheck.check_pads` refuses a level with
+another floor's top within 6 of such a piece (within 4 of its height) but the floors running on from its ends, or with
+a way wider than 14 running on from one; the synthetic level narrows its sector 3 to 12 before the checkpoint, and
+`make_test_level.py` gives Parts_Test necks 12 wide between its pieces and its wide floors (the shipped Parts_Test
+is still an earlier kit's build: rebuilt, its slabs' T-joints fail `our_floors_have_no_seams`).
 
 **The test player's knowledge of a level** is in the same file. From the way laid, leveldsl.py writes the test
 player's hint files for three styles into the level's `pilot/` folder (autopilot.md, "Hint files"): `safe` (rolls
