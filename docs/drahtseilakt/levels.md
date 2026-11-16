@@ -123,9 +123,9 @@ not in git.
 
 - **Classic**, five sectors: floors and surfaces (gutter, brick border, railings, bare, wood, widths, a ramp, round
   turns, hard corners); rails (straight, turning, rising, falling) and scenery (wooden deck on columns, lamp tower,
-  mast, plinth, pillar, wall block, garland, lighthouse); the parts (extra point and life, boxes, dome, the four loose
-  balls); the transformers and the mechanics on the way (paper and the fan, seesaw,
-  plate bridge, swing, stone shoving boxes, sticky, wood); stone and the puzzle modules on the way (flap wheel, board
+  mast, plinth, pillar, wall block, garland, lighthouse); the parts (extra point and life, boxes, dome, the loose
+  wooden, stone and paper balls); the transformers and the mechanics on the way (paper and the fan, seesaw,
+  plate bridge, swing, stone shoving boxes, wood); stone and the puzzle modules on the way (flap wheel, board
   bridge, drawbridge, pushers, crate under its stone, the lift, a row of sacks, the turning arms).
 - **The gate** "COMMUNITY", past which the sky, the fog and the light change (a script).
 - **Community**, two sectors: the materials community maps use (alpha blend, alpha test, additive glow, chrome and
@@ -134,7 +134,8 @@ not in git.
   them into the level's `scripts`, [open-format.md](open-format.md)): Rotate, a shuttle and a lift (Linear
   Progression, Interpolator, Set Position), Text Display while the ball is near, 3D Text, a particle fountain, a
   screen cycling textures (Set Texture), Show/Hide and Set Diffuse, a portal (Box Box Intersection, Set Position on
-  the ball), a crate made a body by Physicalize.
+  the ball), a crate made a body by Physicalize; then the sticky ball of the BallSticky mod (its transformer, a
+  slope it climbs, its loose ball).
 
 What the open format cannot hold yet, found while making it: a texture's slots (Movie Player, Set Current Slot), wave
 sounds (Wave Player), a level's own texture for script particles, a level's 3D sprite turned to the view.
@@ -146,7 +147,7 @@ the plate bridge over 15.4 with its frame 6.9 from the near edge (levels 2-10), 
 trench 6.2 deep between two walls (level 8), the flap wheel between two lanes 15 apart, tipped by a stone ball that
 comes at its standing flap rolling (levels 9-11), the board bridge over 9.1 (levels 2, 3, 5, 8), the drawbridge
 falling into a lane's gap of 7.6 (level 5), two pushers pushed from a floor 2.5 lower (level 1), the crate under its
-stone in a slot 5.3 long over a broad floor 5 lower (34 x 30 here, 34 x 42 in level 1), knocked out by a stone ball
+stone in a slot 5.3 long over a broad floor 5 lower (34 x 28 here, 34 x 42 in level 1), knocked out by a stone ball
 rolling through under the stone and kept on that floor, the way back up a ramp on the far side (level 1); the lift
 (P_Modul_03; levels 7, 9, 10, 12): a wood ball from a transformer 23 before it comes on a floor 11.3 under the frame
 into the cage's gate, rams the seven panels off and rides the disc up to the way on, 8.9 higher (level 9; the disc
@@ -160,11 +161,11 @@ floor) and P_Box crates stand on their ways; none uses texgen, unlit or additive
 Rotate, progressions, scripted lifts, Text Display, Set Texture, blinking or the sky, fog and light blocks, so those
 exhibits stand beside the way with no community setting to copy. `crates/game/src/showcase.rs` checks that every
 part of ours stands in the level and that each element does its job in the game's physics: the level's `checks.txt`
-(written by the generator from its `check` lines, 28 checks) rolls a ball of the right kind and of the wrong one
+(written by the generator from its `check` lines, 29 checks) rolls a ball of the right kind and of the wrong one
 through each element with the arrows and checks where it gets to, how far the module's parts turned or moved and
 where a knocked-out part lies; every check is required. `SHOWCASE_COPY_PARTS=<copy>` runs the same checks with the
 copy's parts in place of ours, `SHOWCASE_ONLY=<prefix>` only the checks so named, `SHOWCASE_TRACE=<check>` prints the
-ball's way. The test player's run is no longer kept for the level.
+ball's way. The test player's run is no longer kept for the level. Since the owner's notes 11 (2026-11-16): the drawbridge's lane has a ledge 1 long and 0.5 deep either side of its gap, as level 5's, so the fallen deck lies flush with the lane (its check asserts the ball's height on it); every checkpoint's and the start's bowl is drawn whole; no two drawn faces overlap in one plane (the kit refuses them, `check_coplanar`, and `our_levels_have_no_faces_flickering_in_one_plane` checks every level it made); signs stand where no way passes; the fan's grille is a grid of bars with a dark hub, as the original's; where the stone ball goes on a bare floor every hard corner has a railing on its outer side (the original's narrow stone lanes are troughs 0.68 deep instead); the sticky ball, which no original level and no converted community map has (it is the BallSticky mod's), stands in the community part with a 40-degree slope it climbs from rest and the wooden ball does not.
 Without a copy of the original the level behind the menu is the first shipped level past the showcase (order 0),
 so the menu never shows its sign boards.
 

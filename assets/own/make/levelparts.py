@@ -187,7 +187,9 @@ def pit(b, name, at, fwd, width, length, depth, wall_len, wall_h, wall_side, sec
 
 
 def _shaft(m, b, x, y_top, z, r, depth, mat="post", seg=14):
-    K.cylinder(m, b.mat_ids[mat], (x, y_top - depth, z), UP, r, depth, seg=seg, vscale=L.SLAB)
+    """A shaft up to `y_top`, under the cornice that caps it: it stops L.TUCK short, inside the cornice, so its top
+    is not drawn in the cornice's top's plane (two faces in one plane flicker)."""
+    K.cylinder(m, b.mat_ids[mat], (x, y_top - depth, z), UP, r, depth - L.TUCK, seg=seg, vscale=L.SLAB)
 
 
 def lamp_tower(b, name, base, r, height, depth=L.COLUMN_DEPTH):
@@ -294,8 +296,9 @@ def lighthouse(b, name, base, half, height, sector, depth=L.COLUMN_DEPTH):
     # the shaft is solid from just under the quay up; below it the haze hides a plain drawn one (the clouds lie under
     # the lowest floor, not under this)
     bottom = y - 12.0
-    solid(body, b.mat_ids["beige"], b.mat_ids["beige"], (x, (top + bottom) / 2, z), axes,
-          (half, (top - bottom) / 2, half), scale=L.SLAB)
+    # (its top L.TUCK inside the gallery's band, not in the band's top's plane)
+    solid(body, b.mat_ids["beige"], b.mat_ids["beige"], (x, (top - L.TUCK + bottom) / 2, z), axes,
+          (half, (top - L.TUCK - bottom) / 2, half), scale=L.SLAB)
     node = b.add(name, body, groups=b._floor_groups("stone"))
     deep = K.Mesh(name + "_Deep")
     lo = y - depth

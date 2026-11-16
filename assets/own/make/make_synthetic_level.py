@@ -12,8 +12,8 @@ CLASSIC
   sound), a way narrowing and widening, a ramp up and down, two round turns, two hard corners;
 - sector 2, rails and scenery: straight rails, rails turning, rails rising and falling; a wooden deck on
   columns; the lamp tower, mast, plinth, pillar, wall block with its lantern, garland and lighthouse;
-- sector 3, the parts: extra point, extra life, boxes (one stacked), the dome, the loose balls (wood, stone, paper,
-  sticky);
+- sector 3, the parts: extra point, extra life, boxes (one stacked), the dome, the loose balls (wood, stone,
+  paper);
 - sector 4, paper and wood on the way: the fan steps (P_Modul_18), the troughs (P_Modul_41), the seesaw (P_Modul_30),
   the plate bridge (P_Modul_29), the swing (P_Modul_08);
 - sector 5, stone and the puzzle modules on the way, each as the original's levels set it: the flap wheel
@@ -208,9 +208,8 @@ sign "P_Ball_Wood / P_Ball_Stone"
 loose wood side 9 ahead 6
 loose stone side -9 ahead 6
 floor 18
-sign "P_Ball_Paper / P_Ball_Sticky"
+sign "P_Ball_Paper"
 loose paper side 9 ahead 6
-loose sticky side -9 ahead 6
 floor 18
 floor 20
 checkpoint
@@ -265,9 +264,9 @@ floor 18
 sign "P_Modul_08: swing over a trench (level 8)"
 check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
 # level 8: the swing hangs over a trench 6.2 deep under the gap, its floor about as wide as the gap is long
-plaza 18 15 up -6.2
-block 15 8.7 width 3 side 10.5 top 0
-block 15 8.7 width 3 side -10.5 top 0
+plaza 18 15 kerb up -6.2
+block 15.4 6.2 width 3 side 10.5 ahead -0.2 top 0
+block 15.4 6.2 width 3 side -10.5 ahead -0.2 top 0
 pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
 pilot speed : via 0 0 0 ; via 9 0 0
 swingbridge nopilot
@@ -313,22 +312,26 @@ floor 14
 boardbridge
 floor 14
 sign "P_Modul_37: drawbridge into a lane (level 5)"
-check drawbridge-stone : ball stone 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; turned P_Modul_37_01 P_Modul_37_Bridge 60 ; go 8 -2 0 4 600 ; go 8 -12 0 4 600 ; go 36.95 -12 0 4 900 ; go 36.95 12 0 7 900 ; reach 36.95 12 2 3 ; kept
+# level 5: the lane's floor has a ledge 1 long and 0.5 deep (the deck's thickness) either side of the gap; the fallen
+# deck lies in it flush with the lane (the ball rolls over it at the lane's height)
+check drawbridge-stone : ball stone 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; turned P_Modul_37_01 P_Modul_37_Bridge 60 ; go 8 -2 0 4 600 ; go 8 -12 0 4 600 ; go 36.95 -12 0 4 900 ; go 36.95 -1 0 3 600 ; level 36.95 0 0 0.08 ; go 36.95 12 0 7 900 ; reach 36.95 12 2 3 ; kept
 check drawbridge-wood : ball wood 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; still P_Modul_37_01 P_Modul_37_Bridge 30
 floor 8
 mark spur
 floor 14
 hingebridge
 back spur
-move 0 -2.5 0
+move 0 -3 0
 turn -90
-floor 9.5
+floor 9
 corner left
 floor 28.95
 corner left
-floor 8.2
+floor 7.2
+rebate 1 0.5
 gap 7.6 nopilot
-floor 8.2
+rebate 1 0.5
+floor 7.2
 corner right
 floor 14
 sign "P_Modul_01: two pushers, from the low floor (level 1)"
@@ -350,7 +353,7 @@ sign "P_Modul_34: crate under the stone, from below (level 1)"
 # the stone stands in a slot 5.3 long, on its crate on the floor below; a stone ball rolling across that floor under
 # the slot knocks the crate out (it stays on the broad floor), the stone sinks level with the lane and shuts the
 # way back under it, and the ball goes up a ramp on the floor's far side
-check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 36 12 -5 4 600 ; go 26.65 22 -5 4 600 ; go 6 22 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; lies P_Modul_34_01 P_Modul_34_Kiste 26.65 8 -5 18 ; kept
+check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 36 12 -5 4 600 ; go 26.65 16 -5 4 600 ; go 26.65 22 -5 4 600 ; go 6 22 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; lies P_Modul_34_01 P_Modul_34_Kiste 26.65 8 -5 18 ; kept
 check crate-block : ball stone 0 0 0 ; go 42 0 0 4 600 ; away 42 0 2 6
 floor 6
 mark crate
@@ -359,24 +362,24 @@ crateblock
 floor 16
 mark past
 back crate
-move 0 -2.5 0
+move 0 -3 0
 turn -90
-floor 9.5
+floor 9
 corner left
 width 6
 floor 20.65 down 5
 corner left
-floor 2
-plaza 34 30
+floor 3
+plaza 34 28
 back crate
-move 0 2.5 0
+move 0 3 0
 turn 90
-floor 19.5
+floor 19
 corner right
 width 6
 floor 20.65 down 5
 corner right
-floor 2
+floor 3
 back past
 width 6
 floor 10
@@ -419,11 +422,7 @@ width 12
 floor 8
 safety border
 floor 10
-sign "P_Trafo_Sticky (our fourth ball)"
-trafo sticky
 floor 20
-sign "P_Trafo_Wood"
-trafo wood
 floor 18
 autopilot all
 columns 60
@@ -451,8 +450,12 @@ class Show(C.Community, D.Track):
         super().__init__(out_dir)
         self.signs = []
         self.checks = []
+        self.sign_wanted = []
+        self.signs_placed = []
+        self.line_no = 0
 
     def run_command(self, cmd, args, opts, flags, line):
+        self.line_no = line
         if cmd == "check":
             self.check(args, line)
         elif cmd == "sign":
@@ -460,7 +463,9 @@ class Show(C.Community, D.Track):
         elif cmd == "gate":
             self.gate(D.word(args, 0, line))
         elif cmd == "block":
-            self.block(D.num(args, 0, line), D.num(args, 1, line), opts)
+            # (`width` and `top` are not among the parser's options: they come as words)
+            words = dict(zip(args[2::2], args[3::2]))
+            self.block(D.num(args, 0, line), D.num(args, 1, line), {**opts, **words})
         elif self.community_command(cmd, args, opts, line):
             pass
         else:
@@ -477,7 +482,8 @@ class Show(C.Community, D.Track):
         points): `ball KIND F S U` (begin there at rest), `go F S U V T` (roll to the point at up to V, at most T
         ticks), `arc F S U R A H N` (N points along a turn of radius R, A degrees to the left, H down, from F S U on
         the heading, rolled through at 4), `wait T`, and what must hold then: `reach F S U R` (the ball within R),
-        `away F S U R` (not within R), `kind KIND`, `turned OBJECT PART DEG` (the module's part turned at least DEG
+        `away F S U R` (not within R), `level F S U T` (the ball, within 2.5 of the point seen from above, rolls on a floor at its height: its bottom
+        within T of it), `kind KIND`, `turned OBJECT PART DEG` (the module's part turned at least DEG
         from its start), `still OBJECT PART DEG` (less), `moved OBJECT PART D`, `lies OBJECT PART F S U R` (the part within R of the point), `lost` (a ball was lost), `kept` (none
         was)."""
         text = " ".join(args)
@@ -494,7 +500,7 @@ class Show(C.Community, D.Track):
                 out.append(f"ball {w[0]} {D.fmt(P(w[1:4]))}")
             elif v in ("go",):
                 out.append(f"go {D.fmt(P(w[0:3]))} {float(w[3]):g} {int(w[4])}")
-            elif v in ("reach", "away"):
+            elif v in ("reach", "away", "level"):
                 out.append(f"{v} {D.fmt(P(w[0:3]))} {float(w[3]):g}")
             elif v == "arc":
                 f0, s0, u0, r, a, h, n = (float(x) for x in w)
@@ -565,19 +571,44 @@ class Show(C.Community, D.Track):
 
     def sign(self, text, opts):
         """A sign on a post beside the way at the cursor: on the right by default (`side`: its place across the way),
-        facing the ball that comes along the way, turned a little toward the way."""
-        side = float(opts["side"]) if "side" in opts else -(self.width / 2 + 5.2)
-        base = self.at(float(opts.get("ahead", 0.0)), side, float(opts.get("up", 0.0)))
+        facing the ball that comes along the way, turned a little toward the way. Its place is chosen when the whole
+        way is laid (place_signs): the first of its places beside the way here whose post and board stand clear of
+        every floor's and rails' clearance (levelcheck.check_scenery: never on a way, the one here or another that
+        passes by)."""
+        out = self.width / 2 + 5.2
+        ahead = float(opts.get("ahead", 0.0))
+        up = float(opts.get("up", 0.0))
+        sides = [float(opts["side"])] if "side" in opts else []
+        sides += [-out, out, -(out + 3.0), out + 3.0]
+        places = [(ahead + a, s) for a in (0.0, -6.0, 6.0, -12.0, 12.0) for s in sides]
+        self.sign_wanted.append((text, [(self.at(a, s, up), s) for a, s in places], self.head, self.line_no))
+
+    def place_signs(self):
+        """Puts each sign (sign) at its first place clear of the ways; a sign with none is refused."""
+        import levelcheck
+        for text, places, head, line in self.sign_wanted:
+            for base, side in places:
+                i = self.sign_at(text, base, side, head)
+                if not levelcheck.scenery_hits(self.b, [i], near=(base, 16.0)):
+                    self.signs_placed.append(i)
+                    break
+                self.b.nodes.pop()
+                self.b.meshes.pop()
+            else:
+                raise D.LevelError(f"line {line}: no place beside the way for the sign {text!r} clear of the ways")
+
+    def sign_at(self, text, base, side, head):
+        """The sign's post and board at `base` (`side` its place across the way: it turns toward the way)."""
         sgn = 1.0 if side > 0 else -1.0
         # the reader looks along the heading: the board's right is the way's right, turned toward the way
-        a = math.radians(self.head + 22.0 * sgn)
+        a = math.radians(head + 22.0 * sgn)
         fwd = np.array([math.cos(a), 0.0, math.sin(a)])
         right = -np.array([-fwd[2], 0.0, fwd[0]])
         up = np.array([0.0, 1.0, 0.0])
         m = K.Mesh("sign")
         K.cylinder(m, self.b.mat_ids["wood"], tuple(base - up * 3.0), up, 0.2, 7.0, seg=8)
         self.board(m, text, base + up * 5.0 - fwd * 0.3, right, up, SIGN_HALF)
-        self.b.add(f"Sign_{self.n('sign'):03d}", m)
+        return self.b.add(f"Sign_{len(self.signs_placed) + 1:03d}", m)
 
     def gate(self, text):
         """An arch of brick over the way at the cursor, the text on both of its faces: only drawn (its posts stand
@@ -622,6 +653,7 @@ def render_signs(t):
 
 def hook(t):
     t.community_finish()
+    t.place_signs()
     render_signs(t)
     # the elements' checks (crates/game/src/showcase.rs), world points
     with open(os.path.join(t.b.out, "checks.txt"), "w", encoding="utf-8") as f:

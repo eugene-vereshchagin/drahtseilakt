@@ -356,6 +356,224 @@ mod tests {
         println!("{checked} levels made by the seamless kit checked");
     }
 
+    /// Drawn faces of a level that lie in one plane, facing one way, and overlap (levelcheck.py, check_coplanar): the
+    /// depth buffer cannot tell them apart and the picture flickers between their textures (z-fighting). Faces of two
+    /// objects, or of two materials of one; back to back faces (hidden inside the solids) do not count. Returns
+    /// (object, object, overlapping area, a point of it).
+    fn coplanar_overlaps(level: &level::Level) -> Vec<(String, String, f64, glam::DVec3)> {
+        use glam::{DVec2, DVec3};
+        use std::collections::HashMap;
+        // (label, corners, facing normal) of every drawn triangle
+        let mut tris: Vec<(usize, [DVec3; 3], DVec3)> = Vec::new();
+        let mut labels: Vec<String> = Vec::new();
+        for o in level.objects.iter().filter(|o| o.visible) {
+            let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
+                continue;
+            };
+            let m = glam::Mat4::from_cols_array_2d(&o.matrix).as_dmat4();
+            for part in &mesh.parts {
+                let Some(mat) = part.material else { continue };
+                labels.push(format!("{}[{mat}]", o.name));
+                let label = labels.len() - 1;
+                for t in part.indices.as_chunks::<3>().0 {
+                    let idx = [t[0] as usize, t[1] as usize, t[2] as usize];
+                    if idx.iter().any(|&i| i >= mesh.positions.len()) {
+                        continue;
+                    }
+                    let p = idx.map(|i| {
+                        m.transform_point3(glam::Vec3::from(mesh.positions[i]).as_dvec3())
+                    });
+                    let g = (p[1] - p[0]).cross(p[2] - p[0]);
+                    if g.length() < 1e-6 {
+                        continue;
+                    }
+                    // drawn for the side its winding faces (the kit turns every face to its normals')
+                    tris.push((label, p, g.normalize()));
+                }
+            }
+        }
+        let mut bins: HashMap<([i64; 3], i64), Vec<usize>> = HashMap::new();
+        for (k, (_, p, n)) in tris.iter().enumerate() {
+            let key = (
+                (*n * 100.0).round().as_i64vec3().to_array(),
+                (n.dot(p[0]) / 0.05).floor() as i64,
+            );
+            bins.entry(key).or_default().push(k);
+        }
+        fn clip(poly: Vec<DVec2>, a: DVec2, b: DVec2) -> Vec<DVec2> {
+            let side = |p: DVec2| (b - a).perp_dot(p - a);
+            let mut out = Vec::new();
+            for i in 0..poly.len() {
+                let (p, q) = (poly[i], poly[(i + 1) % poly.len()]);
+                let (sp, sq) = (side(p), side(q));
+                if sp >= 0.0 {
+                    out.push(p);
+                }
+                if (sp >= 0.0) != (sq >= 0.0) {
+                    out.push(p + (q - p) * (sp / (sp - sq)));
+                }
+            }
+            out
+        }
+        let area = |poly: &[DVec2]| -> f64 {
+            (0..poly.len())
+                .map(|i| poly[i].perp_dot(poly[(i + 1) % poly.len()]))
+                .sum::<f64>()
+                / 2.0
+        };
+        let mut found = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for ((kn, kd), ids) in &bins {
+            let mut ids = ids.clone();
+            if let Some(more) = bins.get(&(*kn, kd + 1)) {
+                ids.extend(more);
+            }
+            let n = tris[ids[0]].2;
+            let u = n
+                .cross(if n.y.abs() < 0.9 { DVec3::Y } else { DVec3::X })
+                .normalize();
+            let v = n.cross(u);
+            let flat = |k: usize| -> Vec<DVec2> {
+                let mut f: Vec<DVec2> = tris[k]
+                    .1
+                    .iter()
+                    .map(|p| DVec2::new(p.dot(u), p.dot(v)))
+                    .collect();
+                if area(&f) < 0.0 {
+                    f.reverse();
+                }
+                f
+            };
+            for (x, &i) in ids.iter().enumerate() {
+                for &j in &ids[x + 1..] {
+                    let (ti, tj) = (&tris[i], &tris[j]);
+                    if ti.0 == tj.0
+                        || ti.2.dot(tj.2) < 0.9995
+                        || (ti.2.dot(ti.1[0]) - tj.2.dot(tj.1[0])).abs() > 0.004
+                        || !seen.insert((i.min(j), i.max(j)))
+                    {
+                        continue;
+                    }
+                    let (a, b) = (flat(i), flat(j));
+                    let (lo_a, hi_a) = a
+                        .iter()
+                        .fold((a[0], a[0]), |(l, h), p| (l.min(*p), h.max(*p)));
+                    let (lo_b, hi_b) = b
+                        .iter()
+                        .fold((b[0], b[0]), |(l, h), p| (l.min(*p), h.max(*p)));
+                    if lo_a.cmpgt(hi_b).any() || lo_b.cmpgt(hi_a).any() {
+                        continue;
+                    }
+                    let mut poly = a;
+                    for e in 0..3 {
+                        poly = clip(poly, b[e], b[(e + 1) % 3]);
+                        if poly.len() < 3 {
+                            break;
+                        }
+                    }
+                    let shared = if poly.len() < 3 {
+                        0.0
+                    } else {
+                        area(&poly).abs()
+                    };
+                    if shared >= 0.02 {
+                        found.push((labels[ti.0].clone(), labels[tj.0].clone(), shared, ti.1[0]));
+                    }
+                }
+            }
+        }
+        found
+    }
+
+    #[test]
+    fn the_coplanar_finder_sees_two_floors_in_one_plane() {
+        // two objects with a top each, the second from `from` on along x: overlapping, meeting, back to back
+        let pieces = |from: f32, flip: bool| {
+            let quad = |x0: f32, x1: f32| {
+                vec![
+                    [x0, 0.0, -5.0],
+                    [x1, 0.0, -5.0],
+                    [x1, 0.0, 5.0],
+                    [x0, 0.0, 5.0],
+                ]
+            };
+            let mesh = |p: Vec<[f32; 3]>, flip: bool| level::Mesh {
+                name: "Floor".into(),
+                normals: vec![[0.0, if flip { -1.0 } else { 1.0 }, 0.0]; 4],
+                uvs: vec![[0.0, 0.0]; 4],
+                positions: p,
+                parts: vec![level::Part {
+                    material: Some(0),
+                    indices: if flip {
+                        vec![0, 1, 2, 0, 2, 3]
+                    } else {
+                        vec![0, 2, 1, 0, 3, 2]
+                    },
+                }],
+                ..Default::default()
+            };
+            let object = |name: &str, m: usize| level::Object {
+                parent: None,
+                name: name.into(),
+                matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+                mesh: Some(m),
+                visible: true,
+                sprite: None,
+            };
+            level::Level {
+                meshes: vec![
+                    mesh(quad(0.0, 10.0), false),
+                    mesh(quad(from, from + 10.0), flip),
+                ],
+                objects: vec![object("Floor_001", 0), object("Floor_002", 1)],
+                ..Default::default()
+            }
+        };
+        let found = coplanar_overlaps(&pieces(9.0, false));
+        let shared: f64 = found.iter().map(|f| f.2).sum();
+        assert!(
+            (shared - 10.0).abs() < 1e-3,
+            "two tops in one plane overlapping by 1 x 10: {found:?}"
+        );
+        assert!(
+            coplanar_overlaps(&pieces(10.0, false)).is_empty(),
+            "two tops that only meet"
+        );
+        assert!(
+            coplanar_overlaps(&pieces(9.0, true)).is_empty(),
+            "back to back"
+        );
+    }
+
+    /// No two drawn faces of a level the kit made overlap in one plane (they flicker): every level of ours made by
+    /// the kit, the showcase and the parts' test level among them.
+    #[test]
+    fn our_levels_have_no_faces_flickering_in_one_plane() {
+        let showcase = shipped().join("00_Синтетический_уровень");
+        let mut checked = 0;
+        for dir in levels()
+            .into_iter()
+            .chain([shipped().join("Parts_Test"), showcase])
+        {
+            if !dir.join("level.gltf").is_file() || kit_version(&dir) < 2 {
+                continue;
+            }
+            let source = Source::Open(dir.clone());
+            let data = Data::new(None).for_source(&source);
+            let loaded = data.load(&source).expect("the level loads");
+            let found = coplanar_overlaps(&loaded.level);
+            assert!(
+                found.is_empty(),
+                "{}: {} faces overlap in one plane, e.g. {:?}",
+                dir.display(),
+                found.len(),
+                &found[..found.len().min(5)]
+            );
+            checked += 1;
+        }
+        println!("{checked} levels made by the kit checked for faces in one plane");
+    }
+
     /// Every one of our levels has its runs, in the three styles, and each finishes the level.
     #[test]
     fn each_of_our_levels_is_finished_by_its_runs() {

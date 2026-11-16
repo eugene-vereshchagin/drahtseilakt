@@ -113,8 +113,8 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
 - **Klassisch**, fünf Sektoren: Böden und Oberflächen (Rinne, Ziegelrand, Geländer, blanker Boden, Holz, Breiten,
   Rampe, runde Kurven, harte Ecken); Schienen (gerade, in Kurven, steigend, fallend) und Kulisse (Holzdeck auf
   Säulen, Lampenturm, Mast, Sockel, Pfeiler, Mauerblock, Girlande, Leuchtturm); die Teile (Extrapunkt und -leben,
-  Kisten, Kuppel, die vier losen Bälle); die Transformer und die Mechanik auf dem Weg
-  (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, klebriger Ball, Holz); Stein
+  Kisten, Kuppel, die losen Holz-, Stein- und Papierbälle); die Transformer und die Mechanik auf dem Weg
+  (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, Holz); Stein
   und die Rätselmodule auf dem Weg (Klappenrad, Brettbrücke, Zugbrücke, Schieber, Kiste unter ihrem Stein,
   Aufzug, eine Reihe Säcke, Drehkreuz).
 - **Das Tor** „COMMUNITY", hinter dem Himmel, Nebel und Licht wechseln (ein Skript).
@@ -138,7 +138,7 @@ steht), sechs Mulden über der Leere (Level 7), die Wippe über einer Lücke von
 Graben zwischen zwei Wänden (Level 8), das Klappenrad zwischen zwei Bahnen im Abstand 15, gekippt von einem Steinball,
 der rollend auf seine stehende Klappe trifft (Level 9-11), die Brettbrücke über 9,1 (Level 2, 3, 5, 8), die
 Zugbrücke, die in eine Lücke von 7,6 einer Querbahn fällt (Level 5), zwei Schieber, geschoben von einem Boden 2,5
-tiefer (Level 1), die Kiste unter ihrem Stein in einem Schlitz von 5,3 über einem breiten Boden 5 tiefer (hier 34 x 30,
+tiefer (Level 1), die Kiste unter ihrem Stein in einem Schlitz von 5,3 über einem breiten Boden 5 tiefer (hier 34 x 28,
 in Level 1 34 x 42), vom unter dem Stein durchrollenden Steinball herausgestoßen und auf diesem Boden bleibend, zurück
 nach oben über eine Rampe auf der fernen Seite (Level 1); der Aufzug (P_Modul_03; Level 7, 9, 10, 12): ein Holzball von
 einem Transformer 23 davor kommt auf einem Boden 11,3 unter dem Rahmen ins Tor des Käfigs, rammt die sieben Wände ab
@@ -154,7 +154,7 @@ keine nutzt texgen, unbeleuchtete oder additive Materialien, einen zweiten Durch
 Progressionen, Skript-Aufzüge, Text Display, Set Texture, Blinken oder die Himmel-, Nebel- und Lichtblöcke, daher
 stehen diese Exponate neben dem Weg, ohne Community-Umgebung zum Nachbilden. `crates/game/src/showcase.rs` prüft,
 dass jedes unserer Teile im Level steht und jedes Element in der Physik des Spiels seine Aufgabe erfüllt: die
-`checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben, 28 Prüfungen) rollt eine Kugel der
+`checks.txt` des Levels (vom Generator aus seinen `check`-Zeilen geschrieben, 29 Prüfungen) rollt eine Kugel der
 richtigen und der falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt, wie weit sich die
 Teile des Moduls drehen oder bewegen und wo ein herausgestoßenes Teil liegt; jede Prüfung ist Pflicht.
 `SHOWCASE_COPY_PARTS=<Kopie>` führt dieselben Prüfungen mit den Teilen der Kopie statt unserer aus,
@@ -162,6 +162,7 @@ Teile des Moduls drehen oder bewegen und wo ein herausgestoßenes Teil liegt; je
 Testspielers wird für das Level nicht mehr aufbewahrt.
 Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
 Menü nicht seine Schilder zeigt.
+Seit den Notizen 11 des Eigentümers (2026-11-16): die Bahn der Zugbrücke hat zu beiden Seiten ihrer Lücke eine Stufe, 1 lang und 0,5 tief, wie in Level 5, so dass das gefallene Deck bündig mit der Bahn liegt (die Prüfung misst die Höhe der Kugel darauf); die Mulden aller Checkpoints und des Starts werden ganz gezeichnet; keine zwei sichtbaren Flächen liegen in einer Ebene übereinander (der Baukasten lehnt sie ab, `check_coplanar`, und `our_levels_have_no_faces_flickering_in_one_plane` prüft jedes von ihm gebaute Level); Schilder stehen, wo kein Weg vorbeiführt; das Gitter des Ventilators ist ein Raster aus Stäben mit dunkler Mitte wie das des Originals; wo die Steinkugel auf blankem Boden fährt, hat jede scharfe Ecke ein Geländer an ihrer Außenseite (die schmalen Steinbahnen des Originals sind stattdessen Rinnen, 0,68 tief); die klebrige Kugel, die kein Level des Originals und keine konvertierte Community-Karte hat (sie stammt aus dem Mod BallSticky), steht im Community-Teil, mit einem Hang von 40 Grad, den sie aus dem Stand hinauffährt und die Holzkugel nicht.
 
 ## Unsere Level und wie man sie bearbeitet
 

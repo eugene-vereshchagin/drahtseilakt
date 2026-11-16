@@ -4,18 +4,23 @@ written, and each finding is named with its coordinates):
 
   check_seams       no gaps, cracks or small steps at the floors' joints (the test of crates/game/src/ownlevels.rs,
                     `seams`, made stricter: a step under STEP_MAX between two pieces that should meet flush counts);
-  check_scenery     no scenery (lamp towers, masts, plinths, garlands, wall blocks, columns, lanterns) inside the
+  check_scenery     no scenery (lamp towers, masts, plinths, garlands, wall blocks, columns, lanterns, signs) inside the
                     clearance volume of a floor the ball can roll on (the floor's top, its width, BALL_H + CLEAR_MARGIN
                     up), unless the description marks it `obstacle`;
   check_shortcuts   no floor of a later part of the route can be reached from an earlier one by falling, by a flight
                     off an edge at speed, or by the updraft of a fan (a conservative estimate: FLIGHT_V and gravity),
-                    unless the description marks the landing as intended (`drop`).
+                    unless the description marks the landing as intended (`drop`);
+  check_coplanar    no two drawn faces (of two objects, or of two materials of one) lie in one plane facing one way
+                    and overlap: the depth buffer cannot tell them apart and the picture flickers between their
+                    textures as the view moves (z-fighting). Faces back to back (a floor's end against the next
+                    one's) are hidden inside the solids and not counted.
 
 The checks read the builder's meshes, nodes and groups, and its route (`route`: floor node -> (from, to) distance along
 the way, set by leveldsl.py) for the shortcuts. Needs numpy and scipy.
 """
 
 import math
+import os
 import re
 
 import numpy as np
@@ -28,7 +33,7 @@ FLUSH_TOL = 0.005
 BALL_H = 4.0
 CLEAR_MARGIN = 1.0
 SIDE_MARGIN = 0.3
-SCENERY = re.compile(r"^(Lamptower|Mast|Plinth|Wallblock|Lighthouse|Garland|Column|Lantern)_")
+SCENERY = re.compile(r"^(Lamptower|Mast|Plinth|Wallblock|Lighthouse|Garland|Column|Lantern|Sign)_")
 # Shortcuts. The balls' top speeds on a flat floor, measured in the engine (the arrow held 6000 ticks on a floor 40000
 # wide): wood 15.9, stone 17.9, paper 13.9 units a second; off a downhill or blown, faster, so the estimate takes
 # FLIGHT_V. Gravity 20 (physics.rs). A launching piece tilted up gives the flight an upward speed, RAMP_UP of the
@@ -231,6 +236,18 @@ def check_scenery(b):
     intended = getattr(b, "intended", set())
     nodes = [i for i, n in enumerate(b.nodes) if SCENERY.match(n["name"]) and n["name"] not in intended
              and n.get("mesh") is not None]
+    hits = scenery_hits(b, nodes)
+    if hits:
+        rows = sorted(hits.items(), key=lambda kv: (b.nodes[kv[0][0]]["name"], b.nodes[kv[0][1]]["name"]))
+        shown = "; ".join(f"{b.nodes[a]['name']} at {_fmt(p)} in the clearance over {b.nodes[f]['name']}"
+                          for (a, f), p in rows[:SHOW])
+        raise ValueError(f"{len(rows)} pieces of scenery in the ball's way (within {BALL_H + CLEAR_MARGIN} over a floor; "
+                         f"an intended obstacle is marked `obstacle`): {shown}")
+
+
+def scenery_hits(b, nodes, near=None):
+    """check_scenery for the objects `nodes`: {(object, floor): a point of it in the floor's clearance}. `near`
+    (centre, reach): only the floors' triangles within `reach` of `centre` seen from above (one object placed)."""
     pts, who = [], []
     for i in nodes:
         t, _ = _tris_of(b, i)
@@ -239,7 +256,7 @@ def check_scenery(b):
             pts.append(s)
             who.extend([i] * len(s))
     if not pts:
-        return
+        return {}
     S = np.concatenate(pts)
     who = np.array(who)
     CELL = 4.0
@@ -250,7 +267,12 @@ def check_scenery(b):
     for group, grow, below in (("Phys_Floors", SIDE_MARGIN, 0.05), ("Phys_FloorRails", 2.0, 1.0)):
         for i in _floors(b, group, railings=False):
             t, up = _tris_of(b, i)
-            for tri in t[up > 0.3]:
+            tops = t[up > 0.3]
+            if near is not None and len(tops):
+                c, r = near
+                lo, hi = tops.min(1), tops.max(1)
+                tops = tops[(lo[:, 0] < c[0] + r) & (hi[:, 0] > c[0] - r) & (lo[:, 2] < c[2] + r) & (hi[:, 2] > c[2] - r)]
+            for tri in tops:
                 x0, z0 = tri[:, 0].min() - grow, tri[:, 2].min() - grow
                 x1, z1 = tri[:, 0].max() + grow, tri[:, 2].max() + grow
                 cand = []
@@ -278,12 +300,7 @@ def check_scenery(b):
                 for k in cand[ok]:
                     if who[k] != i:
                         hits.setdefault((int(who[k]), i), S[k])
-    if hits:
-        rows = sorted(hits.items(), key=lambda kv: (b.nodes[kv[0][0]]["name"], b.nodes[kv[0][1]]["name"]))
-        shown = "; ".join(f"{b.nodes[a]['name']} at {_fmt(p)} in the clearance over {b.nodes[f]['name']}"
-                          for (a, f), p in rows[:SHOW])
-        raise ValueError(f"{len(rows)} pieces of scenery in the ball's way (within {BALL_H + CLEAR_MARGIN} over a floor; "
-                         f"an intended obstacle is marked `obstacle`): {shown}")
+    return hits
 
 
 # --- 3. shortcuts ---------------------------------------------------------------------------------------------------
@@ -468,10 +485,135 @@ def check_reachable(b):
                          f"in), e.g. " + "; ".join(bad[:SHOW]))
 
 
+# --- 5. faces in one plane -----------------------------------------------------------------------------------------
+# Two faces count as one plane when their normals agree to COPLANAR_COS and their planes are COPLANAR_D apart at most;
+# an overlap of COPLANAR_AREA or more (square units) is reported.
+COPLANAR_COS, COPLANAR_D, COPLANAR_AREA = 0.9995, 0.004, 0.02
+
+
+def _clip_left(poly, a, b):
+    """The 2D polygon clipped to the left of the line a -> b."""
+    out = []
+    for i in range(len(poly)):
+        p, q = poly[i], poly[(i + 1) % len(poly)]
+        sp = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+        sq = (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])
+        if sp >= 0:
+            out.append(p)
+        if (sp >= 0) != (sq >= 0):
+            t = sp / (sp - sq)
+            out.append((p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])))
+    return out
+
+
+def _area2d(poly):
+    return sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1]
+               for i in range(len(poly))) / 2
+
+
+def _overlap2d(t1, t2):
+    """The area two 2D triangles share."""
+    p = [tuple(v) for v in t1]
+    q = [tuple(v) for v in t2]
+    if _area2d(p) < 0:
+        p = p[::-1]
+    if _area2d(q) < 0:
+        q = q[::-1]
+    for i in range(3):
+        p = _clip_left(p, q[i], q[(i + 1) % 3])
+        if len(p) < 3:
+            return 0.0
+    return abs(_area2d(p))
+
+
+def coplanar_overlaps(items):
+    """`items`: [(label, triangles (n, 3, 3), their facing normals (n, 3))]. Returns [(label, label, area, point)]
+    for each pair of faces of two items in one plane, facing one way, overlapping."""
+    if not items:
+        return []
+    T = np.concatenate([t for _, t, _ in items])
+    F = np.concatenate([f for _, _, f in items])
+    owner = np.concatenate([np.full(len(t), k) for k, (_, t, _) in enumerate(items)])
+    g = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])
+    a2 = np.linalg.norm(g, axis=1)
+    ok = a2 > 1e-6
+    g[ok] /= a2[ok, None]
+    # facing: the geometric normal turned to the side the face is drawn for
+    g[np.einsum("ij,ij->i", g, F) < 0] *= -1.0
+    d = np.einsum("ij,ij->i", g, T[:, 0])
+    bins = {}
+    for i in np.nonzero(ok)[0]:
+        bins.setdefault((tuple(np.round(g[i] * 100).astype(int)), int(math.floor(d[i] / 0.05))), []).append(i)
+    found, seen = [], set()
+    for (kn, kd), ids in bins.items():
+        ids = ids + bins.get((kn, kd + 1), [])
+        if len({owner[i] for i in ids}) < 2:
+            continue
+        n = g[ids[0]]
+        u = np.cross(n, (0.0, 1.0, 0.0) if abs(n[1]) < 0.9 else (1.0, 0.0, 0.0))
+        u /= np.linalg.norm(u)
+        v = np.cross(n, u)
+        flat = {i: np.c_[T[i] @ u, T[i] @ v] for i in ids}
+        cells = {}
+        for i in ids:
+            lo, hi = flat[i].min(0) // 4, flat[i].max(0) // 4
+            for cx in range(int(lo[0]), int(hi[0]) + 1):
+                for cy in range(int(lo[1]), int(hi[1]) + 1):
+                    cells.setdefault((cx, cy), []).append(i)
+        for cell in cells.values():
+            for x, i in enumerate(cell):
+                for j in cell[x + 1:]:
+                    if owner[i] == owner[j] or (i, j) in seen or (j, i) in seen:
+                        continue
+                    if abs(d[i] - d[j]) > COPLANAR_D or g[i] @ g[j] < COPLANAR_COS:
+                        continue
+                    seen.add((i, j))
+                    area = _overlap2d(flat[i], flat[j])
+                    if area >= COPLANAR_AREA:
+                        found.append((items[owner[i]][0], items[owner[j]][0], area, T[i].mean(0)))
+                        if os.environ.get("LEVELCHECK_DEBUG"):
+                            print("coplanar", items[owner[i]][0], T[i].round(2).tolist(), items[owner[j]][0], T[j].round(2).tolist())
+    return found
+
+
+def check_coplanar(b):
+    """No two drawn faces of the level overlap in one plane facing one way (see the top)."""
+    names = {v: k for k, v in getattr(b, "mat_ids", {}).items()}
+    items = []
+    for i, node in enumerate(b.nodes):
+        if node.get("mesh") is None or not node.get("visible", True):
+            continue
+        m = b.meshes[node["mesh"]]
+        if not m.p:
+            continue
+        M = node["matrix"]
+        P = np.asarray(m.p, np.float64) @ M[:3, :3].T + M[:3, 3]
+        N = np.asarray(m.n, np.float64) @ M[:3, :3].T if getattr(m, "n", None) else None
+        for mat, idx in m.parts.items():
+            if mat is None or not idx:
+                continue
+            t = np.reshape(idx, (-1, 3))
+            tri = P[t]
+            if N is not None:
+                face = N[t].sum(1)
+            else:
+                face = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+            items.append((f"{node['name']}[{names.get(mat, mat)}]", tri, face))
+    found = coplanar_overlaps(items)
+    if found:
+        per = {}
+        for a, c, area, p in found:
+            k = (a, c)
+            per[k] = (per.get(k, (0.0, p))[0] + area, p)
+        shown = "; ".join(f"{a} and {c} at {_fmt(p)}, {area:.2f}" for (a, c), (area, p) in
+                          sorted(per.items(), key=lambda kv: -kv[1][0])[:SHOW])
+        raise ValueError(f"{len(per)} pairs of faces overlap in one plane (they flicker: z-fighting), e.g. {shown}")
+
+
 def check_all(b):
-    """Runs the three checks; returns the messages of those that fail (empty: all pass)."""
+    """Runs the checks; returns the messages of those that fail (empty: all pass)."""
     msgs = []
-    for fn in (check_seams, check_scenery, check_shortcuts, check_reachable):
+    for fn in (check_seams, check_scenery, check_shortcuts, check_reachable, check_coplanar):
         try:
             fn(b)
         except ValueError as e:

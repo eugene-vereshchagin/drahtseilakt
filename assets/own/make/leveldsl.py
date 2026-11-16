@@ -36,6 +36,9 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
                              ties across between the tubes (a harder ride, for later levels)
     gap L [up H|down H] [runup R]  the cursor jumps L ahead (and H up or down): nothing built; the test player
                              takes it at speed (the careful styles with a run-up of R, 14 if not given)
+    rebate L D               a floor L long, D lower than the cursor (which stays at its height): the ledge a deck
+                             lies in flush with the way, either side of the gap it falls into (the drawbridge's lane,
+                             level 5: 1 long, 0.5 deep, the deck's thickness)
     move F S U               the cursor moves F ahead, S to the left, U up (nothing built)
     turn A                   the heading turns A degrees to the left (negative: right), the cursor stays
     mark NAME / back NAME    remember the cursor / go back to it
@@ -132,6 +135,9 @@ except ValueError:
 # How far a floor's end may be from a checkpoint piece's edge and still join it (the path drifts by a few thousandths).
 JOIN_TOL = 0.02
 CORNER_RAIL = 8.0
+# Commands between a stone corner and the floor out of it that leave its railing to that floor (they lay nothing).
+KEEPS_CORNER_RAIL = ("floor", "width", "sign", "check", "pilot", "nopilot", "autopilot", "smooth", "columns", "drop",
+                     "surface", "mark")
 CRATE_SLOT = 5.3
 PUSHER_SLOT = 1.6
 # The flap wheel (P_Modul_19, flaps): the gap its flat flap lies over; its frame this far on from the gap's near edge
@@ -552,11 +558,28 @@ class Track:
 
     def run(self, cmd, args, opts, flags, line):
         n0, a0 = len(self.b.nodes), self.along
+        if cmd not in KEEPS_CORNER_RAIL:
+            # a stone corner's railing goes on along the floor laid next from the corner, nothing else
+            self.corner_rail_next = None
         self.run_command(cmd, args, opts, flags, line)
         self.b.mark_route(n0, a0, max(self.along, a0))
 
     def run_command(self, cmd, args, opts, flags, line):
-        if cmd in ("floor", "rails", "gap"):
+        if cmd == "floor" and getattr(self, "corner_rail_next", None):
+            # the floor out of a stone corner: its first CORNER_RAIL with the railing on the corner's outer side
+            outer, self.corner_rail_next = self.corner_rail_next, None
+            length = num(args, 0, line)
+            rise = self.rise(opts, line)
+            r = min(CORNER_RAIL, length)
+            for part, turn_rail in ((r, outer), (length - r, (False, False))):
+                if part <= 1e-6:
+                    continue
+                pts, heads = self.straight(part, rise * part / length)
+                self.turn_rail = turn_rail
+                self.lay(pts, heads, "Floor", straight=True)
+                self.turn_rail = (False, False)
+                self.move_along(pts)
+        elif cmd in ("floor", "rails", "gap"):
             length = num(args, 0, line)
             rise = self.rise(opts, line)
             pts, heads = self.straight(length, rise)
@@ -578,6 +601,13 @@ class Track:
             self.lay(pts, heads, "Rails" if cmd.startswith("rails") else "Floor", ties="ties" in opts)
             self.turn_rail = (False, False)
             self.move_along(pts, angle)
+        elif cmd == "rebate":
+            # a ledge: the floor laid D lower, the cursor back up at its end (both steps are the floors' own ends)
+            length, deep = num(args, 0, line), num(args, 1, line)
+            down = np.array([0.0, deep, 0.0])
+            self.pos = self.pos - down
+            self.run_command("floor", [f"{length:g}"], {}, flags, line)
+            self.pos = self.pos + down
         elif cmd == "move":
             to = self.at(num(args, 0, line), num(args, 1, line), num(args, 2, line))
             self.along += float(np.linalg.norm(to - self.pos))
@@ -774,7 +804,13 @@ class Track:
             raise LevelError(f"line {line}: a corner must come at the end of a floor")
         outer = (False, True) if sgn > 0 else (True, False)
         reach = CORNER_RAIL
-        if "rail" in args:
+        # where the stone ball goes on a bare floor (no border, no gutter), every hard corner has the railing on its
+        # outer side: so heavy and slow a ball, steered round, runs on straight into the corner's outer edge and
+        # falls (the owner's notes, 2026-11-16; the original's narrow stone lanes are troughs instead, 0.68 deep in
+        # the middle of 5, level 5). Along the floor out of it as far as the floor laid next reaches (no more floor
+        # laid for it: the description stays as it is).
+        stone_rail = self.ball_kind == "stone" and self.safety == "none" and "rail" not in args
+        if "rail" in args or stone_rail:
             seg = st["along"][-1] - st["along"][-2]
             r = min(reach, seg * 0.5)
             t = 1 - r / seg
@@ -792,7 +828,9 @@ class Track:
         st["scales"][-1] = math.sqrt(2.0)
         self.head += 90.0 * sgn
         st["tail"] = self.fwd()
-        if "rail" in args:
+        if stone_rail:
+            self.corner_rail_next = outer
+        elif "rail" in args:
             gap = float(opts.get("gap", 0))
             if gap > 0:
                 # an opening in the outer railing along the first `gap` of the way out: the way straight on
@@ -988,7 +1026,7 @@ class Track:
             c = top + f * a + lft * s - up * L.DEPTH / 2
             P.solid(m, mats["top"], mats["side"], c, (f, up, lft), (ha, L.DEPTH / 2, hs))
         self.b.add(f"Fan_Pad_{n:02d}", m, groups=self.b._floor_groups("stone") + self.b.sector(self.sector))
-        self.b.fan_block(f"Fan_Block_{n:02d}", tuple(mid), tuple(f), self.sector)
+        self.b.fan_block(f"Fan_Block_{n:02d}", tuple(mid), tuple(f), self.sector, sides=False)
         k = self.n("P_Modul_18")
         self.b.module("P_Modul_18", k, K.pose(tuple(mid), tuple(f)), self.sector, lift=0.0)
         for a in np.linspace(0, size, max(2, int(size / 6) + 1)):
