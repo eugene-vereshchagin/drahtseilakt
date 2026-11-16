@@ -3333,6 +3333,8 @@ struct RetrySave {
     /// and how often at most.
     from: usize,
     most: u32,
+    /// How far across its points may be moved (`Runner::vary`).
+    width: f32,
     state: Saved,
     tries: u32,
     /// Whether it has fired (from the save, it fires on the next tick but for a varied opening of the player's).
@@ -3464,6 +3466,7 @@ impl PilotRun {
                 hint: i,
                 from: 0,
                 most: self.pilot.hints.retry_of(i),
+                width: crate::hints::VARY_POINT,
                 state: (
                     s.clone(),
                     game.replay_out.clone(),
@@ -3517,14 +3520,14 @@ impl PilotRun {
             .wrapping_mul(0x9E37_79B9)
             .wrapping_add(r.tries.wrapping_mul(0x85EB_CA6B))
             ^ (sim.tick as u32).wrapping_mul(0xC2B2_AE35);
-        let (hint, from, tries) = (r.hint, r.from, r.tries);
+        let (hint, from, tries, width) = (r.hint, r.from, r.tries, r.width);
         game.sim = sim;
         game.replay_out = replay;
         let (zones, learned) = (self.pilot.zones.clone(), self.pilot.learned.clone());
         self.pilot = p;
         self.pilot.zones = zones;
         self.pilot.learned = learned;
-        self.pilot.hints.vary(hint, from, tries, seed);
+        self.pilot.hints.vary(hint, from, tries, seed, width);
         (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
         self.heard = game.sim.events.len();
         // (the states saved on the failed try are not gone back to)
@@ -3562,7 +3565,7 @@ impl PilotRun {
         let failed_check = pilot.hints.take_failed();
         // a `retry` step reached: the run saved here, as it is after this tick, to try the rest of the hint again
         // from (the stretch before it got through)
-        if let Some((hint, most)) = pilot.hints.take_mark()
+        if let Some((hint, most, width)) = pilot.hints.take_mark()
             && self.rewinds.enabled()
         {
             if let Some(r) = self.retry.take()
@@ -3576,6 +3579,7 @@ impl PilotRun {
                 hint,
                 from,
                 most,
+                width,
                 state: (
                     game.sim.clone(),
                     game.replay_out.clone(),

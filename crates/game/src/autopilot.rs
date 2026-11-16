@@ -3936,7 +3936,7 @@ mod tests {
         let _ = drive(&mut p, &mut sim, 3, 0);
         assert_eq!(p.hints.take_mark(), None, "not there yet");
         let _ = drive(&mut p, &mut sim, 5, 0);
-        assert_eq!(p.hints.take_mark(), Some((0, 4)));
+        assert_eq!(p.hints.take_mark(), Some((0, 4, 0.3)));
         // on at once: the step after it runs
         assert_eq!(p.hints.at(), Some((0, 2)));
         assert_eq!(p.hints.take_mark(), None, "taken once");

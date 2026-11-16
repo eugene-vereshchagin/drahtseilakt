@@ -86,7 +86,9 @@ pub const MAX_RETRY: u32 = 50;
 /// this many ticks with no arrows, a pass or press point moved up to this far across, speeds up to this share
 /// faster or slower, a push held up to this many ticks longer or shorter, a trace's gain up to this share off.
 const VARY_DELAY: u32 = 15;
-const VARY_POINT: f32 = 0.3;
+pub const VARY_POINT: f32 = 0.3;
+/// How far across a `retry` step may let its points be moved at most (`retry N W`).
+const MAX_VARY_POINT: f32 = 2.0;
 const VARY_SPEED: f32 = 0.06;
 const VARY_PUSH: u32 = 3;
 const VARY_GAIN: f32 = 0.15;
@@ -160,8 +162,9 @@ pub enum Step {
     /// ends there).
     Check(Vec3, f32, u64),
     /// From here on the hint is tried again, up to so many times, when it fails (as `retry N` before the `:` does
-    /// from its start): the run is saved as the step after it begins.
-    Retry(u32),
+    /// from its start): the run is saved as the step after it begins. Its points are moved up to the distance
+    /// across (`VARY_POINT` by default).
+    Retry(u32, f32),
 }
 
 /// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
@@ -488,7 +491,7 @@ fn full_step(words: &[&str]) -> Result<(bool, Step), String> {
             | Step::Trace(..)
             | Step::Wait(_)
             | Step::Check(..)
-            | Step::Retry(_)
+            | Step::Retry(..)
     ) {
         return Err("\"full\" is for a step that pushes in the original's view".into());
     }
@@ -671,7 +674,17 @@ fn step(words: &[&str]) -> Result<Step, String> {
             };
             Step::Until(p, clock, n)
         }
-        "retry" => Step::Retry(retry_count(w.next())?),
+        "retry" => {
+            let n = retry_count(w.next())?;
+            let width = match w.next() {
+                Some(v) => num(Some(v))?,
+                None => VARY_POINT,
+            };
+            if !(0.0..=MAX_VARY_POINT).contains(&width) {
+                return Err(format!("retry moves points 0 to {MAX_VARY_POINT} across"));
+            }
+            Step::Retry(n, width)
+        }
         "check" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let d = num(w.next())?;
@@ -1118,7 +1131,7 @@ pub struct Runner {
     failed: Option<usize>,
     /// A `retry` step reached (the hint's index and the tries it allows), until the test player takes it
     /// (`take_mark`) to save the run there.
-    mark: Option<(usize, u32)>,
+    mark: Option<(usize, u32, f32)>,
 }
 
 impl Runner {
@@ -1267,8 +1280,9 @@ impl Runner {
         self.failed.take()
     }
 
-    /// A `retry` step reached since the last call, if any: the hint's index and the tries it allows.
-    pub fn take_mark(&mut self) -> Option<(usize, u32)> {
+    /// A `retry` step reached since the last call, if any: the hint's index, the tries it allows and how far across
+    /// its points may be moved.
+    pub fn take_mark(&mut self) -> Option<(usize, u32, f32)> {
         self.mark.take()
     }
 
@@ -1278,7 +1292,8 @@ impl Runner {
     /// little off. The wider the more tries, all within the `VARY_*` caps; only its steps from index `from` on (where
     /// it is tried again from) change, and the delay comes before step `from` (when that step runs, it is begun
     /// again after the delay).
-    pub fn vary(&mut self, i: usize, from: usize, attempt: u32, seed: u32) {
+    pub fn vary(&mut self, i: usize, from: usize, attempt: u32, seed: u32, width: f32) {
+        let width = width.clamp(0.0, MAX_VARY_POINT);
         let Some(h) = self.hints.get_mut(i) else {
             return;
         };
@@ -1295,14 +1310,13 @@ impl Runner {
         for step in h.steps.iter_mut().skip(from) {
             match step {
                 Step::Pass(p, v, _) | Step::Press(p, _, v, _) => {
-                    p.x += VARY_POINT * s * unit();
-                    p.z += VARY_POINT * s * unit();
+                    p.x += width * s * unit();
+                    p.z += width * s * unit();
                     *v = scale(*v, unit());
                 }
                 Step::Ram(_, _, _, v, _, side) => {
                     *v = scale(*v, unit());
-                    *side = (*side + VARY_POINT * s * unit())
-                        .clamp(-MAX_PRESS_OFFSET, MAX_PRESS_OFFSET);
+                    *side = (*side + width * s * unit()).clamp(-MAX_PRESS_OFFSET, MAX_PRESS_OFFSET);
                 }
                 Step::Along(v, _) => *v = scale(*v, unit()),
                 Step::Round(_, _, v, _) => *v = scale(v.abs(), unit()).copysign(*v),
@@ -1399,8 +1413,8 @@ impl Runner {
                 .is_some_and(|f| *f);
             let step = adjust(step, run.flowed, self.zone.cap);
             // a retry mark: the run is saved here (by the test player, `take_mark`), and on at once
-            if let Step::Retry(n) = *step {
-                self.mark = Some((run.hint, n));
+            if let Step::Retry(n, width) = *step {
+                self.mark = Some((run.hint, n, width));
                 run.step += 1;
                 self.begin(sim);
                 continue;
@@ -1718,7 +1732,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
         Step::Wait(n) => (t < *n).then_some(0),
         // (the ball not there yet: no arrows while the check waits for it)
         Step::Check(p, d, n) => (ball.position.distance(*p) > *d && t < *n).then_some(0),
-        Step::Retry(_) => None,
+        Step::Retry(..) => None,
         Step::Turn(n) => {
             // a press every fourth tick, released between
             let presses = u64::from(n.unsigned_abs());
@@ -2617,7 +2631,7 @@ mod tests {
         assert_eq!(parse("at 0 0 0 r 1 : wait 1").unwrap()[0].retry, 0);
         assert_eq!(
             parse("at 0 0 0 r 1 : wait 1 ; retry 7 ; wait 2").unwrap()[0].steps[1],
-            Step::Retry(7)
+            Step::Retry(7, VARY_POINT)
         );
         for bad in [
             "at 0 0 0 r 1 retry 0 : wait 1",
@@ -2634,7 +2648,9 @@ mod tests {
             "at 0 0 0 r 1 : wait 1 ; retry 0",
             "at 0 0 0 r 1 : wait 1 ; retry 51",
             "at 0 0 0 r 1 : wait 1 ; full retry 3",
-            "at 0 0 0 r 1 : wait 1 ; retry 3 4",
+            "at 0 0 0 r 1 : wait 1 ; retry 3 2.5",
+            "at 0 0 0 r 1 : wait 1 ; retry 3 -1",
+            "at 0 0 0 r 1 : wait 1 ; retry 3 1 1",
         ] {
             assert!(parse(bad).is_err(), "{bad}");
         }
@@ -2647,7 +2663,7 @@ mod tests {
         let base = parse(text).unwrap();
         let varied = |attempt, seed| {
             let mut r = Runner::new(base.clone());
-            r.vary(0, 0, attempt, seed);
+            r.vary(0, 0, attempt, seed, VARY_POINT);
             r.hints.remove(0)
         };
         // the same try and seed: the same variation (a run is reproducible); another seed: another
@@ -2702,11 +2718,11 @@ mod tests {
         }
         // no such hint: nothing happens
         let mut r = Runner::new(base.clone());
-        r.vary(7, 0, 1, 1);
+        r.vary(7, 0, 1, 1, VARY_POINT);
         assert_eq!(r.hints, base);
         // varied from a step on: the steps before it as written, the delay before it
         let mut r = Runner::new(base.clone());
-        r.vary(0, 2, 4, 5);
+        r.vary(0, 2, 4, 5, VARY_POINT);
         assert_eq!(r.hints[0].steps[..2], base[0].steps[..2]);
         assert!(
             matches!(r.hints[0].steps[2], Step::Wait(_)) || r.hints[0].steps[2] != base[0].steps[2]
