@@ -1127,6 +1127,9 @@ struct Running {
     /// In a flow zone (zones.rs) the step is run without its stop: a goto rolled through, a wait or hold left out,
     /// a slow pass or press taken at `FLOW_SPEED`, when a copy of the run shows the ball is kept so.
     flowed: bool,
+    /// In the raw speedrun (`Runner::raw`), a flowed step's speed is a minimum, not a maximum: a pass, press or along
+    /// pushes on above it instead of braking.
+    least: bool,
     /// A trace's tick of its run due next, what its arrows left of the push wanted, and since when it is lost.
     k: usize,
     residual: Vec3,
@@ -1180,6 +1183,9 @@ pub struct Runner {
     pub began: u64,
     /// What the watcher's zones ask where the ball is now (set by the test player each tick).
     pub zone: crate::zones::Effect,
+    /// The raw speedrun (autopilot.rs, `Style::Raw`, set by the test player): every step is flowed where a copy of
+    /// the run keeps the ball, and a flowed step's speed is a minimum (`Running::least`).
+    pub raw: bool,
     /// A copy of the runner trying a step on a copy of the run: says nothing.
     quiet: bool,
     /// A step of the running hint ended well below its point (the ball fell to a floor beneath): the hint is off
@@ -1462,6 +1468,7 @@ impl Runner {
                 pushes: Vec::new(),
                 passed: None,
                 flowed: false,
+                least: false,
                 k: 0,
                 residual: Vec3::ZERO,
                 lost_since: None,
@@ -1622,6 +1629,7 @@ impl Runner {
         run.from = Vec3::ZERO;
         run.pushes.clear();
         run.flowed = false;
+        run.least = false;
         run.k = 0;
         run.residual = Vec3::ZERO;
         run.lost_since = None;
@@ -1632,10 +1640,15 @@ impl Runner {
             run.quarter = *q;
         }
         // in a flow zone a step that stops the ball goes without its stop, when a copy of the run keeps the ball so
-        if self.zone.flow && step.is_some_and(|s| flowing(s).is_some()) && self.flow_keeps_ball(sim)
+        // (the raw speedrun: a step with a speed too, which then pushes on above it)
+        let raw = self.raw;
+        if self.zone.flow
+            && step.is_some_and(|s| flowing(s).is_some() || (raw && has_speed(s)))
+            && self.flow_keeps_ball(sim)
         {
             if let Some(run) = self.running.as_mut() {
                 run.flowed = true;
+                run.least = raw;
             }
             if !self.quiet {
                 eprintln!("  step {} without its stop (a flow zone)", run_step(self));
@@ -1653,6 +1666,7 @@ impl Runner {
             return false;
         };
         run.flowed = true;
+        run.least = r.raw;
         let mut s = sim.clone();
         let lives = s.lives;
         let gone = |s: &Sim| s.lives < lives || s.is_dying() || s.game_over;
@@ -1684,6 +1698,11 @@ impl Runner {
 /// The running step's number (from 1), for the log.
 fn run_step(r: &Runner) -> usize {
     r.running.as_ref().map_or(0, |run| run.step + 1)
+}
+
+/// Whether a step drives at a speed of its own (the raw speedrun takes it as a minimum when flowed).
+fn has_speed(step: &Step) -> bool {
+    matches!(step, Step::Pass(..) | Step::Press(..) | Step::Along(..))
 }
 
 /// What a step does without its stop in a flow zone: a goto rolled through, a wait or hold left out, a slow pass or
@@ -2070,7 +2089,11 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             // across: to the line (and its offset), damped; along: on while slower than the speed
             let off = rel.dot(across) - side.dot(across);
             let a = -(1.5 * off + 0.8 * v.dot(across));
-            let f = if v.dot(along) < *speed { 1.0 } else { -0.3 };
+            let f = if v.dot(along) < *speed || run.least {
+                1.0
+            } else {
+                -0.3
+            };
             Some(arrows(along * f + across * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Round(c, r, speed, n) => {
@@ -2161,7 +2184,11 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let v = flat(ball.velocity);
             let off = flat(ball.position - from).dot(across);
             let a = -(1.5 * off + 0.8 * v.dot(across));
-            let f = if v.dot(along) < *speed { 1.0 } else { -0.5 };
+            let f = if v.dot(along) < *speed || run.least {
+                1.0
+            } else {
+                -0.5
+            };
             Some(arrows(along * f + across * a.clamp(-1.0, 1.0), quarter))
         }
         Step::Along(speed, n) => {
@@ -2169,7 +2196,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 return None;
             }
             let v = Vec3::new(ball.velocity.x, 0.0, ball.velocity.z);
-            Some(if v.length() < *speed {
+            Some(if v.length() < *speed || run.least {
                 arrows(v, quarter)
             } else {
                 0

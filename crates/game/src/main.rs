@@ -112,7 +112,7 @@ usage: drahtseilakt [options]
   --then FILE         with --follow: from the sector this replay begins at, its way instead (up to 8 times)
   --plan FILE         the test player's way goes through the level objects named in FILE, in order
   --hints FILE        the test player's hints (default: hints/<level>.txt in the data folder; autopilot.md)
-  --style STYLE       how the test player rides: calm (the default: a steady pace on the middle) or speedrun
+  --style STYLE       how the test player rides: calm (the default: a steady pace on the middle), speedrun or raw
   --rewinds N         the test player goes back to a saved state at most N times (lost or stuck; 0: never)
   --report DIR        where the test player writes a report each time it is stuck (default: the temp folder)
   --locate DIR        find the ball's way in a video's frames (DIR/s0001.jpg, four a second); track to --record
@@ -387,7 +387,7 @@ fn parse_args() -> Result<Options, String> {
             "--style" => {
                 let v = value()?;
                 o.style = crate::autopilot::Style::parse(&v)
-                    .ok_or_else(|| format!("--style: calm or speedrun, not {v}"))?;
+                    .ok_or_else(|| format!("--style: calm, speedrun or raw, not {v}"))?;
             }
             "--report" => o.report = Some(value()?.into()),
             "--give-up" => {

@@ -1058,6 +1058,15 @@ pub enum Style {
     #[default]
     Calm,
     Speedrun,
+    /// The raw speedrun: as the first test player rode, with nothing of the calm style left. No cost for speed (the
+    /// physics is the only limit), for slowness, for an edge, off the middle or for switching arrows: a choice is
+    /// worth how far along the way it gets. No careful, flow, calm or plain zone and no learned rule holds it back
+    /// (AUTOPILOT_RAW_CALM_ZONES=1 keeps the calm zones), the followed player's still stretches are skipped and
+    /// where the player hugged an edge, so may it. A hint's stops go wherever a copy of the run keeps the ball
+    /// without them, and its speeds are minimums there (AUTOPILOT_RAW_KEEP_STOPS=1 keeps them as written: a wait a
+    /// puzzle needs that the copy does not see). It goes back only from a lost ball, a stray transformer, a hint's
+    /// failed check or a way that has not got on for 20 seconds (a dead end), as every style does.
+    Raw,
 }
 
 /// A style's pace and line: the cruising speeds (`Route::cruise`), what speed above the pace costs, and what being
@@ -1082,6 +1091,7 @@ impl Style {
         match s {
             "calm" => Some(Style::Calm),
             "speedrun" => Some(Style::Speedrun),
+            "raw" => Some(Style::Raw),
             _ => None,
         }
     }
@@ -1115,6 +1125,20 @@ impl Style {
                 edge: SPEEDRUN_EDGE,
                 middle: 0.0,
                 switch: SPEEDRUN_SWITCH,
+            },
+            // (the cruising speeds only weigh costs, and every cost is 0: progress alone decides)
+            Style::Raw => Pace {
+                calm: SPEEDRUN_CALM,
+                rail: SPEEDRUN_RAIL,
+                wide: SPEEDRUN_WIDE,
+                base: SPEEDRUN_BASE,
+                per_half: SPEEDRUN_PER_HALF,
+                fast: 0.0,
+                slow: 0.0,
+                safe: 0.0,
+                edge: 0.0,
+                middle: 0.0,
+                switch: 0.0,
             },
         }
     }
@@ -1649,7 +1673,7 @@ impl Pilot {
             return None;
         };
         // (AUTOPILOT_SPEEDRUN_NO_SKIP: the player's still stretches are kept, for a try without the skips)
-        if self.style == Style::Speedrun
+        if self.style != Style::Calm
             && !self.in_calm
             && std::env::var_os("AUTOPILOT_SPEEDRUN_NO_SKIP").is_none()
             && let Some(skip) = idle_skip(&d, k, sim)
@@ -1675,6 +1699,7 @@ impl Pilot {
         // the player's keys from tick `k + t`, in our view (as a copy's view turns with them, each tick's own)
         let theirs = |s: &Sim, t: u64| d.input(k + t as usize, crate::hints::Facing::of(&s.camera));
         let route = self.route.clone();
+        let raw = self.ride == Style::Raw;
         let cost_of = |first: Option<u8>| -> (f32, Vec<u8>) {
             let mut s = sim.clone();
             let mut keys = Vec::new();
@@ -1701,7 +1726,8 @@ impl Pilot {
                     // where the player's ball hugged an edge, ours may keep up to `TRACK_SLACK` nearer the middle
                     // (as fast, the speed still counts): each unit off the player's line within it costs less than
                     // a unit off the middle
-                    let hugged = route.off_middle(p.pos).is_some_and(|m| m.1 > 0.0);
+                    // (the raw speedrun hugs it as the player did)
+                    let hugged = !raw && route.off_middle(p.pos).is_some_and(|m| m.1 > 0.0);
                     let middle = route.off_middle(s.ball.position).map(|m| m.0);
                     cost += match middle.filter(|_| hugged) {
                         Some(m) => {
@@ -2892,12 +2918,22 @@ impl Pilot {
         // (a calm zone asks the calm style of a speedrun, and nothing of the calm style)
         // (AUTOPILOT_SPEEDRUN_SKIP_ONLY: a speedrun at the calm pace that still skips the followed player's still
         // stretches, for a try at a level where the speedrun's pace fails)
-        self.in_calm = std::mem::take(&mut self.zone.calm) && self.style == Style::Speedrun;
+        // (the raw speedrun: no zone at all, but a calm one with AUTOPILOT_RAW_CALM_ZONES)
+        let calm = std::mem::take(&mut self.zone.calm);
+        self.in_calm = calm
+            && (self.style == Style::Speedrun
+                || (self.style == Style::Raw
+                    && std::env::var_os("AUTOPILOT_RAW_CALM_ZONES").is_some()));
         self.ride = self.style;
-        if self.in_calm || std::env::var_os("AUTOPILOT_SPEEDRUN_SKIP_ONLY").is_some() {
+        if self.in_calm
+            || (self.style == Style::Speedrun
+                && std::env::var_os("AUTOPILOT_SPEEDRUN_SKIP_ONLY").is_some())
+        {
             self.ride = Style::Calm;
         }
-        if self.ride == Style::Speedrun {
+        if self.ride == Style::Raw {
+            self.zone = crate::zones::Effect::default();
+        } else if self.ride == Style::Speedrun {
             self.zone.cap = None;
         } else if self.zone == crate::zones::Effect::default() && !self.learned.is_empty() {
             let here = self.situation(sim.ball.position, self.at, sim.ball.kind);
@@ -2914,6 +2950,12 @@ impl Pilot {
             None
         };
         self.hints.zone = self.limit();
+        // the raw speedrun: every hint's stop goes where a copy keeps the ball, its speeds as minimums
+        self.hints.raw =
+            self.ride == Style::Raw && std::env::var_os("AUTOPILOT_RAW_KEEP_STOPS").is_none();
+        if self.hints.raw {
+            self.hints.zone.flow = true;
+        }
         // AUTOPILOT_SITUATION: the place as the learned rules see it, every second, and each change of what the
         // zones and rules ask (which zone or rule, from which tick)
         if std::env::var_os("AUTOPILOT_SITUATION").is_some() {
@@ -3648,6 +3690,18 @@ impl<T: Clone> Rewinds<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn raw_style_has_no_costs_but_progress() {
+        assert_eq!(Style::parse("raw"), Some(Style::Raw));
+        let p = Style::Raw.pace();
+        for c in [p.fast, p.slow, p.safe, p.edge, p.middle, p.switch] {
+            assert_eq!(c, 0.0);
+        }
+        // the calm style keeps its costs
+        let c = Style::Calm.pace();
+        assert!(c.fast > 0.0 && c.slow > 0.0 && c.edge > 0.0 && c.middle > 0.0);
+    }
 
     #[test]
     fn rewinds_give_up_at_the_same_spot() {
