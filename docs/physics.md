@@ -286,6 +286,12 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   has run; the C run (checkpoints moved, the physics running about 44 s before the sector against our 16 s) has
   its tests elsewhere. With that one test suppressed the port's sack follows the C trace to 0.02 up to frame 1050.
   The slow drift of the idle ball at level 1's start is the same kind of difference.
+  The same countdown makes the sack's swing depend on everything else in the world: in the C build (2026-11-16,
+  wooden ball) the sack at x 572.15 has z offsets 1.86, -5.31, 7.26, -7.54 at frames 135, 255, 510, 600 when sector 3
+  comes in at frame 3327, 3627 or 3727, but 1.68, -5.04, 7.15, -7.47 at frame 3027 and 1.86, -4.80, 7.01, -7.37 at
+  2727. In the port, the sector begun with a paper ball instead of the wooden one (level 8's start ball, which the
+  C run had) gets a slow-state test at the top of the sack's first big swing (18.71 s) and follows the frame-3027
+  trace to 0.03; the comparison test therefore asks for the wooden ball.
 
   The plate bridge (`P_Modul_29_MF Script`): once its wake-up (80 across, to `P_Modul_29_MF`) has fired, a second
   proximity of 4 over all axes to `P_Modul_29_Platte06` (exactness 8 / 20, 2 / 30 frames); when the ball enters it,

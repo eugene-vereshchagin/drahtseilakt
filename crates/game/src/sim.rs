@@ -4562,7 +4562,10 @@ pub(crate) mod tests {
 
     /// Level 8's sack (sector 3) and swing (sector 5) with the player's copy (skipped without OPENBALLANCE_DATA):
     /// their scripts' pushes swing them as in the C game, which moved them by these z offsets at these frames after
-    /// their sector came in (the C build with the checkpoints moved under the ball).
+    /// their sector came in (the C build with the checkpoints moved under the ball). The C run had level 8's start
+    /// ball, the wooden one, so the test asks for it: with another ball the world's shared sleep countdown falls
+    /// elsewhere, and a sleep test at the top of the sack's swing slows it (the C game does the same: there, the
+    /// sector brought in at frame 3027 instead of 3327 gives 1.68 at frame 135 instead of 1.86).
     #[test]
     fn level_8_s_sack_and_swing_swing_as_in_the_c_game() {
         let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
@@ -4589,7 +4592,7 @@ pub(crate) mod tests {
         ];
         for (sector, x, samples) in cases {
             let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
-            sim.start_from(sector, None, None);
+            sim.start_from(sector, Some(BallKind::Wood), None);
             let body = sim
                 .swings
                 .iter()
