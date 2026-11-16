@@ -8,12 +8,14 @@ in a photograph (the grass at the photographer's feet, a road, a tripod) would r
 track. So only the sky and the horizon are taken from the photograph; everything below is made here, lit by the same
 photograph and seen as from high above: a sea that mirrors the sky with waves, a forest canopy, forested mountains, a
 canyon, a sea of cloud, a valley full of mist (the green lands drawn point by point at each pixel's own scale by
-skyland.py, their five lower faces at LAND_FACE; the rest from maps). The aerial haze thickens towards the horizon in the photograph's own
+skyland.py, as a mesh the game hangs the level over: `land` below; their faces show only the haze under the horizon,
+past the mesh's far edge; the rest from maps). The aerial haze thickens towards the horizon in the photograph's own
 horizon colour, so the two meet without a seam.
 
   python3 -I make_skies.py fetch [DIR]   # download the pinned panoramas once into DIR/skies/<id>/ and check them
   python3 -I make_skies.py check [DIR]   # check the panoramas already there against their checksums
   python3 -I make_skies.py make [DIR] [NAME...]  # make the skies (all, or the named) into Textures/Sky/
+  python3 -I make_skies.py land [DIR] [NAME...]  # only the land meshes of the skies with a green land (`make` does both)
 
 DIR defaults to $DRAHTSEILAKT_TEXTURE_SOURCES, else `texture-sources` beside the repository (as free_textures.py).
 The panoramas are never shipped; the faces made from them are, and are committed, so the game's build needs neither
@@ -103,7 +105,6 @@ SKIES = {
 SKY_LIGHT = os.path.join(HERE, "sky_light.json")
 
 FACE = 1024  # the faces' size as shipped
-LAND_FACE = 2048  # the lower faces' size of a sky with the green land below (sharp up to 4K)
 SS = 2  # drawn at twice that and averaged down
 JPEG_QUALITY = 88
 
@@ -600,6 +601,9 @@ def make_sky(name, root=None):
     if cfg.get("key"):
         # a sun behind haze casts too little to model the land: a soft key light from its direction, a share of the sky's
         light.sun = light.sun + light.sky * cfg["key"]
+    # a green land is the game's mesh (make_land, terrain.rs): the faces show only the haze past its far edge
+    if cfg["below"] == "land" and cfg.get("kind") in skyland.KINDS:
+        cfg = dict(cfg, below="haze")
     below = Below(cfg, light, pano)
     exposure = 0.18 / max(light.reference, 1e-9) * 2.0 ** cfg["ev"]
     cut = math.radians(cfg.get("cut", 0.0))
@@ -648,9 +652,7 @@ def make_sky(name, root=None):
 
     os.makedirs(OUT, exist_ok=True)
     made = []
-    # a sky with the green land below has its five lower faces at LAND_FACE (the land has detail to fill them; the
-    # photograph's sky would gain nothing, and its top stays at FACE)
-    sizes = {f: (LAND_FACE if below.terrain is not None and f != "Top" else FACE) for f in FACES}
+    sizes = {f: FACE for f in FACES}
     bands = [(f, r0) for f in FACES for r0 in range(0, sizes[f] * SS, BAND)]
     global _RENDER
     _RENDER = (radiance, sizes)
@@ -678,6 +680,99 @@ def make_sky(name, root=None):
     print(name, sum(os.path.getsize(p) for p in made), "bytes")
     save_light(name, light, exposure * tint)
     return made
+
+
+# --- the land under a level ------------------------------------------------------------------------------------------
+
+
+def make_land(name, root=None):
+    """The green land of a sky as a mesh the game hangs the level over (skyland.Land; crates/game/src/terrain.rs):
+    `Sky_<name>_LandHeight.png` (16-bit heights, LAND_GRID a side), `Sky_<name>_LandColor.jpg` (the land lit by the
+    sky's sun and sky as its faces are, in their exposure and tone, LAND_TEX a side; no haze: the game adds the air by
+    distance) and `Sky_<name>_Land.txt` (its size, heights and light). None for a sky without a green land."""
+    cfg = SKIES[name]
+    if cfg["below"] != "land" or cfg.get("kind") not in skyland.KINDS:
+        return []
+    pano = load(cfg["src"], root)
+    light = Light(pano)
+    if cfg.get("key"):
+        light.sun = light.sun + light.sky * cfg["key"]
+    exposure = 0.18 / max(light.reference, 1e-9) * 2.0 ** cfg["ev"]
+    tint = np.array(cfg.get("tint", (1.0, 1.0, 1.0)))
+    land = skyland.Land(cfg["kind"], cfg["seed"])
+    ext, n, t = skyland.LAND_EXTENT, skyland.LAND_GRID, skyland.LAND_TEX
+    os.makedirs(OUT, exist_ok=True)
+
+    g = np.linspace(-ext / 2, ext / 2, n, dtype=np.float32)
+    hz, hx = np.meshgrid(g, g, indexing="ij")
+    hgt = land.world_height(hx, hz, ext / (n - 1))
+    y0, y1 = float(hgt.min()), float(hgt.max())
+    q = np.clip(np.round((hgt - y0) / max(y1 - y0, 1e-6) * 65535), 0, 65535).astype(np.uint16)
+    hpath = os.path.join(OUT, f"Sky_{name}_LandHeight.png")
+    Image.fromarray(q, "I;16").save(hpath, optimize=True)
+
+    sun = light.sun
+    white = float(sun @ LUM) * np.ones(3)
+    sun = sun + (white - sun) * cfg.get("white", SUN_WHITE)
+    # the water mirrors the sky some way up (the camera looks down at it from above the track)
+    az = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+    el = math.radians(25.0)
+    up = np.stack([np.sin(az) * math.cos(el), np.full(az.shape, math.sin(el)), np.cos(az) * math.cos(el)], -1)
+    mirror = panorama(pano, azimuth_u(up), elevation(up)).mean(0)
+    deep = skyland.WATER * float(light.sky @ LUM) / np.pi * 8.0
+    water_col = mirror * 0.25 + deep * 0.75
+    fog_lit = (light.sky + sun * max(light.sun_dir[1], 0.05)) / np.pi * 0.8
+
+    def band(rows):
+        z = (-ext / 2 + (rows + 0.5) * ext / t).astype(np.float32)
+        x = (-ext / 2 + (np.arange(t) + 0.5) * ext / t).astype(np.float32)
+        zz, xx = np.meshgrid(z, x, indexing="ij")
+        alb, nrm, water, fog = land.colours(xx, zz, ext / t)
+        grey = alb.mean(-1, keepdims=True)
+        alb = np.clip(grey + (alb - grey) * cfg.get("vivid", 1.0), 0, 1)
+        lam = np.clip(nrm @ light.sun_dir, 0, 1)[..., None]
+        col = alb / np.pi * (sun * lam + light.sky * (0.5 + 0.5 * nrm[..., 1:2]))
+        col = col + (water_col - col) * water[..., None]
+        col = col + (fog_lit - col) * fog[..., None]
+        return srgb(aces(col * exposure * tint)).astype(np.float32)
+
+    global _LAND
+    _LAND = band
+    jobs = [np.arange(r, min(t, r + BAND)) for r in range(0, t, BAND)]
+    try:
+        import multiprocessing as mp
+        workers = mp.get_context("fork").Pool(min(len(jobs), os.cpu_count() or 1))
+    except (ImportError, ValueError, OSError):
+        workers = None
+    try:
+        done = list((workers.map if workers else map)(_land_band, jobs))
+    finally:
+        if workers:
+            workers.close()
+            workers.join()
+    img = np.clip(np.concatenate(done) * 255 + 0.5, 0, 255).astype(np.uint8)
+    cpath = os.path.join(OUT, f"Sky_{name}_LandColor.jpg")
+    Image.fromarray(img, "RGB").save(cpath, quality=JPEG_QUALITY, optimize=True)
+
+    # the light the colours were lit with (the game relights where it lowers the land under the track)
+    sun_l = float(sun @ LUM) / np.pi
+    sky_l = float(light.sky @ LUM) / np.pi
+    tpath = os.path.join(OUT, f"Sky_{name}_Land.txt")
+    with open(tpath, "w") as f:
+        f.write(f"# the land under a level under the sky {name} (make_skies.py land; crates/game/src/terrain.rs)\n")
+        f.write(f"extent {ext:g}\n")
+        f.write(f"heights {y0:.2f} {y1:.2f}\n")
+        f.write("sun " + " ".join(f"{v:.4f}" for v in light.sun_dir) + "\n")
+        f.write(f"light {sun_l / max(sky_l, 1e-9):.4f}\n")
+    print(name, "land", y0, y1, sum(os.path.getsize(p) for p in (hpath, cpath, tpath)), "bytes")
+    return [hpath, cpath, tpath]
+
+
+_LAND = None  # the band function of the land being made, for the forked processes
+
+
+def _land_band(rows):
+    return _LAND(rows)
 
 
 BAND = 256  # rows of a face drawn at once (and the unit of work shared among the processes)
@@ -729,6 +824,15 @@ def main(argv):
             if name not in SKIES:
                 raise SystemExit(f"no sky {name}: {', '.join(SKIES)}")
             make_sky(name, root)
+            make_land(name, root)
+        return 0
+    if len(argv) >= 2 and argv[1] == "land":
+        rest = argv[2:]
+        root = rest.pop(0) if rest and rest[0] not in SKIES else None
+        for name in rest or list(SKIES):
+            if name not in SKIES:
+                raise SystemExit(f"no sky {name}: {', '.join(SKIES)}")
+            make_land(name, root)
         return 0
     if len(argv) == 2 and argv[1] == "credits":
         print("\n".join(credits()))

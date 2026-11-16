@@ -103,7 +103,9 @@ pub struct Pass {
 /// The sea of cloud under a level that names a sky with a land below it (Mountains, Forest, Mist, Desert) and has no
 /// sea of its own: a stranger's map made without the toolkit would show that land (a green swamp from far above)
 /// instead of clouds. Lit like the toolkit's (`levelkit.py` CLOUD_SEA, `sky_light.json`): Mist takes Forest's light,
-/// Desert Mountains'. A closed sea (`under` 1: nothing below it shows through). None for any other sky.
+/// Desert Mountains'. Under Desert a closed sea (`under` 1: nothing below it shows through); under the skies whose land
+/// is a mesh under the level (terrain.rs) scattered banks with gaps the land shows through, as the toolkit's levels
+/// have. None for any other sky.
 pub fn default_sea(sky: &str, lowest: f32) -> Option<level::Clouds> {
     let (sun, sun_color, sky_c, shadow) = match sky {
         "Mountains" | "Desert" => (
@@ -120,17 +122,18 @@ pub fn default_sea(sky: &str, lowest: f32) -> Option<level::Clouds> {
         ),
         _ => return None,
     };
+    let open = sky != "Desert";
     Some(level::Clouds {
         top: lowest - 35.0,
         thickness: 110.0,
-        cover: 0.8,
+        cover: if open { 0.3 } else { 0.8 },
         scale: 85.0,
         sun,
         sun_color,
         sky: sky_c,
         shadow,
         haze: 0.0005,
-        under: 1.0,
+        under: if open { 0.0 } else { 1.0 },
         wind: level::Clouds::DEFAULT.wind,
     })
 }
@@ -677,6 +680,14 @@ fn face_at(d: Vec3) -> (usize, f32, f32) {
 /// the colour a little above the horizon by direction (u = atan2(x, z) / 2 pi + 1/2, as clouds.wgsl reads it),
 /// averaged over a few degrees, and the average of it all.
 pub fn horizon_ring(faces: &[Option<(u32, u32, Vec<u8>)>]) -> Option<(Vec<u8>, [f32; 3])> {
+    ring_at(faces, [0.4, 1.0, 1.6])
+}
+
+/// The colour round the circle at three elevations (degrees; below the horizon if negative), as `horizon_ring`.
+pub fn ring_at(
+    faces: &[Option<(u32, u32, Vec<u8>)>],
+    elevations: [f32; 3],
+) -> Option<(Vec<u8>, [f32; 3])> {
     let mut ring = vec![[0.0f32; 3]; RING];
     for (i, slot) in ring.iter_mut().enumerate() {
         let mut sum = [0.0f32; 3];
@@ -684,7 +695,7 @@ pub fn horizon_ring(faces: &[Option<(u32, u32, Vec<u8>)>]) -> Option<(Vec<u8>, [
         for k in 0..9 {
             let u = (i as f32 + 0.5 + (k % 3) as f32 / 3.0 - 0.33) / RING as f32;
             let az = (u - 0.5) * std::f32::consts::TAU;
-            let el = (0.4 + 0.6 * (k / 3) as f32).to_radians();
+            let el = elevations[k / 3].to_radians();
             let d = Vec3::new(az.sin() * el.cos(), el.sin(), az.cos() * el.cos());
             let (face, fu, fv) = face_at(d);
             let (w, h, rgba) = faces.get(face)?.as_ref()?;

@@ -114,6 +114,9 @@ class Terrain:
     def __init__(self, kind, seed, relief=1.0):
         self.k = dict(KINDS[kind])
         self.relief = relief
+        self.crown_bump = 0.0022  # the crowns' height (the light and shade they get straight down)
+        self.rock, self.scree = ROCK, SCREE
+        self.steep_relief = 1.0  # the ground's slopes taken that much steeper where rock shows (a mesh's true slopes)
         s = seed * 97
         self.warp_x = Field(s + 1, 0.35, 4)
         self.warp_z = Field(s + 2, 0.35, 4)
@@ -155,7 +158,7 @@ class Terrain:
         if forest is None:
             forest = self.forest(x, z, fp, h)
         crowns = self.crowns(x, z, fp)
-        return h + 0.0022 * forest * (crowns - 0.5), crowns, h
+        return h + self.crown_bump * forest * (crowns - 0.5), crowns, h
 
     def forest(self, x, z, fp, h):
         """How much of the ground is under trees (0..1)."""
@@ -183,7 +186,8 @@ class Terrain:
         span = max(q["hi"] - q["lo"], 1e-6)
         h01 = np.clip((h - q["lo"]) / span, 0, 1)
         # the ground's own steepness (not the crowns'): where rock shows
-        steep = 1 - 1 / np.sqrt(1 + ((rx - h) / e) ** 2 + ((rz - h) / e) ** 2)
+        sr = self.steep_relief
+        steep = 1 - 1 / np.sqrt(1 + ((rx - h) / e * sr) ** 2 + ((rz - h) / e * sr) ** 2)
 
         # the open ground: meadows, alpine grass higher up, rock where it is steep and high, snow on the peaks
         mix = self.mix(x, z, fp)
@@ -191,7 +195,7 @@ class Terrain:
         alb = alb + (ALPINE - alb) * smooth(q["treeline"] - 0.05 * span, q["treeline"] + 0.1 * span, h)[..., None]
         if mtn is not None:
             rock = smooth(0.25, 0.5, steep + 0.4 * smooth(q["treeline"], q["snow"], h)) * smooth(0.1, 0.5, mtn)
-            alb = alb + (ROCK + (SCREE - ROCK) * mix[..., None] - alb) * rock[..., None]
+            alb = alb + (self.rock + (self.scree - self.rock) * mix[..., None] - alb) * rock[..., None]
             snow = smooth(q["snow"] - 0.02 * span, q["snow"] + 0.03 * span, h + 0.08 * span * (mix - 0.5))
             snow = snow * smooth(0.55, 0.3, steep)
             alb = alb + (SNOW - alb) * snow[..., None]
@@ -233,3 +237,54 @@ def preview(kind, seed=1, size=512, extent=2.0):
     col = alb * (lam * 3 + 0.6 * (0.5 + 0.5 * nrm[..., 1:2]))
     col = col * (1 - water[..., None]) + np.array([0.05, 0.07, 0.1]) * water[..., None]
     return col + (0.5 - col) * fog[..., None]
+
+
+# --- the land as a mesh under a level (the game's terrain layer: crates/game/src/terrain.rs) ---------------------------
+#
+# Seen as a sky face, the land is at the infinite distance of the sky box: it never moves as the camera does, and its
+# features (a tree a three-hundredth of the camera's altitude) say "an airliner's window" (the owner, 2026-11-16, with
+# Ballex's levels as the reference: there the mountains, cliffs and water are a modest distance below the track and
+# rise to about its height at the sides). So the same land is also made as a height grid and a colour map a level's
+# world hangs over: LAND_EXTENT world units a side, the plane's unit LAND_UNIT world units, its heights by kind from
+# the land's 2nd to its 99.5th percentile (LAND_HEIGHTS, world units relative to the level's lowest floor: the game
+# places it, keeps it clear of the track and fogs it by distance).
+LAND_EXTENT = 10000.0
+LAND_UNIT = 260.0
+LAND_GRID = 641  # heights a side (a vertex every 15.6)
+LAND_TEX = 4096  # colour texels a side (2.4 world units each)
+LAND_CROWN = 7.0  # a tree crown's size (world units)
+LAND_HEIGHTS = {"mountains": (-440.0, 330.0), "forest": (-440.0, -60.0), "mist": (-440.0, -110.0)}
+
+
+class Land(Terrain):
+    """The land of a kind as world heights (relative to the level's lowest floor) at world points (x, z, from the
+    land's middle), with the colours of `surface` at that scale: its slopes the mesh's true ones."""
+
+    def __init__(self, kind, seed):
+        super().__init__(kind, seed)
+        self.crowns = Field(seed * 97 + 10, LAND_UNIT / LAND_CROWN, 3, gain=0.55)
+        g = (np.random.default_rng(seed + 5).random((2, 65536)) * (LAND_EXTENT / LAND_UNIT)).astype(np.float32)
+        hs = self.relief_height(g[1], g[0], np.full(g[0].shape, 15.0 / LAND_UNIT, np.float32))[0]
+        self.lo, self.hi = float(np.quantile(hs, 0.02)), float(np.quantile(hs, 0.995))
+        y0, y1 = LAND_HEIGHTS[kind]
+        # world units of height a unit of the plane's height; the slopes steeper by as much against the plane's own
+        self.scale = (y1 - y0) / max(self.hi - self.lo, 1e-6)
+        self.y0 = y0
+        self.relief = self.scale / LAND_UNIT
+        self.steep_relief = self.relief
+        self.crown_bump = 0.0022 * 3.0 / self.relief
+        # near, the slopes face the sun squarely: a darker, cooler rock (as Ballex's cliffs), or it reads as a pale slab
+        self.rock, self.scree = ROCK * np.float32(0.62), SCREE * np.float32(0.6)
+
+    def plane(self, x, z):
+        c = LAND_EXTENT / LAND_UNIT / 2
+        return (x / LAND_UNIT + c).astype(np.float32), (z / LAND_UNIT + c).astype(np.float32)
+
+    def world_height(self, x, z, step):
+        px, pz = self.plane(x, z)
+        h = self.relief_height(px, pz, np.full(px.shape, step / LAND_UNIT, np.float32))[0]
+        return self.y0 + (h - self.lo) * self.scale
+
+    def colours(self, x, z, step):
+        px, pz = self.plane(x, z)
+        return self.surface(px, pz, np.full(px.shape, step / LAND_UNIT, np.float32))

@@ -71,6 +71,7 @@ mod sim;
 mod sky;
 mod splashpic;
 mod supports;
+mod terrain;
 mod titlescene;
 mod trafo;
 mod ui;

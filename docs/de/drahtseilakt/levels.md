@@ -256,7 +256,18 @@ Hügeln), `Desert` (später Nachmittag über roten Canyons), `Mist` (Abendlicht 
 Ihr Himmel sind CC0-Fotos von Poly Haven; was unter dem Horizont liegt, zeichnet `assets/own/make/make_skies.py`, wie
 aus großer Höhe gesehen, sodass die Bahn hoch darüber schwebt (`assets/own/CREDITS.md`); unter `Mountains`, `Forest` und `Mist` wird
 das grüne Land Punkt für Punkt im Maßstab jedes Pixels gezeichnet (`assets/own/make/skyland.py`: senkrecht unten
-die Baumkronen, in der Ferne ein kühler bläulich-weißer Dunst), seine unteren Seiten mit 2048 Pixeln. Jeder andere Name ist ein
+die Baumkronen, in der Ferne ein kühler bläulich-weißer Dunst) als Gitter unter dem Level. **Das Land unter der
+Bahn** (2026-11-16, der Eigentümer nach dem Vorbild von Ballex: das Land soll nah sein, keine Karte aus dem
+Flugzeugfenster): `make_skies.py land` (auch Teil von `make`) schreibt `Sky_<Name>_LandHeight.png` (16-Bit-Höhen, 641
+je Seite), `Sky_<Name>_LandColor.jpg` (4096, von der Sonne des eigenen Himmels beleuchtet) und `Sky_<Name>_Land.txt`;
+das Spiel (`crates/game/src/terrain.rs`, `terrain.wgsl`) legt es so, dass das Level über dem tiefsten Gelände hängt,
+senkt es weich ab, wo es näher als 290 unter dem tiefsten Boden an etwas vom Level käme (weiter weg darf es um 0,85 je
+Einheit steigen: seitlich reichen die Berge etwa bis zur Höhe der Bahn), gibt ihm nah eine Körnung aus Steinen und
+Kronen und lässt es mit der Entfernung im Dunst unter dem Horizont des Himmels verschwinden; die Seiten zeigen unter
+dem Horizont nur noch Dunst (wieder 1024). Es bewegt sich mit der Kamera wie das Level (Parallaxe), die Wolken liegen
+zwischen ihm und der Bahn, die Physik sieht es nicht; die Himmel des Originals haben keins. Etwa 110 MB Videospeicher
+und 0,2 bis 0,6 ms je Bild (RTX 3060, 2560x1440); das Standard-Wolkenmeer umgewandelter Karten unter diesen Himmeln
+ist nun aufgelockert (cover 0,3). Jeder andere Name ist ein
 Satz Dateien `Textures/Sky/Sky_<Name>_<Seite>` (Front, Right, Back, Left, Down und Top, falls vorhanden) aus dem
 Levelordner oder den Texturen; ein Name besteht aus Buchstaben, Ziffern, `_` und `-`. `--sky NAME` auf der
 Kommandozeile spielt jedes Level unter einem anderen Himmel.

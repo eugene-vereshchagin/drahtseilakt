@@ -4199,6 +4199,35 @@ fn upload_extras(renderer: &mut Renderer, game: &Game, step: usize) -> bool {
             renderer.set_cloud_ring(&ring);
         }
         scene::set_volume_clouds(renderer.clouds.is_some());
+        // the land under the level, when its sky has one (terrain.rs); the original's skies have none
+        let name = crate::sky::override_name()
+            .or_else(|| game.level.level.sky.clone())
+            .filter(|n| crate::sky::valid_name(n));
+        renderer.land = name.and_then(|name| {
+            let land = crate::terrain::load(&name, |p| data.file(p))?;
+            let placed = land.place(&game.level.level, game.sim.lowest_floor())?;
+            let faces: Vec<_> = sky
+                .textures
+                .iter()
+                .take(4)
+                .map(|t| data.texture(t))
+                .collect();
+            // the haze just under the horizon: what the sky box shows past the land's far edge
+            let (ring, _) = crate::clouds::ring_at(&faces, [-0.3, -0.8, -1.5])?;
+            let gpu = crate::terrain::Gpu::new(
+                &renderer.device,
+                &renderer.queue,
+                renderer.format,
+                1,
+                placed,
+                &ring,
+            );
+            eprintln!(
+                "terrain: the land under the sky {name}, {:.1} MB on the card",
+                gpu.bytes as f64 / 1.0e6
+            );
+            Some(gpu)
+        });
         return true;
     }
     // The zenith colour: the top row of the front texture, averaged.
@@ -4443,6 +4472,22 @@ fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Result<
             );
         }
         crate::clouds::set_quality(chosen);
+        // and without the land under the level (terrain.rs), with the clouds as chosen
+        if let Some(land) = r.land.take() {
+            r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+            let _ = r.device.poll(wgpu::PollType::wait_indefinitely());
+            let start = std::time::Instant::now();
+            for _ in 0..n {
+                r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
+            }
+            let _ = r.device.poll(wgpu::PollType::wait_indefinitely());
+            println!(
+                "without the land, clouds {}: {:.2} ms a frame at {w}x{h}",
+                chosen.key(),
+                start.elapsed().as_secs_f64() * 1000.0 / f64::from(n.max(1))
+            );
+            r.land = Some(land);
+        }
         r.draw(&view, w, h, &scene::view(&snap), &inst, &particles);
     }
     r.draw_overlay(
