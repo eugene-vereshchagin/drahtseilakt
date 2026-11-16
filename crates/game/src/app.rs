@@ -3644,6 +3644,7 @@ impl PilotRun {
             )
         {
             let (sim, replay, p, b, sn, h, ne) = state;
+            let (failed_sector, failed_at) = (game.sim.sector, self.pilot.reached());
             let line = format!(
                 "{} {} at ({:.1} {:.1} {:.1}): back to {} (try {attempt}, {} rewinds)",
                 clock(game.sim.tick),
@@ -3664,6 +3665,7 @@ impl PilotRun {
             self.pilot.zones = zones;
             self.pilot.learned = learned;
             self.pilot.perturb(&game.sim, attempt);
+            self.pilot.fall_back(attempt, failed_sector, failed_at);
             (self.best, self.since, self.hint_at, self.near_edges) =
                 (b, game.sim.tick.max(sn), h, ne);
             self.heard = game.sim.events.len();

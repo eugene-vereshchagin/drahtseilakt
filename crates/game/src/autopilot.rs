@@ -1157,6 +1157,11 @@ fn speedrun_scale() -> f32 {
     })
 }
 
+/// The raw speedrun rides the calm style past a place after this many tries there (`Pilot::fall_back`), to this
+/// many way points past it.
+const RAW_FALLBACK: u32 = 6;
+const RAW_FALLBACK_PAST: usize = 20;
+
 const SPEEDRUN_CALM: f32 = 16.0;
 const SPEEDRUN_RAIL: f32 = 11.0;
 const SPEEDRUN_WIDE: f32 = 22.0;
@@ -1513,6 +1518,9 @@ pub struct Pilot {
     pub style: Style,
     ride: Style,
     in_calm: bool,
+    /// The raw speedrun after failing at one place again and again (`RAW_FALLBACK` tries): the calm style until the
+    /// way is past it (this sector, up to this way point).
+    calm_until: Option<(usize, usize)>,
 }
 
 /// The situation of a place (learned.rs): the way ahead read this far (points) for its bend, its slope and what
@@ -1594,6 +1602,7 @@ impl Pilot {
             style: Style::Calm,
             ride: Style::Calm,
             in_calm: false,
+            calm_until: None,
         }
     }
 
@@ -1601,6 +1610,20 @@ impl Pilot {
     /// a short opening move of its own (a wait or a push of random length: moving parts are then met at another
     /// phase) and, for some seconds, random additions to its choices' scores; from the third try on every third
     /// one leaves the player's line, which may be what failed.
+    /// A rewind of the raw speedrun after a failure at way point `at` of `sector` (the `attempt`th there): from
+    /// `RAW_FALLBACK` tries on, the calm style rides from the save to `RAW_FALLBACK_PAST` points past it, as in a calm
+    /// zone (the raw risk is taken everywhere but where it keeps failing). AUTOPILOT_RAW_FALLBACK=N changes the
+    /// tries (0: never).
+    pub fn fall_back(&mut self, attempt: u32, sector: usize, at: usize) {
+        let after = std::env::var("AUTOPILOT_RAW_FALLBACK")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(RAW_FALLBACK);
+        if self.style == Style::Raw && after > 0 && attempt >= after {
+            self.calm_until = Some((sector, at + RAW_FALLBACK_PAST));
+        }
+    }
+
     pub fn perturb(&mut self, sim: &Sim, attempt: u32) {
         let mut seed = 0x9E37_79B9u32.wrapping_mul(attempt.wrapping_add(1))
             ^ (sim.tick as u32).wrapping_mul(0x85EB_CA6B);
@@ -2920,10 +2943,18 @@ impl Pilot {
         // stretches, for a try at a level where the speedrun's pace fails)
         // (the raw speedrun: no zone at all, but a calm one with AUTOPILOT_RAW_CALM_ZONES)
         let calm = std::mem::take(&mut self.zone.calm);
-        self.in_calm = calm
-            && (self.style == Style::Speedrun
-                || (self.style == Style::Raw
-                    && std::env::var_os("AUTOPILOT_RAW_CALM_ZONES").is_some()));
+        // (the raw speedrun's fallback, past the place it kept failing at: over)
+        if self
+            .calm_until
+            .is_some_and(|(s, u)| sim.sector != s || self.at > u)
+        {
+            self.calm_until = None;
+        }
+        self.in_calm = (self.style == Style::Raw && self.calm_until.is_some())
+            || calm
+                && (self.style == Style::Speedrun
+                    || (self.style == Style::Raw
+                        && std::env::var_os("AUTOPILOT_RAW_CALM_ZONES").is_some()));
         self.ride = self.style;
         if self.in_calm
             || (self.style == Style::Speedrun
