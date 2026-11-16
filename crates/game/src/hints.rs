@@ -73,7 +73,7 @@ const MIN_RAM_BACK: f32 = 2.0;
 const MAX_RAM_BACK: f32 = 30.0;
 const RAM_RUNUP_TICKS: u64 = 600;
 const RAM_ON_LINE: f32 = 1.0;
-const RAM_DRIFT: f32 = 1.5;
+const RAM_DRIFT: f32 = 4.0;
 const BECOME_TICKS: u64 = 1200;
 
 #[derive(Debug, Clone, PartialEq)]
