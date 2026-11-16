@@ -1292,7 +1292,7 @@ impl Runner {
     }
 
     /// The hint at index `i` varied for its try number `attempt` (from 1) again, seeded (reproducible): a start delay
-    /// of a few ticks with no arrows (moving parts met at another phase), its pass and press points moved a little
+    /// of a few ticks with no arrows (moving parts met at another phase), its pass and press points and its traces' recorded way moved a little
     /// across, its speeds a little faster or slower, its pushes held a little longer or shorter, its traces' gain a
     /// little off. The wider the more tries, all within the `VARY_*` caps; only its steps from index `from` on (where
     /// it is tried again from) change, and the delay comes before step `from` (when that step runs, it is begun
@@ -1330,7 +1330,11 @@ impl Runner {
                     *n = n.saturating_add_signed(d).max(1);
                 }
                 Step::Track(t) => {
-                    t.gain = (t.gain * (1.0 + VARY_GAIN * s * unit())).clamp(0.0, 4.0)
+                    t.gain = (t.gain * (1.0 + VARY_GAIN * s * unit())).clamp(0.0, 4.0);
+                    // the recorded way moved across as a whole, as a pass point is (a closed-loop trace would
+                    // otherwise pull every try back onto the same line: a ram along it the same each time)
+                    let shift = Vec3::new(width * s * unit(), 0.0, width * s * unit());
+                    t.pos.iter_mut().for_each(|p| *p += shift);
                 }
                 Step::Trace(_, _, _, g) => {
                     *g = (*g * (1.0 + VARY_GAIN * s * unit())).clamp(0.0, 4.0)
@@ -1713,8 +1717,12 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     let t = sim.tick.saturating_sub(run.start);
     // (the arrows of the original's view: `in_view` gives their push in the view as it is)
     let quarter = Facing::of(&sim.camera).straight();
-    // (a chain of pass steps is a line; any other step between them breaks it)
-    if !matches!(step, Step::Pass(..)) {
+    // (a chain of pass steps is a line; any other step between them breaks it, but a condition or a retry mark, which
+    // drives nothing)
+    if !matches!(
+        step,
+        Step::Pass(..) | Step::Check(..) | Step::Retry(..) | Step::Before(_)
+    ) {
         run.passed = None;
     }
     let ball = &sim.ball;

@@ -164,7 +164,7 @@ rammed onto another, a moving part met at its phase): a player tries such a plac
 run is saved; when it fails (its ball lost, standing still or off course while it runs, or a `check` not met), the
 run goes back to that save and the hint runs again, varied and seeded (reproducible): a start delay of up to 3
 ticks a try (15 at most) with no arrows, `pass` and `press` points moved up to 0.3 across, speeds up to 6% faster
-or slower, pushes up to 3 ticks longer or shorter, a `trace`'s gain up to 15% off (the full width from the fourth
+or slower, pushes up to 3 ticks longer or shorter, a `trace`'s gain up to 15% off and its recorded way moved across as the points are (a closed-loop trace would pull every try back onto the same line) (the full width from the fourth
 try). Each try counts against `--rewinds` (0: none), the run kept holds only the try that got through, and after
 N tries again the failure is taken as it comes. The summary lists the tries each such hint took (`retries: line L:
 N tries`). Written as a step, `retry N` does the same from that step on (the run saved as the next step begins;

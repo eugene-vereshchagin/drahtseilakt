@@ -182,7 +182,7 @@ versucht so eine Stelle noch einmal. Bevor der Hinweis auslöst, wird der Lauf g
 verloren, stehend oder vom Kurs ab, während er läuft, oder ein `check` nicht erfüllt), geht der Lauf zu dieser
 Sicherung zurück und der Hinweis läuft erneut, variiert und geseedet (reproduzierbar): eine Startverzögerung bis 3
 Takte je Versuch (höchstens 15) ohne Pfeile, `pass`- und `press`-Punkte bis 0.3 quer verschoben, Geschwindigkeiten
-bis 6% schneller oder langsamer, Stöße bis 3 Takte länger oder kürzer, die Verstärkung eines `trace` bis 15% daneben
+bis 6% schneller oder langsamer, Stöße bis 3 Takte länger oder kürzer, die Verstärkung eines `trace` bis 15% daneben und sein aufgezeichneter Weg quer verschoben wie die Punkte (ein geregelter `trace` zöge sonst jeden Versuch auf dieselbe Linie zurück)
 (die volle Breite ab dem vierten Versuch). Jeder Versuch zählt gegen `--rewinds` (0: keiner), der behaltene Lauf
 enthält nur den gelungenen Versuch, und nach N erneuten Versuchen wird das Scheitern hingenommen. Die
 Zusammenfassung nennt die Versuche jedes solchen Hinweises (`retries: line L: N tries`). Als Schritt geschrieben tut `retry N`
