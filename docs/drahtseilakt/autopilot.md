@@ -332,10 +332,12 @@ from the start when run with the level's plan: `--autopilot --plan hints/Level_1
 Without `--plan` the way found is another (2255 points instead of 2530) and the ball stands at the end of sector 1;
 everything the run reads is in `hints/` (no route, replay or learned table comes from the data folder), and it
 plays tick for tick the same from an empty data folder as from one full of earlier runs. Checked again on
-2026-11-16 from an empty data folder, it does not get through sector 2 from the start (with the binary and hints of
-that merge too): at its end the paper ball rolls behind stone 18 down the rails instead of on it (the owner's ball is
-on its front) and falls into the gap at z 585 that the owner jumps at 9 to 12; a faster `full` push off, before the
-stone or after it has fallen, did not jump it. Sectors 3, 4 and 5 are through when begun at their checkpoints, with
+2026-11-16 from an empty data folder: the run is deterministic (the same recipe twice, and with the binary of
+that merge, gives a byte-identical replay); it gets through sector 2 only by going back: the paper ball rolls behind
+stone 18 down the rails instead of on it (the owner's ball is on its front) and falls into the gap at z 585 that the
+owner jumps at 9 to 12, and the 13th try (gone back to 3:23, the seeded variation) clears it, CP2 at 3:44.88 with 3
+lives. With `--rewinds 0` it is lost there; a faster `full` push off, before the stone or after it has fallen, did
+not jump it. Sectors 3, 4 and 5 are through when begun at their checkpoints, with
 `full` steps (above) where the owner's push was diagonal: in sector 3 the crates rammed `full` along the axes (crate
 40 east straight from his run, no run-up), the paper transformer and the way round to the channel's mouth `full`, so
 the ball is in the channel ahead of the lead stone (0:58.2, his 0:58.0); his run followed from z -753 to the stone
@@ -344,9 +346,17 @@ channel's end his run followed, then the ball held still while the last stone co
 CP3 at 2:44.93 (his 2:44.92). In sector 4 his north-east kick off the raft into the first fan (x -134) is given as
 its two parts, `full` north then `full` east (22 ticks each, then his run on): CP4 at 2:04.48 (his 2:04.18). In
 sector 5 the push onto the helix and the `round` up it are `full`: the level finished from its checkpoint in 1:54.17
-with no ball lost. Run on from sector 3 in one go, sector 4 does not hold yet: the kick takes the
-ball through the first fan, but it lands lower than his after it and is lost at x 50 (the modules' phases differ from
-a start at CP4). Level 13 is not finished from the start yet (sector 2's gap).
+with no ball lost. From the start (2026-11-16) the run dies in
+sector 3 at crate 40: it comes to the ram 0.2 to 1 unit off the checkpoint start's way (crate 38, rammed by his run
+followed at gain 3, is knocked a little otherwise), the ball meets the crate south of its middle, the crate turns and
+jams, and the ball stands at (-726.6, -219.4, -293.9); 30 tries back do not free it. Other press lines, a pass point
+before the ram, standing still at the sector's entry before his run, and a `shove` after the ram each broke the start
+at CP3 or did not help. Run on from sector 3, sector 4 is lost after the first fan: the raft (four loose balls) is in
+the same place as with a start at CP4 (within 0.1), but the trace's place in his run lags 20 to 30 ticks behind, so the
+ball comes to the second fan (x -76, z -1143) 3 units north of it, is lifted too little and falls to the lower floor,
+lost at x 50 to 60. Riding the raft until it is where his was, then following on, gives both starts the same state but
+misses the fan from it; rolled into the fan by `pass` steps, the ball drops into the gap under it. Level 13 is not
+finished from the start yet (sector 3's crate 40 and sector 4's second fan in a run on).
 
 ## The speedrun style
 
