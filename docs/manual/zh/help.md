@@ -26,5 +26,5 @@
 
 ## 报告问题
 
-问题反馈的地址稍后会写在这里。在此之前，请开启 *保存回放*（设置，回放），并保留显示问题那一局的 `.replay` 文件：它准确记录了发生的事情。
+[报告问题](https://github.com/eugene-vereshchagin/drahtseilakt/issues/new){.button}——或游戏 *设置* 中的 *报告问题*——会在浏览器中打开新问题报告表单（需要 GitHub 账号）。请写明发生了什么、在哪一关。请开启 *保存回放*（设置，回放），并保留显示问题那一局的 `.replay` 文件：它准确记录了发生的事情。
 `replays/<关卡>/` 中的开发日志只在以 `--debug`、环境变量 `DRAHTSEILAKT_DEV_LOGS=1` 或 `settings.txt` 中的 `dev-logs on` 启动时才会写入。

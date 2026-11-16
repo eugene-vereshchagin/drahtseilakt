@@ -7321,6 +7321,14 @@ impl App {
                     m.notice = Some(e);
                 }
             }
+            Action::Report => {
+                // the system's browser on the fixed issues page, only because the player asked (manual.rs)
+                if let Err(e) = crate::manual::report_problem(&self.strings)
+                    && let Some(m) = &mut self.menu
+                {
+                    m.notice = Some(e);
+                }
+            }
             Action::Volumes(v) => {
                 self.volumes = v;
                 if let Some(a) = &mut self.audio {

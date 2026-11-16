@@ -237,6 +237,9 @@ manual = Aide
 help manual = Ouvre le manuel (en anglais) dans le navigateur : menus, niveaux, packs, sons et mods. F1 fait de même partout dans le menu.
 manual missing = manuel introuvable : {path}
 manual failed = impossible d'ouvrir le manuel : {error}
+report problem = Signaler un problème
+help report problem = Ouvre dans le navigateur le formulaire d'un nouveau rapport de problème (GitHub issues). Décrivez ce qui s'est passé et joignez le replay de cette partie (Options, Replays).
+report failed = impossible d'ouvrir le navigateur : {error}
 
 # the players' replays (Options, Replays)
 replays = Replays

@@ -184,6 +184,9 @@ h2 { font-size: 1.45rem; margin: 2.4rem 0 .7rem; padding-bottom: .3rem; border-b
 h3 { font-size: 1.15rem; margin: 1.8rem 0 .4rem; }
 h4 { font-size: 1rem; margin: 1.4rem 0 .3rem; color: var(--muted); }
 a { color: var(--accent); text-underline-offset: 2px; }
+a.button { display: inline-block; padding: .45rem 1.1rem; border-radius: .6rem; background: var(--accent); color: #fff;
+  font-weight: 600; text-decoration: none; }
+a.button:hover { filter: brightness(1.1); }
 a.ext::after { content: " \2197"; font-size: .8em; }
 p, li { overflow-wrap: anywhere; }
 li { margin: .2rem 0; }
@@ -249,7 +252,11 @@ def convert(source: str, lang: str, page: str, titles: dict) -> tuple[str, list[
         attrs, href, text = m.group(1), m.group(2), m.group(3)
         href = html.unescape(href)
         if re.match(r"https?://", href):
-            return f'<a{attrs} href="{html.escape(href)}" class="ext" rel="noopener">{text}</a>'
+            # a link given a class in the source ({.button}: drawn as a button) keeps it beside "ext"
+            cls = re.search(r'\sclass="([^"]*)"', attrs)
+            attrs = re.sub(r'\sclass="[^"]*"', "", attrs)
+            classes = f"{cls.group(1)} ext" if cls else "ext"
+            return f'<a{attrs} href="{html.escape(href)}" class="{classes}" rel="noopener">{text}</a>'
         if href.startswith("#"):
             return f'<a{attrs} href="{html.escape(href)}">{text}</a>'
         if href.startswith("mailto:"):

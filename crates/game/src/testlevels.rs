@@ -1,99 +1,16 @@
-// Checks of the levels shipped with the game (assets/levels, made from their level.lvl by
-// assets/own/make/leveldsl.py; docs/drahtseilakt/levels.md, "Our levels"): with no copy of the original and nothing in
-// the player's folders, each loads, every part it names is ours, and each of the runs kept beside it
-// (pilot/<style>.replay, the test player's runs in its styles) plays to its finish. A run is the proof that the level
-// can be finished; a level changed without its runs recorded again fails here.
+// Checks of the levels our level kit made (assets/own/make/levelkit.py): the parts' test level Parts_Test and the
+// showcase level 00_Синтетический_уровень (docs/drahtseilakt/levels.md, "The level kit"). Railings and borders keep the
+// ball on, the floors have no seams, no two drawn faces flicker in one plane, no loose body starts inside a floor.
+// (The ten levels of our own these checks were first written for were removed on 2026-11-16, decisions.md.)
 
 #[cfg(test)]
 mod tests {
     use crate::assets::{Data, Source};
-    use crate::replay::Replay;
     use crate::sim::{BallKind, Sim};
     use std::path::{Path, PathBuf};
 
     fn shipped() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels/drahtseilakt")
-    }
-
-    /// Our levels: the shipped folders made from a level description.
-    fn levels() -> Vec<PathBuf> {
-        let mut v: Vec<PathBuf> = [shipped()]
-            .iter()
-            .flat_map(|d| std::fs::read_dir(d).into_iter().flatten().flatten())
-            .map(|e| e.path())
-            .filter(|p| p.join("level.lvl").is_file())
-            .collect();
-        v.sort();
-        v
-    }
-
-    /// What came of playing a replay: finished (at which tick), lives at the end, extra points and lives taken.
-    struct Outcome {
-        finished: Option<u64>,
-        lives: u32,
-        sectors: usize,
-    }
-
-    fn play(dir: &Path, replay: &Path) -> Outcome {
-        let source = Source::Open(dir.to_path_buf());
-        let data = Data::new(None).for_source(&source);
-        let loaded = data.load(&source).expect("the level loads");
-        let data = data.with_parts(&loaded.level);
-        assert!(
-            data.own_parts,
-            "{}: our level is made for our parts",
-            dir.display()
-        );
-        let text = std::fs::read_to_string(replay).expect("the replay reads");
-        let run = Replay::parse(&text).expect("the replay parses");
-        assert_eq!(
-            run.level_hash,
-            loaded.hash,
-            "{}: recorded on this level",
-            replay.display()
-        );
-        assert!(
-            run.start.is_none(),
-            "{}: a run from the level's start",
-            replay.display()
-        );
-        let modules = crate::scene::load_modules(&loaded.level, &data);
-        let named: std::collections::BTreeSet<String> = (0..loaded.level.objects.len())
-            .filter_map(|i| crate::scene::module_of(&loaded.level, i).map(str::to_owned))
-            .filter(|n| !n.starts_with("PR_"))
-            .collect();
-        let missing: Vec<&String> = named.iter().filter(|n| modules.get(n).is_none()).collect();
-        assert!(
-            missing.is_empty(),
-            "{}: parts not among ours: {missing:?}",
-            dir.display()
-        );
-        let ball = loaded
-            .level
-            .start_ball
-            .as_deref()
-            .and_then(BallKind::from_name)
-            .unwrap_or(BallKind::Wood);
-        // played by the rules of the format it was recorded in, as the game plays it
-        let mut sim = Sim::with_rules(
-            &loaded.level,
-            ball,
-            &modules,
-            loaded.level.settings.tutorial,
-            run.version,
-        );
-        let balls = data.part("3D Entities/Balls.nmo").expect("our balls");
-        sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
-        sim.set_pieces(crate::pieces::Pieces::find(&balls.level));
-        sim.level_bonus = loaded.level.settings.level_bonus.unwrap_or(0);
-        while sim.tick < run.end && !sim.finished && !sim.game_over {
-            sim.step(run.input_at(sim.tick + 1));
-        }
-        Outcome {
-            finished: sim.finished.then_some(sim.tick),
-            lives: sim.lives,
-            sectors: sim.sector_count(),
-        }
     }
 
     /// How a ball thrown sideways at the edge of a stretch of track of each safety fares (Parts_Test's stretches
@@ -325,14 +242,14 @@ mod tests {
         assert!(seams(&two_pieces(4.0)).is_empty());
     }
 
-    /// The floors of our levels have no seams: the pieces laid one after another (straight, turning, rising, a
+    /// The floors the kit lays have no seams: the pieces laid one after another (straight, turning, rising, a
     /// width changing, the start's and the checkpoints' bowls) meet with no crack and no wedge between them.
     /// Levels made by a kit before the seamless one (kit_version 1) are named and passed over until they are made
     /// again.
     #[test]
-    fn our_floors_have_no_seams() {
+    fn kit_floors_have_no_seams() {
         let mut checked = 0;
-        for dir in levels().into_iter().chain([shipped().join("Parts_Test")]) {
+        for dir in [shipped().join("Parts_Test")] {
             if kit_version(&dir) < 2 {
                 println!(
                     "{}: made by an earlier level kit, not checked",
@@ -545,16 +462,13 @@ mod tests {
         );
     }
 
-    /// No two drawn faces of a level the kit made overlap in one plane (they flicker): every level of ours made by
-    /// the kit, the showcase and the parts' test level among them.
+    /// No two drawn faces of a level the kit made overlap in one plane (they flicker): the showcase and the parts'
+    /// test level.
     #[test]
-    fn our_levels_have_no_faces_flickering_in_one_plane() {
+    fn kit_levels_have_no_faces_flickering_in_one_plane() {
         let showcase = shipped().join("00_Синтетический_уровень");
         let mut checked = 0;
-        for dir in levels()
-            .into_iter()
-            .chain([shipped().join("Parts_Test"), showcase])
-        {
+        for dir in [shipped().join("Parts_Test"), showcase] {
             if !dir.join("level.gltf").is_file() || kit_version(&dir) < 2 {
                 continue;
             }
@@ -574,49 +488,13 @@ mod tests {
         println!("{checked} levels made by the kit checked for faces in one plane");
     }
 
-    /// Every one of our levels has its runs, in the three styles, and each finishes the level.
-    #[test]
-    fn each_of_our_levels_is_finished_by_its_runs() {
-        let levels = levels();
-        let count = levels.len();
-        for dir in levels {
-            for style in ["safe", "speed", "collector"] {
-                let replay = dir.join("pilot").join(format!("{style}.replay"));
-                assert!(replay.is_file(), "{}: no {style} run", dir.display());
-                let o = play(&dir, &replay);
-                assert!(
-                    o.finished.is_some(),
-                    "{}: the {style} run does not finish",
-                    dir.display()
-                );
-                assert!(
-                    (3..=6).contains(&o.sectors),
-                    "{}: {} sectors",
-                    dir.display(),
-                    o.sectors
-                );
-                println!(
-                    "{} {style}: finished at {:.2} s, {} lives",
-                    dir.file_name()
-                        .map(|n| n.to_string_lossy())
-                        .unwrap_or_default(),
-                    o.finished.unwrap_or(0) as f32 / 60.0,
-                    o.lives
-                );
-            }
-        }
-        // (while the owner's picks stand in for our own levels there may be none; the release wants ten again)
-        println!("{count} of our own levels finished by their runs");
-    }
-
-    /// No loose body of our levels (boxes, loose balls) starts inside the floors (levelkit.py, check_clear): the
+    /// No loose body of the kit's levels (boxes, loose balls) starts inside the floors (levelkit.py, check_clear): the
     /// physics would shove it out as its sector begins and throw the player's ball touching it far away (the game
     /// lifts one out if it does, sim.rs `rest_out_of`; this checks that none has to be). Measured before that lift,
     /// with the bodies the game makes (the paper ball's hull from its part file).
     #[test]
-    fn our_loose_bodies_start_clear_of_the_floors() {
-        let mut dirs = levels();
-        dirs.push(shipped().join("Parts_Test"));
+    fn kit_loose_bodies_start_clear_of_the_floors() {
+        let dirs = [shipped().join("Parts_Test")];
         let mut sunk = Vec::new();
         for dir in dirs {
             let source = Source::Open(dir.clone());

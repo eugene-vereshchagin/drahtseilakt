@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Builds the game's own levels in the open format (docs/drahtseilakt/open-format.md) from track pieces: floors with
-their safety (railings, gutter, brick border or none), rails, the start's bowl with its four flame cups, checkpoints'
+"""Builds levels in the open format (docs/drahtseilakt/open-format.md; the showcase level, Parts_Test) from track
+pieces: floors with their safety (railings, gutter, brick border or none), rails, the start's bowl with its four flame cups, checkpoints'
 bowls with their two flame cups across the way, the finish's balloon, and the
 stand-ins of the parts (boxes, domes, loose balls, transformers, extra points and lives, the modules), each in the
 groups the game's rules read (docs/drahtseilakt/nmo-format.md, "What the game reads from levels"). A level made here
@@ -31,7 +31,7 @@ import ownkit as K  # noqa: E402
 TEX = 256
 # The kit's version, written into each level it makes (asset.generator): 2 since the floors are seamless (one mesh
 # along the way, the cross-sections upright across the cursor's heading, the start's and checkpoints' pieces sharing
-# the floors' vertices). crates/game/src/ownlevels.rs checks the floors of the levels made by version 2 on for seams.
+# the floors' vertices). crates/game/src/testlevels.rs checks the floors of the levels made by version 2 on for seams.
 KIT_VERSION = 2
 OWN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The game's own texture set (CC0), by the original's texture names.

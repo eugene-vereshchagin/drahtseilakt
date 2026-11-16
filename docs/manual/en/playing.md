@@ -51,7 +51,7 @@ Restart and Exit ask once whether you are sure. Replays are off by default; see 
 - **Replays** lists your saved replays, newest first; Enter plays one. It is empty until you turn on saving.
 - **Options** has *Graphics* (window size, sync, clouds, full screen and the *Look*, see [Looks](looks.md)),
   *Controls*, *Sound* (volumes and the sound theme, see [Sound and music](sound.md)), *Replays*, *Language*, *Extended* and
-  *Help* (this manual).
+  *Help* (this manual) and *Report a problem* (the form for a problem report, in your browser).
 - **Language** changes the language of the menus at once: English, Russian, German, Simplified Chinese, French,
   Spanish and Italian.
 - **Extended** switches on the extended mode: best times beside the levels, more choices for looks and sounds and the

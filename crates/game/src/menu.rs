@@ -136,7 +136,7 @@ enum Line {
     Level(usize),
     /// Classic Ballance: the 13 original levels of the player's copy (the list of Start).
     Classic,
-    /// Drahtseilakt: our own levels, shipped with the game.
+    /// Drahtseilakt: the set shipped with the game in the open format (the owner's community picks).
     Ours,
     /// Ballance Challenges: the community remakes of the original levels (levels/modified).
     Challenges,
@@ -169,6 +169,8 @@ enum Line {
     Language,
     /// Opens the local manual (manual.rs).
     Help,
+    /// Opens the page for problem reports in the system's browser (manual.rs, REPORT_URL).
+    Report,
     Lang(usize),
     /// One of the extended mode's additions, by its place in FEATURES.
     Switch(usize),
@@ -201,6 +203,8 @@ pub enum Action {
     Quit,
     /// Open the local manual at this page (`index`, `levels`); the game says if it cannot.
     Manual(&'static str),
+    /// Open the page for problem reports in the system's browser; the game says if it cannot.
+    Report,
     /// The extended mode on or off.
     ToggleDebug,
     /// One of the extended mode's additions on or off.
@@ -308,10 +312,10 @@ pub struct Menu {
     folder: Option<PathBuf>,
     /// Which list the custom levels shown are.
     list: List,
-    /// Our own levels and the best community maps are shipped (the Start items are left out when not).
+    /// The Drahtseilakt set and the community set are shipped (the Start items are left out when not).
     has_ours: bool,
     has_best: bool,
-    /// The player's copy of the original is there: without it the levels are our own and the Options page says where the original comes from.
+    /// The player's copy of the original is there: without it the levels are the shipped sets and the Options page says where the original comes from.
     copy: bool,
     /// There are modified originals (levels/modified) to offer; they are listed only with a copy too.
     modified: bool,
@@ -643,6 +647,7 @@ impl Menu {
             Line::ReplayList => (k("replay list"), NONE),
             Line::Language => (k("language"), NONE),
             Line::Help => (k("manual"), NONE),
+            Line::Report => (k("report problem"), NONE),
             Line::Extended => (k("extended"), NONE),
             Line::Lang(_) => (k("lang"), NONE),
             Line::Look => (
@@ -1054,6 +1059,7 @@ impl Menu {
                 Some(Line::Replays),
                 Some(Line::Language),
                 Some(Line::Help),
+                Some(Line::Report),
                 Some(Line::Extended),
                 Some(Line::Back),
             ]
@@ -1381,6 +1387,7 @@ impl Menu {
             Line::ModOpt(o) => Action::ModOption(self.mod_page, o, 1),
             Line::Language => open(self, Screen::Language),
             Line::Help => Action::Manual("index"),
+            Line::Report => Action::Report,
             Line::Lang(i) => match languages().get(i) {
                 Some(&(code, _)) => {
                     self.pop();
@@ -1867,6 +1874,7 @@ impl Menu {
             Line::Replay(i) => self.replay_name(i),
             Line::Language => s.ours("language"),
             Line::Help => s.ours("manual"),
+            Line::Report => s.ours("report problem"),
             Line::Lang(i) => languages().get(i).map_or("", |l| l.1).to_owned(),
             Line::Extended => s.ours("extended"),
             Line::Level(i) => {
@@ -4085,7 +4093,7 @@ impl Menu {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum List {
     None,
-    /// Drahtseilakt: our own levels.
+    /// Drahtseilakt: the shipped open-format set.
     Ours,
     /// The best community maps (shipped).
     Best,
@@ -5767,14 +5775,14 @@ mod tests {
         assert_eq!(
             m.screen(),
             Screen::Kinds,
-            "Start offers our levels and the community maps"
+            "Start offers the Drahtseilakt set and the community maps"
         );
         assert_eq!(
             m.lines(Screen::Kinds),
             [Line::Ours, Line::Community, Line::Back]
         );
         assert_eq!(m.enter(), Action::None);
-        assert_eq!(m.screen(), Screen::Custom, "our own levels");
+        assert_eq!(m.screen(), Screen::Custom, "the Drahtseilakt set");
         assert_eq!(m.title(Screen::Custom).as_deref(), Some("Featured maps"));
     }
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # The level statistics report (in Russian, for the owner): joins the measurements of `drahtseilakt --level-stats DIR`
 # (DIR/level-stats-auto.csv) with the hand annotations (hints/level-stats-manual.csv), works out a difficulty index
-# per level and the targets for our own levels, and writes level-stats.md, level-stats.csv and level-stats.png.
+# per level and the targets once set for our own levels (shelved 2026-11-11, removed 2026-11-16; the report keeps them
+# as a measure of a difficulty curve), and writes level-stats.md, level-stats.csv and level-stats.png.
 #
 #   scripts/level-stats.py AUTO_CSV MANUAL_CSV HINTS_DIR OUT_DIR
-#   scripts/level-stats.py --own OWN_CSV OWN_MANUAL_CSV LEVEL_STATS_CSV   (one of our levels against its target)
 #
 # A level without a finished run (12, 13) is measured along the test player's way through its plan: that way is
 # shorter than a real run (no detours, no going back), so its length is estimated from the walkthrough's time at the
@@ -61,39 +61,6 @@ def index_of(d, m):
     return {"track": track, "puzzles": puzzles, "tricks": tricks, "navigation": navigation, "hazards": hazards,
             "total": track + puzzles + tricks + navigation + hazards}
 
-
-def own_report(own_csv, manual_csv, stats_csv):
-    """One of our levels against its target: `--level-stats DIR --open LEVEL --replay RUN` (DIR/level-stats-own.csv),
-    its hand annotations (one line, the columns of hints/level-stats-manual.csv, `level` its order) and the report's
-    level-stats.csv (the target for that order: the index split as the original's of the same number)."""
-    rows = list(csv.DictReader(open(own_csv)))
-    whole = {k: num(v) for k, v in rows[0].items() if k not in ("level", "source", "finished_runs")}
-    m = next(csv.DictReader(l for l in open(manual_csv) if not l.startswith("#")))
-    n = int(m["level"])
-    orig = next(r for r in csv.DictReader(open(stats_csv)) if int(r["level"]) == n and int(r["sector"]) == 0)
-    i = index_of(whole, m)
-    target = num(orig["target_index"])
-    print(f"{rows[0]['level']} against our level {n}'s target (2x the original {n}'s trend)")
-    t = whole["time_s"]
-    print(f"  path {whole['path_len']:.0f} (target {num(orig['target_length']):.0f}), time {int(t // 60)}:{t % 60:04.1f}, "
-          f"sectors {len(rows) - 1}")
-    for k in ("track", "puzzles", "tricks", "navigation", "hazards", "total"):
-        share = num(orig[f"index_{k}"]) / max(num(orig["index_total"]), 1e-9)
-        print(f"  {k:10s} {i[k]:6.1f}   target {target * share:6.1f}")
-    print("  track by class: " + ", ".join(f"{c} {whole.get(f'len_{c}', 0):.0f}" for c in CLASSES))
-    for k in ("extra_points", "extra_lives", "taken_extra_points", "taken_extra_lives", "transforms", "fan_flights", "loose_moved",
-              "m01_pushers", "m34_boxstone", "m30_seesaws", "m29_plates", "sharp_turns", "sharp_turns_at_edge", "ramps_up",
-              "ramps_down", "humps",
-              "standing_share", "speed_p10", "speed_p50", "speed_p90"):
-        if k in whole:
-            print(f"  {k} {whole[k]:g}")
-    for r in rows[1:]:
-        print(f"  sector {r['sector']}: path {num(r['path_len']):.0f}, time {num(r['time_s']):.0f} s")
-
-
-if len(sys.argv) > 1 and sys.argv[1] == "--own":
-    own_report(*sys.argv[2:5])
-    sys.exit(0)
 
 auto = list(csv.DictReader(open(AUTO)))
 manual = {int(r["level"]): r for r in csv.DictReader(l for l in open(MANUAL) if not l.startswith("#"))}

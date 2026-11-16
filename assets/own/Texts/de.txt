@@ -237,6 +237,9 @@ manual = Hilfe
 help manual = Öffnet die Anleitung im Browser: wie Menüs, Level, Pakete, Klänge und Mods funktionieren. F1 tut dasselbe überall im Menü.
 manual missing = Anleitung nicht gefunden: {path}
 manual failed = Anleitung konnte nicht geöffnet werden: {error}
+report problem = Problem melden
+help report problem = Öffnet im Browser das Formular für eine neue Problemmeldung (GitHub Issues). Beschreiben Sie, was passiert ist, und hängen Sie das Replay dieses Laufs an (Optionen, Replays).
+report failed = Browser konnte nicht geöffnet werden: {error}
 
 # the players' replays (Options, Replays)
 replays = Replays

@@ -81,7 +81,7 @@ def build():
     b.extra_point(3, (340, 0, 0), 3)
     b.finish((412, 0, 0), 3)
     # beside the way, away from it: a stretch of track of each safety, along +X, 12 wide, for the test that a ball
-    # thrown sideways at one is kept on it (crates/game/src/ownlevels.rs)
+    # thrown sideways at one is kept on it (crates/game/src/testlevels.rs)
     for k, safety in enumerate(L.SAFETY):
         z = SAFETY_Z + 40.0 * k
         b.track(f"Safety_{safety}", [(20.0, 0.0, z), (100.0, 0.0, z)], [12.0, 12.0], [0.0, 80.0], safety)

@@ -1,4 +1,4 @@
-// Level statistics (`--level-stats DIR`): measures the original levels for designing our own — what the ball rolls
+// Level statistics (`--level-stats DIR`): measures the original levels — what the ball rolls
 // over, sector by sector, along the way a finished run took (the runs in hints/), or, for a level without one, along
 // the way the test player finds through its plan. Every number here is computed from the level's objects, its floors'
 // geometry and the run; the judgements (hidden ways, tricks) are written by hand beside it
@@ -889,12 +889,11 @@ pub(crate) fn replays(hints: &Path, n: u32) -> Vec<PathBuf> {
 
 /// `--level-stats DIR`: measures the original levels 1 to 13 (or `--level N` alone) and writes
 /// `DIR/level-stats-auto.csv` (one row a sector and one for the whole level, for each source: a finished run, a
-/// plan's way) and the samples of each way (`DIR/samples/`) to check the classes against. With `--open LEVEL` and
-/// `--replay RUN` it measures that level (one of ours) along that run instead, into `DIR/level-stats-own.csv`.
+/// plan's way) and the samples of each way (`DIR/samples/`) to check the classes against.
 pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), String> {
     std::fs::create_dir_all(out.join("samples")).map_err(|e| format!("{}: {e}", out.display()))?;
-    if let Source::Open(dir) = &o.source {
-        return run_open(o, data, dir, out);
+    if !matches!(o.source, Source::Original(_)) {
+        return Err("--level-stats measures the original levels only".into());
     }
     let levels: Vec<u32> = match o.source {
         Source::Original(n) if o.chosen => vec![n],
@@ -962,100 +961,6 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
         }
     }
     write_rows(&rows, &out.join("level-stats-auto.csv"))
-}
-
-/// One of our levels (an open-format folder) measured along the run `o.replay`.
-fn run_open(o: &Options, data: &Data, dir: &Path, out: &Path) -> Result<(), String> {
-    let replay = o
-        .replay
-        .clone()
-        .ok_or("--level-stats with --open needs --replay RUN")?;
-    let data = data.for_source(&o.source);
-    let run = crate::app::stats_run(o, &data, None)?;
-    let name = dir
-        .file_name()
-        .map_or_else(String::new, |f| f.to_string_lossy().into_owned());
-    let run_name = replay
-        .file_name()
-        .map_or_else(String::new, |f| f.to_string_lossy().into_owned());
-    println!(
-        "{name}: {run_name}: {} after {:.1} s",
-        if run.finished {
-            "finished"
-        } else {
-            "not finished"
-        },
-        run.ticks.len() as f64 / 60.0
-    );
-    let file = out.join("samples").join(format!("{name}-run.csv"));
-    let mut tallies = measure_into(&run, &file)?;
-    // how the ride went (the whole level's row): the share of the time the ball stood (not counting a transformer's
-    // hold), and its speed while it rolled
-    let ride = ride(&run.ticks);
-    println!(
-        "{name}: standing {:.1}% of the time, speed p10 {:.1} p50 {:.1} p90 {:.1} units/s",
-        ride[0] * 100.0,
-        ride[1],
-        ride[2],
-        ride[3]
-    );
-    if let Some(t) = tallies.first_mut() {
-        for (k, v) in ["standing_share", "speed_p10", "speed_p50", "speed_p90"]
-            .into_iter()
-            .zip(ride)
-        {
-            t.set(k, v);
-        }
-    }
-    let rows: Vec<_> = tallies
-        .into_iter()
-        .enumerate()
-        .map(|(k, t)| {
-            (
-                name.clone(),
-                format!("run:{run_name}"),
-                format!("{:.1}", run.ticks.len() as f64 / 60.0),
-                k,
-                t,
-            )
-        })
-        .collect();
-    write_rows(&rows, &out.join("level-stats-own.csv"))
-}
-
-/// Standing below this speed (units a second).
-const STANDING: f32 = 0.5;
-
-/// The share of the ticks the ball stood (held by a transformer or dying not counted), and the 10th, 50th and 90th
-/// percentiles of its speed while it rolled.
-fn ride(ticks: &[TickRec]) -> [f64; 4] {
-    let mut speeds: Vec<f32> = Vec::new();
-    let (mut standing, mut counted) = (0usize, 0usize);
-    for w in ticks.windows(2) {
-        if w[1].held || w[1].dying || w[0].dying {
-            continue;
-        }
-        let v = w[1].pos.distance(w[0].pos) * 60.0;
-        counted += 1;
-        if v < STANDING {
-            standing += 1;
-        } else {
-            speeds.push(v);
-        }
-    }
-    speeds.sort_by(f32::total_cmp);
-    let pct = |q: f64| {
-        speeds
-            .get(((speeds.len() as f64 - 1.0) * q).round().max(0.0) as usize)
-            .copied()
-            .unwrap_or(0.0) as f64
-    };
-    [
-        standing as f64 / counted.max(1) as f64,
-        pct(0.1),
-        pct(0.5),
-        pct(0.9),
-    ]
 }
 
 /// Measures a way and writes its samples to `file`: the tallies, the whole level's first, then each sector's.

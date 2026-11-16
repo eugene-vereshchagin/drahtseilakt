@@ -237,6 +237,9 @@ manual = 帮助
 help manual = 在浏览器中打开手册：菜单、关卡、包、音效和模组如何运作。在菜单中任何位置按 F1 也可打开。
 manual missing = 找不到手册：{path}
 manual failed = 无法打开手册：{error}
+report problem = 报告问题
+help report problem = 在浏览器中打开新问题报告表单（GitHub issues）。请描述发生了什么，并附上那次游玩的回放（设置，回放）。
+report failed = 无法打开浏览器：{error}
 
 # the players' replays (Options, Replays)
 replays = 回放

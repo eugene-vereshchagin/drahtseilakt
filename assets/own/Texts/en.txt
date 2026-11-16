@@ -237,6 +237,9 @@ manual = Help
 help manual = Opens the manual in your browser: how the menus, levels, packs, sounds and mods work. F1 does the same anywhere in the menu.
 manual missing = manual not found at {path}
 manual failed = manual could not be opened: {error}
+report problem = Report a problem
+help report problem = Opens the form for a new problem report (GitHub issues) in your browser. Describe what happened and attach the replay of that run (Options, Replays).
+report failed = the browser could not be opened: {error}
 
 # the players' replays (Options, Replays)
 replays = Replays
