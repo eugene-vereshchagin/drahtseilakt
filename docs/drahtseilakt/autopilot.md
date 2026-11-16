@@ -344,7 +344,9 @@ channel's end his run followed, then the ball held still while the last stone co
 CP3 at 2:44.93 (his 2:44.92). In sector 4 his north-east kick off the raft into the first fan (x -134) is given as
 its two parts, `full` north then `full` east (22 ticks each, then his run on): CP4 at 2:04.48 (his 2:04.18). In
 sector 5 the push onto the helix and the `round` up it are `full`: the level finished from its checkpoint in 1:54.17
-with no ball lost. Level 13 is not finished from the start yet (sector 2's gap).
+with no ball lost. Run on from sector 3 in one go, sector 4 does not hold yet: the kick takes the
+ball through the first fan, but it lands lower than his after it and is lost at x 50 (the modules' phases differ from
+a start at CP4). Level 13 is not finished from the start yet (sector 2's gap).
 
 ## The speedrun style
 

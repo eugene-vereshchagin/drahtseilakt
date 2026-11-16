@@ -372,8 +372,10 @@ bei ihm und dort kein Stein fällt; am Ende des Kanals sein Lauf, dann hält die
 kommt: alle zehn Steine in der Schlange, CP3 um 2:44.93 (bei ihm 2:44.92). In Sektor 4 ist sein Kick nach Nordosten
 vom Floß in den ersten Ventilator (x -134) in seinen zwei Teilen gegeben, `full` nach Norden, dann `full` nach Osten
 (je 22 Ticks, danach sein Lauf): CP4 um 2:04.48 (bei ihm 2:04.18). In Sektor 5 sind der Schub auf die Spirale und
-`round` hinauf `full`: das Level vom Kontrollpunkt in 1:54.17 ohne verlorene Kugel geschafft. Vom Start ist Level 13
-noch nicht geschafft (die Lücke in Sektor 2).
+`round` hinauf `full`: das Level vom Kontrollpunkt in 1:54.17 ohne verlorene Kugel geschafft. Von Sektor 3 an in einem Zug hält Sektor 4 noch
+nicht: der Kick bringt die Kugel durch den ersten Ventilator, danach landet sie aber tiefer als seine und geht bei x 50
+verloren (die Phasen der Module sind andere als bei einem Start an CP4). Vom Start ist Level 13 noch nicht geschafft
+(die Lücke in Sektor 2).
 
 ## Der Speedrun-Stil
 

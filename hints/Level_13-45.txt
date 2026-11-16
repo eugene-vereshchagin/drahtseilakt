@@ -45,7 +45,7 @@
 #   tick 5551 for 31 ticks); here a north-east push is one arrow, 1.0, and the paper ball fell behind the raft. His run
 #   is followed to tick 5551, then the kick given as its two parts, each `full` along an axis (1.41): north 22 ticks
 #   (his north part), east 22, and his run followed on from tick 5600: the ball rides the fan as his, CP4 at 2:04.48
-#   (his 2:04.18). East first (or alone) drops the ball off the raft's front before it is north enough for the fan.
+#   (his 2:04.18); run on from sector 3 in one go it lands lower after the fan and is lost at x 50 (open). East first (or alone) drops the ball off the raft's front before it is north enough for the fan.
 # Sector 5 (2026-11-16): the push onto the helix (340, -614.5) and the `round` up it `full`: at the original's push on
 #   average the ball fell off 2.5 s up; with them the level finishes from CP4 in 1:54.17, no ball lost.
 # From the start (checked 2026-11-16 from an empty data folder, also with the hints and binary of cac12f6) the run dies
