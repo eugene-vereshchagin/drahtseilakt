@@ -2,5 +2,3 @@
 # are only built for a platform the owner's machine has not fetched). Read by tools/third_party.py; each is marked †
 # in THIRD-PARTY.md until it is confirmed from the crate itself (cargo fetch, then delete the line and regenerate).
 # name                  version  licence (SPDX, as on the crate's crates.io page)
-iana-time-zone-haiku    0.1.2    MIT OR Apache-2.0
-objc2-app-kit           0.3.2    Zlib OR Apache-2.0 OR MIT

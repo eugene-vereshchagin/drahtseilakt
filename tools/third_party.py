@@ -234,7 +234,7 @@ def render(rows, program):
         BEGIN,
         "",
         f"Crates compiled into `{program}` on any of its platforms (Linux, Windows, macOS; an upper bound, since a "
-        "crate is counted when any build in Cargo.lock enables it): {len(shipped)}, "
+        f"crate is counted when any build in Cargo.lock enables it): {len(shipped)}, "
         "each with the licence its manifest declares (an `OR` means the crate may be used under either; we take the "
         "one compatible with GPL-3.0). Their licence texts are in each crate's source at its version on crates.io.",
         "",

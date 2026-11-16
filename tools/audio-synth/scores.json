@@ -1,0 +1,266 @@
+{
+ "start_level": {
+  "original": "Misc_StartLevel",
+  "score": 79.0,
+  "spec": 0.825,
+  "env": 0.964,
+  "mfcc_dtw": 32.8,
+  "dur_ratio": 1.0
+ },
+ "checkpoint": {
+  "original": "Misc_Checkpoint",
+  "score": 83.1,
+  "spec": 0.852,
+  "env": 0.964,
+  "mfcc_dtw": 22.9,
+  "dur_ratio": 1.0
+ },
+ "ball_fall": {
+  "original": "Misc_Fall",
+  "score": 89.8,
+  "spec": 0.975,
+  "env": 0.989,
+  "mfcc_dtw": 17.9,
+  "dur_ratio": 1.0
+ },
+ "new_ball_lightning": {
+  "original": "Misc_Lightning",
+  "score": 81.0,
+  "spec": 0.836,
+  "env": 0.974,
+  "mfcc_dtw": 28.2,
+  "dur_ratio": 1.0
+ },
+ "extra_start": {
+  "original": "Extra_Start",
+  "score": 81.1,
+  "spec": 0.777,
+  "env": 0.986,
+  "mfcc_dtw": 22.4,
+  "dur_ratio": 1.0
+ },
+ "extra_hit": {
+  "original": "Extra_Hit",
+  "score": 80.3,
+  "spec": 0.832,
+  "env": 0.957,
+  "mfcc_dtw": 28.4,
+  "dur_ratio": 1.0
+ },
+ "extra_life_blob": {
+  "original": "Extra_Life_Blob",
+  "score": 82.9,
+  "spec": 0.891,
+  "env": 0.91,
+  "mfcc_dtw": 23.0,
+  "dur_ratio": 0.99
+ },
+ "extra_ball": {
+  "original": "Misc_extraball",
+  "score": 74.9,
+  "spec": 0.673,
+  "env": 0.966,
+  "mfcc_dtw": 28.7,
+  "dur_ratio": 1.0
+ },
+ "transformer": {
+  "original": "Misc_Trafo",
+  "score": 77.0,
+  "spec": 0.877,
+  "env": 0.876,
+  "mfcc_dtw": 39.1,
+  "dur_ratio": 1.0
+ },
+ "rope_tears": {
+  "original": "Misc_RopeTears",
+  "score": 65.9,
+  "spec": 0.627,
+  "env": 0.634,
+  "mfcc_dtw": 25.0,
+  "dur_ratio": 0.98
+ },
+ "menu_click": {
+  "original": "Menu_click",
+  "score": 71.8,
+  "spec": 0.629,
+  "env": 0.93,
+  "mfcc_dtw": 27.1,
+  "dur_ratio": 0.92
+ },
+ "fan_loop": {
+  "original": "Misc_Ventilator",
+  "score": 79.6,
+  "spec": 0.929,
+  "env": 0.783,
+  "mfcc_dtw": 27.6,
+  "dur_ratio": 1.0
+ },
+ "hit_wood_wood": {
+  "original": "Hit_Wood_Wood",
+  "score": 83.6,
+  "spec": 0.941,
+  "env": 0.885,
+  "mfcc_dtw": 23.7,
+  "dur_ratio": 0.98
+ },
+ "hit_stone_stone": {
+  "original": "Hit_Stone_Stone",
+  "score": 75.6,
+  "spec": 0.808,
+  "env": 0.833,
+  "mfcc_dtw": 29.7,
+  "dur_ratio": 0.97
+ },
+ "hit_stone_metal": {
+  "original": "Hit_Stone_Metal",
+  "score": 80.0,
+  "spec": 0.958,
+  "env": 0.712,
+  "mfcc_dtw": 23.9,
+  "dur_ratio": 0.99
+ },
+ "hit_wood_metal": {
+  "original": "Hit_Wood_Metal",
+  "score": 46.7,
+  "spec": 0.564,
+  "env": 0.733,
+  "mfcc_dtw": 76.2,
+  "dur_ratio": 0.32
+ },
+ "hit_stone_wood": {
+  "original": "Hit_Stone_Wood",
+  "score": 85.3,
+  "spec": 0.985,
+  "env": 0.901,
+  "mfcc_dtw": 24.8,
+  "dur_ratio": 0.99
+ },
+ "hit_wood_stone": {
+  "original": "Hit_Wood_Stone",
+  "score": 80.6,
+  "spec": 0.92,
+  "env": 0.859,
+  "mfcc_dtw": 29.2,
+  "dur_ratio": 0.99
+ },
+ "hit_paper_paper": {
+  "original": "Hit_Paper",
+  "score": 81.2,
+  "spec": 0.856,
+  "env": 0.714,
+  "mfcc_dtw": 11.9,
+  "dur_ratio": 0.99
+ },
+ "roll_wood_wood": {
+  "original": "Roll_Wood_Wood",
+  "score": 89.0,
+  "spec": 0.972,
+  "env": 0.993,
+  "mfcc_dtw": 20.0,
+  "dur_ratio": 1.0
+ },
+ "roll_wood_stone": {
+  "original": "Roll_Wood_Stone",
+  "score": 87.6,
+  "spec": 0.921,
+  "env": 0.988,
+  "mfcc_dtw": 18.6,
+  "dur_ratio": 1.0
+ },
+ "roll_wood_metal": {
+  "original": "Roll_Wood_Metal",
+  "score": 90.6,
+  "spec": 0.913,
+  "env": 0.993,
+  "mfcc_dtw": 11.4,
+  "dur_ratio": 1.0
+ },
+ "roll_stone_stone": {
+  "original": "Roll_Stone_Stone",
+  "score": 81.9,
+  "spec": 0.849,
+  "env": 0.98,
+  "mfcc_dtw": 27.1,
+  "dur_ratio": 1.0
+ },
+ "roll_stone_wood": {
+  "original": "Roll_Stone_Wood",
+  "score": 91.7,
+  "spec": 0.994,
+  "env": 0.997,
+  "mfcc_dtw": 15.5,
+  "dur_ratio": 1.0
+ },
+ "roll_stone_metal": {
+  "original": "Roll_Stone_Metal",
+  "score": 85.2,
+  "spec": 0.885,
+  "env": 0.896,
+  "mfcc_dtw": 15.8,
+  "dur_ratio": 1.0
+ },
+ "roll_paper_paper": {
+  "original": "Roll_Paper",
+  "score": 89.6,
+  "spec": 0.976,
+  "env": 1.0,
+  "mfcc_dtw": 19.1,
+  "dur_ratio": 1.0
+ },
+ "hit_stone_dome": {
+  "original": "Hit_Stone_Kuppel",
+  "score": 87.7,
+  "spec": 0.954,
+  "env": 0.99,
+  "mfcc_dtw": 21.4,
+  "dur_ratio": 1.0
+ },
+ "hit_wood_dome": {
+  "original": "Hit_Wood_Dome",
+  "score": 89.1,
+  "spec": 0.955,
+  "env": 0.989,
+  "mfcc_dtw": 18.0,
+  "dur_ratio": 1.0
+ },
+ "menu_load": {
+  "original": "Menu_load",
+  "score": 81.2,
+  "spec": 0.878,
+  "env": 0.961,
+  "mfcc_dtw": 31.2,
+  "dur_ratio": 1.0
+ },
+ "music_thunder": {
+  "original": "Music_thunder",
+  "score": 87.3,
+  "spec": 0.931,
+  "env": 0.898,
+  "mfcc_dtw": 14.9,
+  "dur_ratio": 1.0
+ },
+ "music_atmo_1": {
+  "original": "Music_Atmo_1",
+  "score": 78.0,
+  "spec": 0.821,
+  "env": 0.965,
+  "mfcc_dtw": 36.1,
+  "dur_ratio": 1.0
+ },
+ "music_atmo_2": {
+  "original": "Music_Atmo_2",
+  "score": 85.5,
+  "spec": 0.934,
+  "env": 0.97,
+  "mfcc_dtw": 24.6,
+  "dur_ratio": 1.0
+ },
+ "music_atmo_3": {
+  "original": "Music_Atmo_3",
+  "score": 86.2,
+  "spec": 0.942,
+  "env": 0.981,
+  "mfcc_dtw": 24.1,
+  "dur_ratio": 1.0
+ }
+}

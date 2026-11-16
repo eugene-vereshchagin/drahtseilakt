@@ -1,0 +1,132 @@
+{
+ "start_level": {
+  "same_family": null,
+  "best_other": 69.6,
+  "mean_other": 37.0
+ },
+ "checkpoint": {
+  "same_family": null,
+  "best_other": 69.1,
+  "mean_other": 38.4
+ },
+ "ball_fall": {
+  "same_family": null,
+  "best_other": 72.5,
+  "mean_other": 41.8
+ },
+ "new_ball_lightning": {
+  "same_family": null,
+  "best_other": 63.5,
+  "mean_other": 18.9
+ },
+ "extra_start": {
+  "same_family": 58.7,
+  "best_other": 58.7,
+  "mean_other": 29.1
+ },
+ "extra_hit": {
+  "same_family": 57.7,
+  "best_other": 57.8,
+  "mean_other": 26.2
+ },
+ "extra_life_blob": {
+  "same_family": 33.1,
+  "best_other": 60.0,
+  "mean_other": 30.8
+ },
+ "extra_ball": {
+  "same_family": 55.2,
+  "best_other": 56.4,
+  "mean_other": 29.5
+ },
+ "transformer": {
+  "same_family": null,
+  "best_other": 61.5,
+  "mean_other": 17.2
+ },
+ "rope_tears": {
+  "same_family": null,
+  "best_other": 37.3,
+  "mean_other": 14.7
+ },
+ "menu_click": {
+  "same_family": null,
+  "best_other": 37.4,
+  "mean_other": 19.5
+ },
+ "fan_loop": {
+  "same_family": null,
+  "best_other": 60.4,
+  "mean_other": 31.1
+ },
+ "hit_wood_wood": {
+  "same_family": 72.6,
+  "best_other": 72.6,
+  "mean_other": 35.6
+ },
+ "hit_stone_stone": {
+  "same_family": 69.9,
+  "best_other": 69.9,
+  "mean_other": 34.2
+ },
+ "hit_stone_metal": {
+  "same_family": 78.5,
+  "best_other": 78.5,
+  "mean_other": 37.8
+ },
+ "hit_wood_metal": {
+  "same_family": 71.9,
+  "best_other": 71.9,
+  "mean_other": 38.7
+ },
+ "hit_stone_wood": {
+  "same_family": 68.5,
+  "best_other": 68.5,
+  "mean_other": 35.7
+ },
+ "hit_wood_stone": {
+  "same_family": 69.8,
+  "best_other": 69.8,
+  "mean_other": 37.0
+ },
+ "hit_paper_paper": {
+  "same_family": 31.3,
+  "best_other": 68.1,
+  "mean_other": 26.0
+ },
+ "roll_wood_wood": {
+  "same_family": 73.4,
+  "best_other": 73.4,
+  "mean_other": 35.9
+ },
+ "roll_wood_stone": {
+  "same_family": 71.2,
+  "best_other": 71.2,
+  "mean_other": 39.7
+ },
+ "roll_wood_metal": {
+  "same_family": 79.0,
+  "best_other": 79.0,
+  "mean_other": 38.5
+ },
+ "roll_stone_stone": {
+  "same_family": 79.5,
+  "best_other": 79.5,
+  "mean_other": 39.4
+ },
+ "roll_stone_wood": {
+  "same_family": 76.0,
+  "best_other": 76.0,
+  "mean_other": 36.8
+ },
+ "roll_stone_metal": {
+  "same_family": 71.3,
+  "best_other": 71.3,
+  "mean_other": 34.4
+ },
+ "roll_paper_paper": {
+  "same_family": 31.4,
+  "best_other": 55.6,
+  "mean_other": 22.4
+ }
+}

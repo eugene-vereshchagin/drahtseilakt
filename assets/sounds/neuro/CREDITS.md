@@ -8,6 +8,9 @@ Every file in `Sounds/` and `Music/` was synthesized for Drahtseilakt by code: o
 centroid, peak frequencies and decay) to set the synthesis parameters; no sample of the original was resampled,
 cut, filtered or otherwise copied into them. They are part of the game and under its licence (GPL-3.0-only).
 
+The synthesizer is in the repository, `tools/audio-synth/` (this project's own code, GPL-3.0-only); its README says
+how to rebuild the theme from it (only `Hit_Sack` comes from the system theme's `prepare.py`).
+
 The theme holds every role the game asks for, so it takes nothing from another theme (`fallback none` in
 theme.txt); a test checks this.
 
