@@ -462,6 +462,8 @@ pub struct Renderer {
     pub menu_frame: bool,
     /// The cloud pass, made the first time a level has clouds (its noise takes a moment).
     cloud_pass: Option<crate::clouds::Pass>,
+    /// The land under the level (terrain.rs), drawn after the opaque scene; none for most levels.
+    pub land: Option<crate::terrain::Gpu>,
     /// The clouds' clock (their drift).
     started: std::time::Instant,
     globals: wgpu::Buffer,
@@ -1128,6 +1130,7 @@ impl Renderer {
             clouds: None,
             menu_frame: false,
             cloud_pass: None,
+            land: None,
             started: std::time::Instant::now(),
             point: None,
             globals,
@@ -2450,6 +2453,21 @@ impl Renderer {
             }
         }
         let opaque_count = draws.iter().take_while(|d| d.3.blend.is_none()).count();
+        if let Some(l) = &mut self.land {
+            l.ensure(&self.device, self.samples);
+        }
+        let land = self.land.as_ref().filter(|_| !self.menu_frame);
+        let mut land_drawn = false;
+        if let Some(l) = land {
+            l.prepare(
+                &self.queue,
+                &crate::terrain::Frame {
+                    view_proj: proj * look,
+                    eye: view.eye,
+                    far: view.far,
+                },
+            );
+        }
         let mut enc = self.device.create_command_encoder(&Default::default());
         let phases: &[(std::ops::Range<usize>, bool)] = if clouds {
             &[(0..opaque_count, false), (opaque_count..draws.len(), true)]
@@ -2513,7 +2531,13 @@ impl Renderer {
                 multiview_mask: None,
             });
             pass.set_bind_group(0, &self.globals_bind, &[]);
-            for &(_, i, p, key) in &draws[range.clone()] {
+            for (k, &(_, i, p, key)) in draws[range.clone()].iter().enumerate() {
+                // the land after the opaque scene, before what is blended
+                if let (Some(l), true) = (land, range.start + k == opaque_count && !land_drawn) {
+                    land_drawn = true;
+                    l.draw(&mut pass);
+                    pass.set_bind_group(0, &self.globals_bind, &[]);
+                }
                 let Some(inst) = instances.get(i) else {
                     continue;
                 };
@@ -2546,6 +2570,11 @@ impl Renderer {
                 );
                 pass.set_index_buffer(part.index.slice(), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..part.count, 0, 0..1);
+            }
+            if let (Some(l), true) = (land, range.end == opaque_count && !land_drawn) {
+                land_drawn = true;
+                l.draw(&mut pass);
+                pass.set_bind_group(0, &self.globals_bind, &[]);
             }
             // Particles last, over everything, testing depth without writing it.
             for (buf, count, key, texture) in particle_draws.iter().filter(|_| *last) {
@@ -2785,7 +2814,7 @@ impl Renderer {
 }
 
 /// Uploads RGBA pixels with a full mip chain (box-filtered on the CPU).
-fn upload_texture(
+pub(crate) fn upload_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     width: u32,

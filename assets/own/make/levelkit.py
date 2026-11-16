@@ -180,8 +180,8 @@ RESET_UP = START_RESET - START_BOWL[-1][1]
 # lights it: the sun's direction and colour (half way to white: a photograph's low sun is redder than the light on
 # the clouds it shines on) and the sky's, the shade bluer than the sky. A sky without its light there has no sea.
 CLOUD_SEA = {"Sunset": dict(cover=0.75, under=1.0, warm=0.7), "Clouds": dict(cover=0.8, under=1.0, sun=0.65),
-             "Mountains": dict(cover=0.42, under=0.0), "Forest": dict(cover=0.38, under=0.0),
-             "Mist": dict(cover=0.5, under=0.4), "Desert": dict(cover=0.3, under=0.0)}
+             "Mountains": dict(cover=0.26, under=0.0), "Forest": dict(cover=0.24, under=0.0),
+             "Mist": dict(cover=0.34, under=0.4), "Desert": dict(cover=0.3, under=0.0)}
 # its tops CLOUD_TOP under the lowest floor, CLOUD_THICK deep, a cloud about CLOUD_SIZE across, CLOUD_HAZE of the
 # horizon's haze a unit of distance
 CLOUD_TOP, CLOUD_THICK, CLOUD_SIZE, CLOUD_HAZE = 35.0, 110.0, 85.0, 0.0005

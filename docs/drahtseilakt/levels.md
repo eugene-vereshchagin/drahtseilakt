@@ -264,7 +264,7 @@ canyons), `Mist` (an evening glow over hills with mist in the valleys). Their sk
 Haven; what lies below the horizon is drawn by `assets/own/make/make_skies.py`, seen as from high above, so the
 track hangs far over it (`assets/own/CREDITS.md`); under `Mountains`, `Forest` and `Mist` the green land is
 drawn point by point at each pixel's own scale (`assets/own/make/skyland.py`: the tree crowns straight down, the
-haze turning a cool blue-white with distance), its lower faces at 2048 pixels. Any other name is a set of files `Textures/Sky/Sky_<name>_<face>`
+haze turning a cool blue-white with distance) as a mesh under the level (below). Any other name is a set of files `Textures/Sky/Sky_<name>_<face>`
 (Front, Right, Back, Left, Down, and Top if it has one) a level folder or the textures bring; a name is letters,
 digits, `_` and `-`. `--sky NAME` on the command line plays any level under another sky.
 
@@ -278,10 +278,28 @@ which the land shows far below. The level kit writes it into the level's setting
 `clouds cover C below B thickness T size S` (any of them: how much of it is cloud, 0..1; its tops B under the lowest
 floor, 35 if not given; T deep, 110; a cloud S across, 85) or has none with `clouds off`. The original's levels have
 none. A level that names one of those four land skies but carries no `clouds` of its own (a converted map) is drawn
-over a closed sea of cloud (`clouds::default_sea`), so the sky box's land (a green swamp from far above) never shows.
+over a sea of cloud of its own (`clouds::default_sea`: under `Desert` a closed one; under the three green lands
+scattered banks over the land's mesh).
 The settings file's `cloud-quality` (`low`, `medium` (the default), `high`; `off` draws none) sets how finely
 it is drawn, and *Clouds?* off hides it as well ([menu.md](menu.md)). On an RTX 3060 at 2560×1440 it costs about
 3.5, 4.5 and 6 ms a frame (low, medium, high).
+**The land under the track** (2026-11-16, the owner after Ballex's levels: the land must be near, not a map seen
+from an airliner). Under `Mountains`, `Forest` and `Mist` the land is not in the sky box but a mesh the level hangs
+over (`crates/game/src/terrain.rs`, `terrain.wgsl`): `make_skies.py land` (also part of `make`) writes
+`Sky_<name>_LandHeight.png` (16-bit heights, 641 a side), `Sky_<name>_LandColor.jpg` (4096 a side, lit by the sky's
+own sun as its faces are) and `Sky_<name>_Land.txt` (its size, heights and light) from `skyland.Land`: 10 km a side,
+its valleys about 440 under the lowest floor and its peaks (under `Mountains`) up to 330 over it. The game places it so
+that the level lies over its lowest ground, lowers it smoothly where it would still come within 290 under the lowest
+floor of anything of the level (rising 0.85 a unit further off, so the mountains reach about the track's height a few
+hundred units to the side; the light on a lowered slope corrected as the sun would light it), adds a grain of rocks
+and crowns near the eye, and fades it by distance into the haze just under the sky's horizon, which is all the faces
+show below it now (1024 pixels again). It moves with the camera like the level (parallax), the clouds lie between it
+and the track, and the physics never sees it. Any level under these skies has it, a converted map's default sea
+(`clouds::default_sea`) is now scattered banks too (cover 0.3), and the original's skies have none. It costs about
+110 MB of video memory and 0.2 to 0.6 ms a frame on an RTX 3060 at 2560x1440 (the synthetic level: textures 286 to
+206 MB with the smaller faces, a frame with medium clouds 5.5 to 4.4 ms at the start, 6.8 to 6.6 ms looking down
+the track, the clouds being fewer).
+
 `make_skies.py` makes `Sunset` and `Clouds` with only haze below the horizon: their sea of cloud is the game's,
 which the level kit writes into a level under them; a level without it (`clouds off`, or one made otherwise) shows
 the haze below.
