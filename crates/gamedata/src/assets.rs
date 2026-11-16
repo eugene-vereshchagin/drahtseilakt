@@ -430,6 +430,10 @@ impl Data {
             name_meant_textures(&mut loaded.level);
         }
         self.put_pack_textures(&mut loaded.level, maker);
+        self.put_originals(
+            &mut loaded.level,
+            &crate::packs::chain(crate::packs::Kind::Textures),
+        );
         // the toolbox's remaster of a map (`remaster-nmo`): `<name>.remaster/` beside the .nmo, an open-format level
         // made from it; its rounded looks and larger pictures are put on the map's meshes (the map itself, its
         // physics and scripts, stays what it is). The Back to 2004 look draws the meshes without them.
@@ -554,6 +558,80 @@ impl Data {
         Ok(loaded)
     }
 
+    /// One picture, one look: a material of an own-format level that stands for one of the original's textures
+    /// (level::Original) is drawn with that texture when the chosen texture pack is not ours and has it (the copy's,
+    /// the remaster's, a player's pack keyed by the original's names), as the parts and balls are; with ours, and for
+    /// a texture the pack lacks, the material keeps the level's own picture. Its relief belongs to its own picture,
+    /// so it goes with it; the original's way of drawing the texture (its rails' chrome) comes with the texture. Then
+    /// every `game:` texture the remaster's pack draws is its export's file (planned as a level's file is, with the
+    /// compressed texture beside it, not decoded at 4K).
+    fn put_originals(&self, level: &mut level::Level, chain: &[crate::packs::Pack]) {
+        for o in level.originals.clone() {
+            let Some(remaster) = self.pack_picture(&o.texture, chain) else {
+                continue;
+            };
+            let at = level.textures.iter().position(|t| {
+                matches!(&t.source, level::TextureSource::Game(n) if *n == o.texture)
+            });
+            let at = at.unwrap_or_else(|| {
+                level.textures.push(level::Texture {
+                    name: o.texture.clone(),
+                    source: level::TextureSource::Game(o.texture.clone()),
+                    color_key: None,
+                });
+                level.textures.len().saturating_sub(1)
+            });
+            if let (Some(file), Some(t)) = (remaster, level.textures.get_mut(at)) {
+                t.source = level::TextureSource::LevelFile(file);
+            }
+            if let Some(m) = level.materials.get_mut(o.material) {
+                m.texture = Some(at);
+                m.normal = None;
+                m.parallax = 0.0;
+                m.texgen = o.texgen;
+            }
+        }
+        for t in &mut level.textures {
+            if let level::TextureSource::Game(name) = &t.source
+                && let Some(Some(file)) = self.pack_picture(name, chain)
+            {
+                t.source = level::TextureSource::LevelFile(file);
+            }
+        }
+    }
+
+    /// Where the chosen texture packs have the original's texture `name`, in game_texture's order: none when ours
+    /// (the built-in `own`) or nothing comes first; else Some, with the remaster's file when it is the remaster's
+    /// (none: the copy's, a player's pack's or the level's own game/Textures picture, drawn by name).
+    fn pack_picture(&self, name: &str, chain: &[crate::packs::Pack]) -> Option<Option<PathBuf>> {
+        use crate::packs::{ORIGINAL, OWN, REMASTERED};
+        let level_own = self
+            .overlay
+            .as_deref()
+            .and_then(|o| plain_path(o, "Textures"));
+        if level_own.is_some_and(|d| crate::packs::picture(&d, name).is_some()) {
+            return Some(None);
+        }
+        for p in chain {
+            match (p.key.as_str(), &p.dir) {
+                (_, Some(dir)) => {
+                    if crate::packs::picture(dir, name).is_some() {
+                        return Some(None);
+                    }
+                }
+                (OWN, None) => return None,
+                (ORIGINAL, None) => return self.copy_picture(name).map(|_| None),
+                (REMASTERED, None) => {
+                    if let Some(file) = crate::packs::remaster_picture(name) {
+                        return Some(Some(file));
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// RGBA pixels of a texture: its own pixels, or its file from the game's texture folders.
     pub fn texture(&self, t: &level::Texture) -> Option<(u32, u32, Vec<u8>)> {
         self.texture_with(t, &crate::packs::chain(crate::packs::Kind::Textures))
@@ -651,7 +729,7 @@ impl Data {
         name: &str,
         chain: &[crate::packs::Pack],
     ) -> Option<(u32, u32, Vec<u8>, bool)> {
-        use crate::packs::{ORIGINAL, OWN};
+        use crate::packs::{ORIGINAL, OWN, REMASTERED};
         // each candidate: its path, whether it is a player's pack's (budgeted, real alpha), whether it is the copy's
         // (its transparent colour applies)
         let level_own = self
@@ -668,6 +746,8 @@ impl Data {
                 (_, Some(dir)) => crate::packs::picture(dir, name).map(|p| (p, true, false)),
                 (OWN, None) => crate::resources::own_texture(name).map(|p| (p, false, false)),
                 (ORIGINAL, None) => copy(self.copy_picture(name)),
+                // the remaster's enlarged picture of the original's texture (it carries the copy's transparent colour)
+                (REMASTERED, None) => crate::packs::remaster_picture(name).map(|p| (p, true, true)),
                 _ => None,
             }))
             .chain(crate::resources::own_texture(name).map(|p| (p, false, false)))
@@ -1136,6 +1216,7 @@ impl Data {
                 // transparent colour (a remaster's texture carries the copy's)
                 let from_pack = pack.dir.is_some();
                 let keep_key = pack.key == ORIGINAL && pack.dir.is_none();
+                let remaster = pack.key == REMASTERED && pack.dir.is_none();
                 let path = match (pack.key.as_str(), &pack.dir) {
                     (_, Some(dir)) => names.iter().find_map(|n| crate::packs::picture(dir, n)),
                     (OWN, None) => names.iter().find_map(|n| crate::resources::own_texture(n)),
@@ -1143,6 +1224,8 @@ impl Data {
                     // the copy's texture: kept as it is
                     (ORIGINAL, None) => break,
                     (REMASTERED, None) if remaster_file => break,
+                    // a part's texture of the copy: the remaster's picture of it, where the export has one
+                    (REMASTERED, None) => names.iter().find_map(|n| crate::packs::remaster_picture(n)),
                     _ => None,
                 };
                 let Some(path) = path else { continue };
@@ -1156,6 +1239,12 @@ impl Data {
                         self.is_copys_texture(&t.name, *width, *height, rgba)
                     })
                 {
+                    break;
+                }
+                // the remaster's picture is its export's file, planned as a level's file is (with the compressed
+                // texture beside it); it carries the copy's transparent colour
+                if remaster {
+                    t.source = level::TextureSource::LevelFile(path);
                     break;
                 }
                 if let Some(px) = self.decode_budgeted(&path, from_pack)

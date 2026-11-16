@@ -198,7 +198,8 @@ pub fn export_slots(
     let materials: Vec<Value> = level
         .materials
         .iter()
-        .map(|m| {
+        .enumerate()
+        .map(|(i, m)| {
             let mut pbr = json!({"baseColorFactor": m.diffuse, "metallicFactor": 0.0, "roughnessFactor": 1.0});
             if let Some(t) = tex(m.texture) {
                 pbr["baseColorTexture"] = json!({"index": t});
@@ -235,11 +236,18 @@ pub fn export_slots(
                     v["extras"]["drahtseilakt"]["parallax"] = json!(m.parallax);
                 }
             }
+            let gen_name = |g: TexGen| match g {
+                TexGen::Reflect => "reflect",
+                TexGen::Chrome => "chrome",
+            };
             if let Some(g) = m.texgen {
-                v["extras"]["drahtseilakt"]["texgen"] = json!(match g {
-                    TexGen::Reflect => "reflect",
-                    TexGen::Chrome => "chrome",
-                });
+                v["extras"]["drahtseilakt"]["texgen"] = json!(gen_name(g));
+            }
+            if let Some(o) = level.originals.iter().find(|o| o.material == i) {
+                v["extras"]["drahtseilakt"]["original"] = json!({"texture": o.texture});
+                if let Some(g) = o.texgen {
+                    v["extras"]["drahtseilakt"]["original"]["texgen"] = json!(gen_name(g));
+                }
             }
             v
         })
@@ -1138,6 +1146,25 @@ fn import_from(
                 }
             },
         };
+        // what the material stands for in the original: a plain texture name and how it is drawn, else refused
+        let original = &x["original"];
+        if !original.is_null() {
+            let texture = original["texture"]
+                .as_str()
+                .filter(|t| game_texture_name(t))
+                .ok_or("a material's original is not a plain name of the game's textures")?;
+            let texgen = match original["texgen"].as_str() {
+                None => None,
+                Some("reflect") => Some(TexGen::Reflect),
+                Some("chrome") => Some(TexGen::Chrome),
+                Some(_) => return Err("a material's original has an unknown texgen".into()),
+            };
+            level.originals.push(crate::Original {
+                material: level.materials.len(),
+                texture: texture.to_owned(),
+                texgen,
+            });
+        }
         level.materials.push(Material {
             name: m["name"].as_str().unwrap_or_default().to_owned(),
             normal,

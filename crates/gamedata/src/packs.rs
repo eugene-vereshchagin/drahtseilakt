@@ -416,6 +416,42 @@ pub fn picture(dir: &Path, name: &str) -> Option<PathBuf> {
         .cloned()
 }
 
+/// The remaster's enlarged picture of the original's texture `name`: the toolbox's export of the original levels
+/// (levels/remastered/Level_NN/textures/, its files named `NNNN_<texture>.png`), the first level that has it, its
+/// files indexed once. None without an export: the remaster's pack then draws the copy's (its fallback).
+pub fn remaster_picture(name: &str) -> Option<PathBuf> {
+    static INDEX: Mutex<Option<std::collections::HashMap<String, PathBuf>>> = Mutex::new(None);
+    let key = crate::resources::texture_key(name);
+    let mut index = INDEX.lock().ok()?;
+    index
+        .get_or_insert_with(|| remaster_index(&crate::profile::dir(crate::profile::Kind::Remastered)))
+        .get(&key)
+        .cloned()
+}
+
+/// The pictures of a remaster export under `root` by their texture's key: each `Level_NN/textures/` of levels 1 to
+/// 13 in order (a real folder), its PNG files with the number before the name left off, the first level's winning.
+pub fn remaster_index(root: &Path) -> std::collections::HashMap<String, PathBuf> {
+    let mut index = std::collections::HashMap::new();
+    for n in 1..=13 {
+        let dir = root.join(format!("Level_{n:02}")).join("textures");
+        for path in picture_index(&dir).into_values() {
+            if !path.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
+                continue;
+            }
+            let file = path.file_name().and_then(|f| f.to_str()).unwrap_or_default();
+            let bare = match file.split_once('_') {
+                Some((num, rest)) if !num.is_empty() && num.bytes().all(|b| b.is_ascii_digit()) => rest,
+                _ => continue,
+            };
+            index
+                .entry(crate::resources::texture_key(bare))
+                .or_insert(path);
+        }
+    }
+    index
+}
+
 /// The settings' choice of a kind, if the player made one.
 pub fn from_settings(kind: Kind) -> Option<String> {
     crate::profile::setting(kind.key()).filter(|k| plain(k) && k.len() <= MAX_KEY)

@@ -41,6 +41,45 @@ TRACK_SET = os.path.join(OWN, "Track")
 # The textures every level shares, named as the game's (`game:<name>`) instead of copied into each level.
 SHARED = ("Track_Side", "Track_floor_border", "Track_floor_border_n", "Wood_Plain", "Track_Rail", "Track_Rail_n",
           "Track_Column", "Laterne_Glas", "Floor_Top_Checkpoint")
+# One picture, one look (open-format.md, a material's `original`): what each of our levels' own pictures stands for
+# in the original, by the picture's name (a set's letter left off), and how the original draws it. With a texture pack
+# other than ours (the copy's, the remaster's, a player's) the game draws that texture instead, as it draws the parts
+# and balls, so floors, rails and grilles never keep our look among the copy's. `game:` names that are the original's
+# own texture names (wood, plates, lamps, the ball tiles) need no entry. Every other picture must be own-only below:
+# a level is not written with a picture that is neither.
+ORIGINAL_OF = {
+    "Track_Top": ("Floor_Top_Borderless", None),
+    "Track_Shade": ("Floor_Top_Borderless", None),
+    # the kerb, the gutter's slope and the side carry the brick strip along their outer edge, as Floor_Side does
+    "Track_Kerb": ("Floor_Side", None),
+    "Track_Slope": ("Floor_Side", None),
+    "Track_Side": ("Floor_Side", None),
+    "Track_floor_border": ("Brick", None),
+    "Track_Rail": ("Rail_Environment", "chrome"),
+    "Track_Column": ("Column_beige", None),
+    "Fan_Grille": ("Modul18_Gitter", None),
+    "SkyLayer": ("SkyLayer", None),
+}
+# Pictures that stand for nothing of the original: the signs, the community part's (a community map's own textures)
+# and the sticky ball's skin (the original has no sticky ball). They stay ours in every look.
+OWN_ONLY = ("Signs_", "Comm_", "Ball_Sticky")
+
+
+def original_of(texture):
+    """What a material's picture stands for: ("original", texture, texgen), ("own",) or ("game",) for a `game:` name
+    of the original's own texture set; ValueError for a picture that is none of them."""
+    game = texture.startswith(K.GAME)
+    stem = texture[len(K.GAME):] if game else os.path.splitext(texture)[0]
+    if game and os.path.isfile(os.path.join(TEXTURE_SET, stem + ".png")):
+        return ("game",)
+    base = stem[:-2] if len(stem) > 2 and stem[-2] == "_" and stem[-1] in "ABC" else stem
+    if base in ORIGINAL_OF:
+        return ("original",) + ORIGINAL_OF[base]
+    if stem.startswith(OWN_ONLY):
+        return ("own",)
+    raise ValueError(f"{texture}: neither one of the original's textures nor own-only (levelkit.ORIGINAL_OF)")
+
+
 # The track's cross-section (across, up): its top at 0, 2.5 deep.
 DEPTH = 2.5
 # How a stretch of track keeps the ball on (decisions in docs/drahtseilakt/levels.md, "Safety"), measured on the
@@ -1600,6 +1639,13 @@ class LevelBuilder:
         for m in self.meshes:
             orient(m)
         groups = sorted(self.groups.items())
+        for mt in self.materials:
+            if mt["texture"]:
+                kind = original_of(mt["texture"])
+                if kind[0] == "original":
+                    mt["original"] = {"texture": kind[1], **({"texgen": kind[2]} if kind[2] else {})}
+                elif kind[0] == "own":
+                    mt["own_only"] = True
         K.write_open(self.out, self.meshes, self.nodes, self.materials, groups, sky=sky, start_ball=start_ball,
                      settings={"music": music, "light": list(light), "level_bonus": bonus, "tutorial": False,
                                "last_level": False, "parts": "own", **({"fog": fog} if fog else {}),
