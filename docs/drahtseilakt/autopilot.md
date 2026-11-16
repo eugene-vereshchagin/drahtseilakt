@@ -388,6 +388,16 @@ not the hints'); every variant tried from the release (trace from it at ticks 23
 clock after it) jams crate 40 from CP3 as well. The crate puzzle needs steps whose outcome does not depend on such
 small differences.
 
+With the hints' tries again (2026-11-16, `retry`, `check`, `before` in "Hint files"): the gap z 585 hint is tried
+again from its start (from the start: through on the 2nd try), sector 3 from before crate 38's ram (`retry 50 2`, a
+check that crate 40 went and `before 3530` at the channel's mouth, where the CP3 start comes at 3468), sector 4 from
+the kick off the raft. From CP3 and from CP4 each passes on its first try, as before. Run on from the start, crate 40
+jams in nearly every try (the saves the old going back reached were after the ram, the jam showed only some 40 s
+later, and the steps after a save replayed as written, the closed-loop trace pulling each try onto the same ram);
+in five runs of 41 to 51 varied tries five got through the crates, all 3.5 to 6 s late at the channel's mouth, so
+the stone convoy is ahead and the queue at CP3 stays short. Level 13 is still not finished from the start: the run on
+meets the crates in another state, which the ram's line does not make up for.
+
 ## The speedrun style
 
 `--style speedrun` (with `--autopilot` or `--watch`) makes the test player ride as fast as it can, for speedrun

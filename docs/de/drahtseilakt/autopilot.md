@@ -420,6 +420,17 @@ liegen nicht bei den Hinweisen); jede Variante ab dem Loslassen (trace ab Takt 2
 des Sektors danach) klemmt Kiste 40 auch ab CP3. Das Kistenrätsel braucht Schritte, deren Ausgang von so kleinen
 Unterschieden nicht abhängt.
 
+Mit den erneuten Versuchen der Hinweise (2026-11-16, `retry`, `check`, `before` unter „Hinweisdateien“): der
+Hinweis an der Lücke z 585 wird von seinem Anfang an erneut versucht (vom Start: im 2. Versuch durch), Sektor 3 von
+vor dem Rammen der Kiste 38 (`retry 50 2`, eine Prüfung, dass Kiste 40 wegging, und `before 3530` an der Rinnenmündung,
+wo der CP3-Start bei 3468 ankommt), Sektor 4 vom Stoß vom Floß. Von CP3 und von CP4 aus geht jeder im ersten Versuch
+durch, wie zuvor. Vom Start durchgespielt klemmt Kiste 40 in fast jedem Versuch (das alte Zurückgehen erreichte nur
+Sicherungen nach dem Rammen, das Klemmen zeigte sich erst etwa 40 s später, und die Schritte nach einer Sicherung
+liefen wie geschrieben, der geregelte `trace` zog jeden Versuch auf dasselbe Rammen); in fünf Läufen mit 41 bis 51
+variierten Versuchen kamen fünf durch die Kisten, alle 3,5 bis 6 s zu spät an der Rinnenmündung, sodass der Zug der
+Steinkugeln vorn ist und die Reihe an CP3 zu kurz bleibt. Level 13 ist vom Start noch nicht fertig: der Lauf trifft
+die Kisten in einem anderen Zustand, den die Linie des Rammens nicht ausgleicht.
+
 ## Der Speedrun-Stil
 
 `--style speedrun` (mit `--autopilot` oder `--watch`) lässt den Testspieler so schnell fahren, wie er kann, für
