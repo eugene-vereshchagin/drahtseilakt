@@ -119,7 +119,10 @@ Community-Teil), nur aus eigenen Inhalten; das gebaute Level liegt nicht in git.
   (Papier und der Ventilator, Wippe, Plattenbrücke, Schaukel, Stein schiebt Kisten, Holz); Stein
   und die Rätselmodule auf dem Weg (Klappenrad, Brettbrücke, Zugbrücke, Schieber, Kiste unter ihrem Stein,
   Aufzug, eine Reihe Säcke, Drehkreuz).
-- **Das Tor** „COMMUNITY", hinter dem Himmel, Nebel und Licht wechseln (ein Skript).
+- **Das Tor** „COMMUNITY". Der Community-Teil ist beleuchtet wie der klassische; nur sein letztes Stück, von seinem
+  Schild bis zum Ballon, hat anderen Himmel, Nebel und anderes Licht (ein Skript: TT Sky, Set Fog, Set Light Color).
+  Bis 2026-11-16 hatte sie der ganze Teil, und der Eigentümer hielt das warme Licht und den Abendhimmel für dunklere
+  Texturen.
 - **Community**, zwei Sektoren: die Materialien der Community-Karten (Alpha-Blending, Alpha-Test, additives
   Leuchten, Chrom- und Spiegel-Texturkoordinaten, ein doppelseitiges Blatt, unbeleuchtete Farbe, Normalmap mit
   Parallaxe, ein zweiter Durchgang über ein Mesh, ein 3D-Sprite, ein Glasboden auf dem Weg), dann unsere eigenen
@@ -319,8 +322,7 @@ sind ebenso angeschlossen: an ihren Kanten, wo ein Boden weiterläuft, liegen ih
 des Bodens selbst, und ihre Oberseite ist wie die Bahn texturiert. Der Test `kit_floors_have_no_seams` (testlevels.rs)
 prüft die Böden jedes Levels, das der Baukasten gemacht hat (ab Version 2, in `asset.generator` von level.gltf): wo
 die Oberseite eines Bodens endet, liegt daneben in ihrer Höhe keine andere (`the_seam_finder_sees_a_crack` prüft die
-Suche selbst). Ein Checkpoint auf einem schmalen Weg bekommt eine kleinere Schale und mit ihr weniger Tiefe, so
-bleiben ihre Hänge die gemessenen (eine Steinkugel, die in einer steileren Schale lag, rollte nicht heraus).
+Suche selbst).
 
 **Platz, Schienen und Wolken** (2026-11-03, nachdem der Besitzer Level 1 gespielt hat): ein Weg muss der Kugel (Radius
 2) auf der Höhe ihrer Mitte mindestens 5,5 Breite lassen, zwischen seinen Rändern oder den Holmen seiner Geländer
@@ -415,6 +417,22 @@ Flammenschalen an ihrem Rand; ein Checkpoint ein Bodenstück von 10 Länge mit e
 Radius 5 (bis zu einer Lippe) und zwei Flammenschalen quer zum Weg, ±7 zur Seite, wo die Flammen des Teils brennen.
 Die Böden vor und nach einem Checkpoint enden an seinem Stück. Ihre Rahmen und Rücksetzpunkte stehen in den Schalen
 (die Rücksetzpunkte 3,65 und 3,33 über dem Grund, wie beim Original).
+
+**Checkpoints auf einem eigenen Stück** (2026-11-16, der Eigentümer: „im Original haben sie nie einen Weg zurück oder
+herum"). Gemessen an allen 13 Levels (55 Checkpoints und 13 Starts, nur Zahlen): ein Checkpoint steht auf einem eigenen
+Stück, 9,84 entlang des Wegs und 18 quer, seine ganze Oberseite die Platte des Checkpoints (Floor_Top_Checkpoint), die
+Schale von Radius 5 in der Mitte und die Flammen auf seinen zwei Spitzen; Böden von etwa 10,8 Breite (5 davon flach) oder Schienen
+kommen durch seine Enden herein und gehen weiter, sonst liegt nichts daneben, so führt der Weg durch die Schale. Der
+Start ist 18,5 mal 16 um seine Schale von 7,5, die vier Flammen an seinen Ecken, ein Boden geht von ihm weiter, dahinter
+nichts. Unsere sind so gebaut (`levelkit.pad_outline`): das Stück eines Checkpoints ist 11 lang (der Rand der Schale
+0,5 von seinen Enden) und so breit wie die Hülle des Rands und der zwei Flammenschalen (18), das des Starts die Hülle
+des Rands (Radius 8) und der vier Schalen, die sich zum Hals verengt, von dem der erste Boden weitergeht; ihre Oberseite
+ist ganz die Platte, die Schale immer die gemessene. `levelcheck.check_pads` weist ein Level ab, in dem die Oberseite
+eines anderen Bodens näher als 6 an einem solchen Stück liegt (innerhalb von 4 seiner Höhe), außer den Böden, die von
+seinen Enden weitergehen, oder ein Weg breiter als 14 von ihm weitergeht; das synthetische Level verengt Sektor 3 vor
+dem Checkpoint auf 12, `make_test_level.py` gibt Parts_Test 12 breite Hälse zwischen
+seinen Stücken und seinen breiten Böden (das ausgelieferte Parts_Test ist noch ein Bau eines früheren Kits: neu gebaut,
+bestehen seine T-Stöße der Platten `our_floors_have_no_seams` nicht).
 
 **Was der Testspieler über ein Level weiß**, steht in derselben Datei. Aus dem gelegten Weg schreibt leveldsl.py die
 Hinweisdateien des Testspielers für drei Stile in den Ordner `pilot/` des Levels (autopilot.md, „Hinweisdateien“):

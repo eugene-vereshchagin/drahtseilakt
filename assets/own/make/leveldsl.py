@@ -42,8 +42,8 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     move F S U               the cursor moves F ahead, S to the left, U up (nothing built)
     turn A                   the heading turns A degrees to the left (negative: right), the cursor stays
     mark NAME / back NAME    remember the cursor / go back to it
-    checkpoint               a checkpoint at the cursor (a piece 10 long with its bowl, taking 5 of the floors before
-                             and after it): the next sector begins
+    checkpoint               a checkpoint at the cursor (a piece of its own 11 long with its bowl and flame cups, taking
+                             5.5 of the floors before and after it; the way into it at most 14 wide): the next sector begins
     finish                   the balloon, 22 ahead of the cursor (the floor must end at the cursor)
     point, life, box, dome, trafo KIND, loose KIND   a part at the cursor;  options: side S (to the left), ahead A
                              (a box also up U: on another box, `up 5`);
@@ -714,7 +714,7 @@ class Track:
             self.skip = L.CHECK_LEN / 2
             self.pending = {"n": self.checkpoints, "at": self.pos.copy(), "width": self.width,
                             "fwd": self.fwd(), "back": back, "along": self.along}
-            bottom_reset = self.pos + np.array([0.0, L.CHECK_RESET - L.check_bowl(self.width)[-1][1], 0.0])
+            bottom_reset = self.pos + np.array([0.0, L.CHECK_RESET - L.check_bowl()[-1][1], 0.0])
             self.sector += 1
             self.pilot.begin(bottom_reset, self.sector)
         elif cmd == "finish":

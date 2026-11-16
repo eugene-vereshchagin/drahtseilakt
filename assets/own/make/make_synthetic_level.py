@@ -211,7 +211,10 @@ floor 18
 sign "P_Ball_Paper"
 loose paper side 9 ahead 6
 floor 18
-floor 20
+# the way narrows to the checkpoint's piece, as every way into a checkpoint (its own piece, no floor beside it)
+width 12
+floor 14
+floor 12
 checkpoint
 
 # ---- sector 4: paper (fans, troughs), then wood (seesaw, plates, swing) -------------------------------------------
