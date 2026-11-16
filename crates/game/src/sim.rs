@@ -3439,6 +3439,7 @@ pub(crate) mod tests {
             scripts: None,
             frames: Vec::new(),
             texture_slots: Vec::new(),
+            originals: Vec::new(),
         }
     }
 

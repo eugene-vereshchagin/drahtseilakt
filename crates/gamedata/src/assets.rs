@@ -570,9 +570,9 @@ impl Data {
             let Some(remaster) = self.pack_picture(&o.texture, chain) else {
                 continue;
             };
-            let at = level.textures.iter().position(|t| {
-                matches!(&t.source, level::TextureSource::Game(n) if *n == o.texture)
-            });
+            let at = level.textures.iter().position(
+                |t| matches!(&t.source, level::TextureSource::Game(n) if *n == o.texture),
+            );
             let at = at.unwrap_or_else(|| {
                 level.textures.push(level::Texture {
                     name: o.texture.clone(),
@@ -1225,7 +1225,9 @@ impl Data {
                     (ORIGINAL, None) => break,
                     (REMASTERED, None) if remaster_file => break,
                     // a part's texture of the copy: the remaster's picture of it, where the export has one
-                    (REMASTERED, None) => names.iter().find_map(|n| crate::packs::remaster_picture(n)),
+                    (REMASTERED, None) => {
+                        names.iter().find_map(|n| crate::packs::remaster_picture(n))
+                    }
                     _ => None,
                 };
                 let Some(path) = path else { continue };
@@ -3110,5 +3112,78 @@ mod tests {
         assert_eq!(light_of(&[0.5, f32::NAN, 0.0]), None);
         assert_eq!(light_of(&[f32::INFINITY, 0.0, 0.0]), None);
         assert_eq!(light_of(&[0.5, 0.5]), None);
+    }
+
+    /// One picture, one look: a material standing for the original's texture keeps the level's picture with ours,
+    /// takes the pack's texture (by name, its relief dropped, the original's texgen put on) with a pack that has it,
+    /// and stays the level's with one that lacks it.
+    #[test]
+    fn a_material_standing_for_the_original_follows_the_texture_pack() {
+        let root =
+            std::env::temp_dir().join(format!("drahtseilakt-originals-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (has, lacks) = (root.join("has"), root.join("lacks"));
+        std::fs::create_dir_all(&has).unwrap();
+        std::fs::create_dir_all(&lacks).unwrap();
+        image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+            .save(has.join("Floor_Side.png"))
+            .unwrap();
+        let data = Data::new(None);
+        let level = || {
+            let mut l = level::Level {
+                textures: vec![
+                    pixels("Track_Kerb_C", [9, 9, 9, 255]),
+                    pixels("relief", [8, 8, 8, 255]),
+                ],
+                ..Default::default()
+            };
+            l.materials.push(level::Material {
+                name: "kerb".into(),
+                diffuse: [1.0; 4],
+                ambient: [0.0; 3],
+                emissive: [0.0; 3],
+                specular: [0.0; 3],
+                power: 0.0,
+                texture: Some(0),
+                normal: Some(1),
+                parallax: 0.1,
+                blend: None,
+                alpha_cutoff: None,
+                z_write: true,
+                two_sided: false,
+                unlit: false,
+                texgen: None,
+            });
+            l.originals.push(level::Original {
+                material: 0,
+                texture: "Floor_Side".into(),
+                texgen: Some(level::TexGen::Chrome),
+            });
+            l
+        };
+        // ours first: the level's own picture
+        let mut own = level();
+        data.put_originals(&mut own, &[builtin("own")]);
+        assert_eq!(own.materials[0].texture, Some(0));
+        assert_eq!(own.materials[0].normal, Some(1));
+        // a pack with the original's texture: drawn with it, by name
+        let mut swapped = level();
+        data.put_originals(&mut swapped, &[player_pack("has", &has, Some("none"))]);
+        let m = &swapped.materials[0];
+        let t = &swapped.textures[m.texture.unwrap()];
+        assert!(matches!(&t.source, level::TextureSource::Game(n) if n == "Floor_Side"));
+        assert_eq!(
+            (m.normal, m.parallax, m.texgen),
+            (None, 0.0, Some(level::TexGen::Chrome))
+        );
+        assert_eq!(swapped.originals.len(), 1, "kept for an export");
+        // a pack without it, then ours: the level's own picture
+        let mut kept = level();
+        data.put_originals(
+            &mut kept,
+            &[player_pack("lacks", &lacks, None), builtin("own")],
+        );
+        assert_eq!(kept.materials[0].texture, Some(0));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
