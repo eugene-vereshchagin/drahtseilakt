@@ -76,11 +76,18 @@ und seine Eingänge gelöscht, damit keine Karte an ihm hängt. Der Leser gerät
 184 Karten mit Skripten (584 Karten mit `community-unsorted/`): 148 nur die Vorlage, 36 eigene Skripte. Bei 173
 kennt die Laufzeit jeden Baustein; von den 36 eigenen laufen 8 mit der vollen Wirkung jedes Bausteins (AAAAAA
 Class Islands Scenery, Be Besieged on All Sides 2.0, Painstaking Journey, Queen Ball (Easy Ver.), Take the leap,
-Traveling on Rubber Walls, Trial of the Ballance King, 反向Level_11), 17 mit einem eingeschränkten Baustein (die
+Traveling on Rubber Walls, Trial of the Ballance King, 反向Level_11; Traveling on Rubber Walls wurde am 2026-11-16
+aus der Sammlung gelöscht, siehe unten), 17 mit einem eingeschränkten Baustein (die
 neun Portal-Karten: die Objektkopie fehlt noch, das Versetzen der Kugel läuft; Physik per Skript; Texturen;
 Tasten). 11 Karten haben unbekannte Bausteine; die Reihenfolge der Arbeit (Gruppen und Progressionen, Physik per
 Skript, Kopien, Klang und Text durch die Engine, Aussehen, übrige Logik, „nie": Maus, Schriften, 2D) steht auf der
 englischen Seite.
+
+*2026-11-16:* drei Karten, deren Skripte ein Mesh ganz ohne Vertices nennen (die einzigen Karten, die die Konvertierung
+ins offene Format nicht identisch erhielt: der Export machte aus so einem Mesh ein schlichtes Objekt), 20th Anniversary
+Commemorative Map, Fake Strength v4.4 und Traveling on Rubber Walls, wurden aus der Sammlung des Eigentümers
+(`ref/Maps`) gelöscht. Die Zahlen oben sind die der Zählung davor; die Prüfung des Konverters deckt jetzt 589 Karten ab,
+alle identisch (STATUS/convert-audit.md).
 
 ## Stufe 0 (2026-11-11): Konformität des Kerns
 

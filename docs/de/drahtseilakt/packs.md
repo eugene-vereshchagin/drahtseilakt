@@ -8,7 +8,7 @@ Wie die Level aussehen, kommt aus zwei Arten von **Paketen**, getrennt gewählt,
   Holzkugel gezeichnet werden.
 
 Ein Modellpaket ändert nur, was **gezeichnet** wird. Die Physik nutzt immer die Formen, die das Spiel vermessen hat (die
-des Originals für die Level der Kopie, unsere für unsere eigenen Level: [resources.md](resources.md), „Unsere eigenen
+des Originals für die Level der Kopie, unsere für die für unsere Teile gemachten Level: [resources.md](resources.md), „Unsere eigenen
 Teile“), also ändert ein Paket nie, wie ein Level spielt, und jede Aufzeichnung (Replay) spielt mit jedem Paket gleich.
 Diese Seite ist für Paketautoren und Spieler.
 

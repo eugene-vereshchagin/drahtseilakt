@@ -509,7 +509,8 @@ by the engine's.
 With the blocks above, **173 of the 184 scripted maps** have every block known to the runtime: the 148
 template maps and 25 of the 36 with scripts of their own. Of those 25, eight use only blocks with their full
 effect (AAAAAA Class Islands Scenery, Be Besieged on All Sides 2.0, Painstaking Journey, Queen Ball (Easy
-Ver.), Take the leap, Traveling on Rubber Walls, Trial of the Ballance King, 反向Level_11); the other 17 run
+Ver.), Take the leap, Traveling on Rubber Walls, Trial of the Ballance King, 反向Level_11; Traveling on Rubber Walls was
+deleted from the collection on 2026-11-16, see below); the other 17 run
 with a limited block: the nine **Portal** maps (Dueling With the Ice Cube ×3, Find Your Place, In the Field 2.0,
 Periodic Travel, Rectangular Elements, See You Tomorrow, Traveling Through the Void 2.0) share one portal script
 whose Object Copy (the portals' particle frames) was not made in phase 1, so the portals did nothing (phase 2 makes them work, see above); 2010s, A Little Journey, All-We-Know physicalize objects by script; Board-Na
@@ -525,6 +526,11 @@ editor of its own), **Morning Mist**, **Back and Forth**, **Misty**, **A Peacefu
 
 Each map is listed in [scripts-maps.csv](scripts-maps.csv): its kind (template or own), top-level graphs,
 blocks, the blocks beyond the template, the blocks not covered, and whether phase 1 covers it.
+
+*2026-11-16:* three maps whose scripts name a mesh with no vertices at all (the only maps the open-format conversion
+did not keep identical: the export turned such a mesh into a plain object), 20th Anniversary Commemorative Map, Fake
+Strength v4.4 and Traveling on Rubber Walls, were deleted from the owner's collection (`ref/Maps`). The counts above
+are of the census before that; the converter audit now covers 589 maps, all identical (STATUS/convert-audit.md).
 
 ## The order of work to reach all maps
 

@@ -30,7 +30,8 @@ In Ihrem Datenordner (siehe [Level und Ordner](levels.md)):
 
 ## Ein Problem melden
 
-Wohin Sie Probleme melden können, steht bald hier. Bis dahin schalten Sie *Replays speichern* ein (Optionen, Replays)
+[Problem melden](https://github.com/eugene-vereshchagin/drahtseilakt/issues/new){.button} — oder *Problem melden* in den *Optionen* des Spiels — öffnet im Browser das Formular
+für eine neue Meldung (ein GitHub-Konto ist nötig). Schreiben Sie, was geschah und in welchem Level. Schalten Sie *Replays speichern* ein (Optionen, Replays)
 und heben die `.replay`-Datei des Laufs auf, der das Problem zeigt: sie zeigt genau, was geschah. Die Entwicklerprotokolle
 in `replays/<Level>/` entstehen nur, wenn das Spiel mit `--debug`, mit der Umgebungsvariable `DRAHTSEILAKT_DEV_LOGS=1`
 oder mit `dev-logs on` in `settings.txt` gestartet wird.

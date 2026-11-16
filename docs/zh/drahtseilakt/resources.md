@@ -29,7 +29,7 @@
 | menu sounds | `Sounds/Menu_click, Menu_load` | 音效主题（assets/sounds） |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | 音效主题（assets/sounds） |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | 自有：*system* 有十八首乐曲和八段氛围，Music/music.txt 为每个部分给出一个池（主题 1–3 用前九首，主题 4 和 5 用另外九首）；*neuro* 有十五段合成乐句，每个部分一段，以及自己的氛围和终点音乐 |
-| original levels | `3D Entities/Level/Level_NN.NMO` | 我们自己的关卡，`assets/levels/`（levels.md） |
+| original levels | `3D Entities/Level/Level_NN.NMO` | 随附的关卡集，`assets/levels/`（levels.md） |
 
 ## 自有界面
 

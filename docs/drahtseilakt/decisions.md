@@ -309,6 +309,8 @@ copy, as the levels do. The interface no longer decides the sound theme.
 
 ## The game plays out of the box
 
+*Amended 2026-11-16: no levels of our own, see "No levels of our own" below.*
+
 *2026-11-03, the owner's release condition.* An original level's layout and its parts' models (`3D Entities/PH/*.nmo`,
 `Balls.nmo` and the rest) are Cyparade's and Atari's work; its mechanics are free. So before the release the game
 needs its own parts and its own levels, and it must ship in working order *before* anyone imports anything: it
@@ -486,3 +488,24 @@ on request, never during a run, never a remote address. Why: a hint like "the le
 is useless if the manual is a URL to type in by hand.
 
 *Done 2026-11-13:* the game now ships a local manual (`assets/manual/`, `tools/make_manual.py`) and the hint says to press F1; the owner's decision of the same day relaxes "never opens a browser" to: only the local manual, only on the player's request (see menu.md, "The manual").
+
+## No levels of our own
+
+*Owner's decision, 2026-11-16* ("our 10 levels really must be removed now"). The ten levels of our own planned on
+2026-11-03 ("The game plays out of the box"; levels.md then had "Our levels and how to edit them") were shelved on
+2026-11-11, when the owner's community picks took their place, and are removed now with everything that only served
+them: their runs test (`ownlevels.rs`, its kit checks kept as `testlevels.rs`), `scripts/own-levels.sh`, the
+level-stats comparison of one of our levels with its target (`--level-stats --open`, `scripts/level-stats.py --own`,
+`hints/level-stats-manual-own.csv`) and the docs that described them. What the game ships instead: the Drahtseilakt
+set (the owner's picks in the open format), the community set (`.nmo`), the showcase level `00_Синтетический_уровень`
+and the hidden `Parts_Test`, both made with the level kit, which stays for them. The entries above that speak of "our
+own levels" are kept as they were written; this entry replaces them. Release criteria: [roadmap.md](roadmap.md),
+"Release criteria".
+
+## Report a problem opens the issue form in the browser
+
+*Owner's decision, 2026-11-16* ("problem reports must be a button that leads to GitHub issues and doesn't just show
+the URL"). Options has *Report a problem*, and the manual's troubleshooting page a button-styled link: both open
+`https://github.com/eugene-vereshchagin/drahtseilakt/issues/new` in the system's browser. This widens the entry
+above ("The player's manual ships as local HTML") by exactly one remote address: a constant in the game, handed to the
+system's opener only when the player asks. The game itself still has no network code and connects nowhere.

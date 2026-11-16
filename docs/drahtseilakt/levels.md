@@ -102,14 +102,15 @@ and title, and no folders to open. Everything a level's author and a player need
 
 ## Levels shipped with the game
 
-Our own levels come with the game in its `assets/levels/`, a folder per level in the open format, made of our own
-parts only (assets/own, [resources.md](resources.md)), so they play with no copy of the original at all. The menu
-shows them with the open-format levels of `levels/open/`: under Start when there is no copy (the list "Our levels"),
-under the extended mode's "Open format" always. They are made by scripts in `assets/own/make/` (`levelkit.py` builds
-a level from track pieces and the stand-ins of the parts; `make_test_level.py` the first one, `Parts_Test`, a few
-hundred units of track with every part on it or beside it and a stretch of track of each safety, for the tests; it is
-hidden from the players' list by `hidden = yes` in its level.txt and still opens with `--open`), whose outputs are
-committed. Their licence is the
+Two sets of levels come with the game, both community maps picked by the owner (decisions.md, "No levels of our own"):
+the **Drahtseilakt set** (`assets/levels/drahtseilakt/01-…13-…`, converted to the open format) and the **community set**
+(`assets/levels/community/`, the maps' own `.nmo` files), each credited in its `level.txt` and in CREDITS.md. Beside
+them `assets/levels/drahtseilakt/` holds two levels of ours, made of our own parts only (assets/own,
+[resources.md](resources.md)) by scripts in `assets/own/make/` (`levelkit.py` builds a level from track pieces and the
+stand-ins of the parts): the showcase level `00_Синтетический_уровень` (below) and `Parts_Test`
+(`make_test_level.py`, a few hundred units of track with every part on it or beside it and a stretch of track of
+each safety, for the tests; hidden from the players' list by `hidden = yes` in its level.txt and still opened with
+`--open`). Their text sources are committed, the built files are not. Their licence is the
 game's (GPL-3.0-only).
 
 ### The showcase level
@@ -165,32 +166,19 @@ part of ours stands in the level and that each element does its job in the game'
 through each element with the arrows and checks where it gets to, how far the module's parts turned or moved and
 where a knocked-out part lies; every check is required. `SHOWCASE_COPY_PARTS=<copy>` runs the same checks with the
 copy's parts in place of ours, `SHOWCASE_ONLY=<prefix>` only the checks so named, `SHOWCASE_TRACE=<check>` prints the
-ball's way. The test player's run is no longer kept for the level. Since the owner's notes 11 (2026-11-16): the drawbridge's lane has a ledge 1 long and 0.5 deep either side of its gap, as level 5's, so the fallen deck lies flush with the lane (its check asserts the ball's height on it); every checkpoint's and the start's bowl is drawn whole; no two drawn faces overlap in one plane (the kit refuses them, `check_coplanar`, and `our_levels_have_no_faces_flickering_in_one_plane` checks every level it made); signs stand where no way passes; the fan's grille is a grid of bars with a dark hub, as the original's; where the stone ball goes on a bare floor every hard corner has a railing on its outer side (the original's narrow stone lanes are troughs 0.68 deep instead); the sticky ball, which no original level and no converted community map has (it is the BallSticky mod's), stands in the community part with a 40-degree slope it climbs from rest and the wooden ball does not.
+ball's way. The test player's run is no longer kept for the level. Since the owner's notes 11 (2026-11-16): the drawbridge's lane has a ledge 1 long and 0.5 deep either side of its gap, as level 5's, so the fallen deck lies flush with the lane (its check asserts the ball's height on it); every checkpoint's and the start's bowl is drawn whole; no two drawn faces overlap in one plane (the kit refuses them, `check_coplanar`, and `kit_levels_have_no_faces_flickering_in_one_plane` checks every level it made); signs stand where no way passes; the fan's grille is a grid of bars with a dark hub, as the original's; where the stone ball goes on a bare floor every hard corner has a railing on its outer side (the original's narrow stone lanes are troughs 0.68 deep instead); the sticky ball, which no original level and no converted community map has (it is the BallSticky mod's), stands in the community part with a 40-degree slope it climbs from rest and the wooden ball does not.
 Without a copy of the original the level behind the menu is the first shipped level past the showcase (order 0),
 so the menu never shows its sign boards.
 
-## Our levels and how to edit them
+## The level kit
 
-*2026-11-03.* Ten levels of our own, from a first roll to the gauntlet, ship with the game (the release criterion of
-roadmap.md). Each is new: its layout is ours, only the mechanics are the original's. The menu lists them in this
-order (`order` in level.txt; their difficulty, `difficulty`, runs 1 to 10 with it), by their names in the menus' language:
+*2026-11-16.* The kit below (`assets/own/make/leveldsl.py`, `levelkit.py`, `levelparts.py`, `levelcheck.py`) was
+written for ten levels of our own (2026-11-03). The owner shelved them on 2026-11-11 and had them removed on
+2026-11-16 (decisions.md, "No levels of our own"); the kit stays, because the showcase level and `Parts_Test` are
+made with it, and its checks run on them (`crates/game/src/testlevels.rs`). What it says about "our levels" holds
+for any level made with it.
 
-| # | Level | Sectors | Idea | Sky, music, bonus |
-|---|---|---|---|---|
-| 1 | First Roll | 4 | the original's first level in spirit, twice its length: a wooden bridge, rails straight, curving and in loops, boxes and crates shoved off bare stretches, the stone transformer and back, loose balls, the paper ball up three fans and over a plate bridge, a dome, seesaws, two stones on their crates, four pushers, bare terraces of sharp turns, wooden ramps up between railed landings, rails spiralling down; gutters on most floors, railings where a fall is possible | Sunset, 1, 100 |
-| 2 | Wood and Stone | 4 | the wooden ball climbs the ramps the stone one cannot; the stone ball shoves crates and loose balls off ledges without borders | B, 2, 200 |
-| 3 | Paper Winds | 4 | the paper ball rides fans up to the floors above; plate bridges hold it | C, 3, 300 |
-| 4 | Swing Time | 4 | things that move: swinging sacks, turning arms, a flap wheel, swings that bridge a gap while they swing by | A, 4, 400 |
-| 5 | Bridges and Boards | 5 | seesaws under every ball; plate bridges that break under the stone one | B, 5, 500 |
-| 6 | Stone Work | 5 | crates, loose balls and domes in the way: shoved off by the stone ball, gone round by the wooden one | C, 1, 600 |
-| 7 | Rail Runner | 5 | long rails through curves, up and down; narrow floors without borders | A, 2, 700 |
-| 8 | Shifting Shapes | 5 | every sector wants another ball: paper for fans and plate bridges, stone for crates, wood for ramps and seesaws | B, 3, 800 |
-| 9 | Leap of Faith | 5 | speed and jumps: long runs down, ramps that throw the ball over gaps, rails taken fast | C, 4, 900 |
-| 10 | The Gauntlet | 6 | narrow ways, every ball and every part one after another | A, 5, 1000 |
-
-Every level starts with the wooden ball and has checkpoints with their flames, extra points and an extra life.
-
-**A level is written as text.** Each folder holds its description, `level.lvl`, a small language read by
+**A level is written as text**: its description, `level.lvl`, a small language read by
 `assets/own/make/leveldsl.py`, which writes the level beside it (`level.gltf`, `level.bin`, `textures/`, `level.txt`)
 with `levelkit.py`. Only the level's own textures (its set of slabs, kerbs, shade and slopes) are files of its
 `textures/`; the textures every level shares are named as the game's (`game:` images, open-format.md) and drawn with
@@ -268,7 +256,7 @@ haze turning a cool blue-white with distance) as a mesh under the level (below).
 (Front, Right, Back, Left, Down, and Top if it has one) a level folder or the textures bring; a name is letters,
 digits, `_` and `-`. `--sky NAME` on the command line plays any level under another sky.
 
-**The sea of cloud.** Under `Sunset` and `Clouds` our levels hang over a sea of cumulus that the game draws as a
+**The sea of cloud.** Under `Sunset` and `Clouds` the kit's levels hang over a sea of cumulus that the game draws as a
 volume (`crates/game/src/clouds.wgsl`): billows of tiling noise, lit by the sky's sun (bright where it meets them,
 blue-violet in their shade) and by the sky above, fading far off into the sky's own haze at the horizon; the columns
 and supports sink into it. Under `Mountains`, `Forest`, `Mist` and `Desert` it is broken banks with gaps through
@@ -310,11 +298,7 @@ thirds of the floors' edges are profiled (the floor rising 0.7 over 2.5 to its e
 ball back to the middle; a third bare), from level 6 on only a quarter to a third (the rest bare); raised walls
 are rare (only the wooden half pipes of level 4 and a few pieces of 12 and 13); steel railings (a pipe about 2.6 over
 the floor, on posts) run along about 490 and 420 units of the floors' edges in levels 1 and 2, 130 to 540 in levels 3
-to 8, under 90 in 9 to 11 and none in 12. Our levels go the same way, a step clearer:
-level 1 has gutters with railings where a fall is possible (round the start, along the outer side of turns, on the
-landings, beside floors with a drop), as the original's first level, level 2 railings, 3 and 4 brick borders (3 a
-sector of railings), 5 to 8 gutters (5 a sector of
-borders, 8 its last bare), 9 and 10 bare floors (9 its first sector a gutter). `safety KIND` sets it from there on
+to 8, under 90 in 9 to 11 and none in 12. `safety KIND` sets it from there on
 (the first one in a file is the level's); `borders off` makes the floors bare from there on, `borders on` gives them
 back the level's safety. What each is:
 
@@ -327,7 +311,7 @@ back the level's safety. What each is:
 - `none`: the bare floor, its edges marked by the brick strip.
 
 Every border and railing is part of the floors' physics: the test `borders_and_railings_keep_the_ball_on_the_track`
-(ownlevels.rs) throws each ball sideways at 12, 25 and 40 units a second into the railings and the borders of
+(testlevels.rs) throws each ball sideways at 12, 25 and 40 units a second into the railings and the borders of
 Parts_Test and pushes it on into them, and it stays on; a ball drifting into a gutter rolls back; thrown off the bare
 floor it falls.
 
@@ -346,7 +330,7 @@ a ramp into a flat has the very same cross-section where they meet: no wedge of 
 points is shared by the quads before and after it (no crack, no T-junction), and the textures are mapped by the
 distance along the way. The start's and the checkpoints' pieces are joined the same way: their edges where a floor
 runs on have their corners at the floor's own cross-section points, and their tops are mapped as the track's. The test
-`our_floors_have_no_seams` (ownlevels.rs) checks the floors of every level the kit made (version 2 on, in level.gltf's
+`kit_floors_have_no_seams` (testlevels.rs) checks the floors of every level the kit made (version 2 on, in level.gltf's
 `asset.generator`): wherever a floor's top ends, there is no other top beside it at its height
 (`the_seam_finder_sees_a_crack` checks the finder itself). A checkpoint on a narrow way has a smaller bowl, and its
 depth with it, so its slopes stay the measured ones (a stone ball resting in a steeper bowl did not roll out of it).
@@ -444,17 +428,8 @@ taken at speed in every style (the careful ones with a run-up); a place that nee
 STEPS` (the hint steps, their points as `ahead side up` about the cursor; e.g. a wait timed for a swing) and `nopilot
 STYLES` / `autopilot STYLES` around a stretch the styles take on their own.
 
-**To change a level**: edit its `level.lvl`, then
-
-```
-scripts/own-levels.sh assets/levels/03_Paper_Winds
-```
-
-builds it and lets the test player play it in each style; each run that finishes is kept as
-`pilot/<style>.replay` (the runs are played in a data folder of their own under `target/`). The test
-`crates/game/src/ownlevels.rs` plays every level's three runs with no copy of the original and fails when one does
-not finish, so a level is never shipped without a run that proves it can be finished. `scripts/video.sh
-assets/levels/03_Paper_Winds assets/levels/03_Paper_Winds/pilot/speed.replay out.mp4` renders a run as a video.
+**To build a level** from its description: `python3 -I assets/own/make/leveldsl.py DIR/level.lvl` (the showcase
+level: `make_synthetic_level.py`). `scripts/video.sh LEVEL RUN out.mp4` renders a run of it as a video.
 A level weighs 3.3 to 3.8 MB, 2.6 MB of it the textures it carries (the format keeps a level's
 textures in its own folder).
 
@@ -464,7 +439,7 @@ The game copies what it needs from the player's own copy into `levels/ballance-o
 (`drahtseilakt --import <Ballance folder>`) or straight from the game's CD or its image
 (`drahtseilakt --import Ballance.cue`, or `.bin`, `.iso`: the InstallShield 6 archive in `SETUP/`, read by
 `crates/cdimage`). The copy is optional (decisions.md, "The game plays out of the box"): without one the game starts
-with its own levels, and the Options page says to import the original levels with `drahtseilakt-toolbox` (a separate program; the game has no import window and never runs it). The
+with the shipped sets, and the Options page says to import the original levels with `drahtseilakt-toolbox` (a separate program; the game has no import window and never runs it). The
 copy is the player's own data on the player's machine; nothing is downloaded and nothing goes into the
 repository. `--data DIR` still plays from any folder without copying.
 
@@ -479,7 +454,7 @@ README saying where the levels are, so a player who looks there finds them.
 
 ## What comes with the game
 
-The game is installed with some levels in `levels/open/` (our own) and converted community maps whose authors
+The game is installed with some levels in `levels/open/` (our showcase and test levels) and converted community maps whose authors
 want them shipped with the game. Each shipped level needs:
 
 - its author's permission and a free licence, recorded next to it (`LICENSE` in its folder);

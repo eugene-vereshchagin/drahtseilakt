@@ -11,10 +11,10 @@
 | 界面 | 各行，从上到下 | 说明 |
 |---|---|---|
 | 主菜单（`Menu_Main`） | Start, Highscore, Options, Credits, Exit | Exit 会询问 "Do you want to quit the game?"（Yes / No） |
-| 没有副本时的主菜单（我们的） | Start, Highscore, Options, Credits, Exit | Start 列出 "Our levels"（随附的关卡和 `levels/open/`）；Options 显示一条备注：原版关卡请用 `drahtseilakt-toolbox` 导入（独立程序；游戏没有导入窗口，也从不运行 toolbox）（decisions.md，“游戏开箱即玩”） |
+| 没有副本时的主菜单（我们的） | Start, Highscore, Options, Credits, Exit | Start 列出随附的关卡集（Drahtseilakt 集、社区集）和玩家的关卡；Options 显示一条备注：原版关卡请用 `drahtseilakt-toolbox` 导入（独立程序；游戏没有导入窗口，也从不运行 toolbox）（decisions.md，“游戏开箱即玩”） |
 | Start（`Menu_Start`） | Level 1 … Level 12, Back | 前一关完成后，这一关才能玩（`DB_Levelfreischaltung`）；其余的显示为灰色。第 13 关附加包会替换 Menu.nmo 并加上它的那一行 |
 | Highscore（`Menu_Highscore`） | "Highscore Level N"、十个名字及分数、Back；左右键切换关卡 | 副本的默认值是 base.cmo 中的数组 `DB_Highscore_LvNN`（"Mr. Default"） |
-| Options（`Menu_Options`） | Graphics, Controls, Sound, Back | 我们在 Back 前另有 Language 和 Extended |
+| Options（`Menu_Options`） | Graphics, Controls, Sound, Back | 我们的：Graphics, Controls, Sound, Replays, Language, Help, Report a problem, Extended, Back |
 | Graphics（`Menu_Opt_Graphics`） | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | 副本的默认值（`DB_Options`）：不同步，有云 |
 | Controls（`Menu_Opt_Keys`） | Forward, Backward, Left, Right, Rotation, Overview：各一个键；Invert Rotation? (Yes/No)；OK | 默认：方向键、Shift、Space；`DB_Options` 以按键在 `Language.nmo` 的 `all_keys` 中的行号保存它（按顺序的 DirectInput 扫描码） |
 | Sound（`Menu_Opt_Sound`） | Music Volume, Sound Volume, OK | 音乐和音效两个音量（我们在所有模式下都显示两者，与项目所有者记得的原版一致） |
@@ -40,7 +40,7 @@
     仍然优先）；
   - *Clouds?* 显示关卡的云层（`clouds on|off`），即其 `SkyLayer` 对象，选项打开时 `Gameplay.nmo` 会显示它。它的纹理是黑底上的灰色云，
     材质不做混合，所以我们把它叠加到后面的天空上绘制（这是我们的理解；副本的材质没有说明）。视频追踪绘制时不带云层；
-  - `cloud-quality low|medium|high|off`（设置文件；默认 `medium`）：我们关卡的云海绘制得多精细（见 levels.md“云海”）：穿过它的步数、朝向太阳的步数、边缘的小云团；`off` 不绘制，关闭 *Clouds?* 也会隐藏它；
+  - `cloud-quality low|medium|high|off`（设置文件；默认 `medium`）：工具包关卡的云海绘制得多精细（见 levels.md“云海”）：穿过它的步数、朝向太阳的步数、边缘的小云团；`off` 不绘制，关闭 *Clouds?* 也会隐藏它；
   - *Fullscreen?*（`fullscreen off|borderless|exclusive`）：无边框使用桌面的显示模式，独占在平台允许时更改它（Wayland 不允许：改为无边框）。
     F11 在窗口和无边框之间切换。
 - **外观选择**（所有者 2026-11-09 的决定）在经典模式下同样提供，设置键与扩展模式的各行相同：*Textures* 和 *Models* 在 Graphics 页的各行之下，*Sound theme* 在 Sound 页的两个音量之下（先是原版的各行，顺序不变，我们的在其下，如同 *Fullscreen?*）。箭头循环切换找到的每个包：内置的 `own`、`original`（仅当玩家的副本存在时）、`remastered`，以及数据文件夹中的任何包，因此玩家自己转换的资源会直接出现在选项中（[packs.md](packs.md)、[sound-themes.md](sound-themes.md)）。默认值不变（我们的纹理、关卡自带的部件、默认主题）。只改变外观：规则和玩法仍是原版的，回放不依赖外观。渲染修正（任意分辨率、宽屏、过滤、平滑）始终开启，不可切换。
@@ -129,7 +129,9 @@ Start 在经典模式和扩展模式下相同；为空或不可用的项目不�
 
 ## 手册
 
-选项中有 *帮助* 一行，菜单中任何位置按 F1 效果相同：用系统的打开程序（`xdg-open`、`open`、`cmd /c start`）在独立进程中打开玩家手册，即本地 HTML 页面 `assets/manual/<语言>/index.html`（英、俄、德、中；法、西、意语打开英文）。在玩家的关卡列表上，F1 打开关卡页面。只打开这个本地文件，只在玩家要求时，绝不在游戏进行中，绝不联网；文件缺失时提示面板会说明查找位置。`tools/make_manual.py` 由面向玩家的文档生成页面（`python3 -I tools/make_manual.py`，需要 `markdown` 模块）；`assets/manual/` 为生成物，不在 git 中，随 `assets/` 发布的构建需先运行生成器。
+选项中有 *帮助* 一行，菜单中任何位置按 F1 效果相同：用系统的打开程序（`xdg-open`、`open`、`cmd /c start`）在独立进程中打开玩家手册，即本地 HTML 页面 `assets/manual/<语言>/index.html`（英、俄、德、中；法、西、意语打开英文）。在玩家的关卡列表上，F1 打开关卡页面。只打开这个本地文件，只在玩家要求时，绝不在游戏进行中，绝不联网；文件缺失时提示面板会说明查找位置。
+
+*报告问题*（Options 中，在 *帮助* 之下；2026-11-16，所有者：要一个按钮，而不是让人去抄的地址）通过同一个打开程序，在系统浏览器中打开项目的新建 issue 表单 `https://github.com/eugene-vereshchagin/drahtseilakt/issues/new`。该地址是一个常量（`manual.rs`，`REPORT_URL`；测试保证它是不含 shell 会解释的字符的纯 https），绝不由输入拼出；游戏只把它交给打开程序，自己不联网。打开程序失败时，提示面板会说明。手册的故障排除页有同样的链接，画成按钮。`tools/make_manual.py` 由面向玩家的文档生成页面（`python3 -I tools/make_manual.py`，需要 `markdown` 模块）；`assets/manual/` 为生成物，不在 git 中，随 `assets/` 发布的构建需先运行生成器。
 
 ## 工作顺序
 

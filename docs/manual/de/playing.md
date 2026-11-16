@@ -51,7 +51,7 @@ verlassen. Neustart und Verlassen fragen einmal nach. Wiederholungen sind standa
 - **Replays** listet Ihre gespeicherten Wiederholungen, neueste zuerst; Enter spielt eine ab. Leer, solange das Speichern aus ist.
 - **Optionen** enthält *Grafik* (Fenstergröße, Synchronisation, Wolken, Vollbild und das *Aussehen*, siehe
   [Aussehen](looks.md)), *Steuerung*, *Sound* (Lautstärke und Klangthema, siehe [Klang und Musik](sound.md)),
-  *Replays*, *Sprache*, *Erweitert* und *Hilfe* (diese Anleitung).
+  *Replays*, *Sprache*, *Erweitert*, *Hilfe* (diese Anleitung) und *Problem melden* (das Formular für eine Problemmeldung, im Browser).
 - **Sprache** wechselt die Menüsprache sofort: Englisch, Russisch, Deutsch, vereinfachtes Chinesisch, Französisch,
   Spanisch und Italienisch.
 - **Erweitert** schaltet den erweiterten Modus ein: Bestzeiten neben den Leveln, mehr Auswahl bei Aussehen und Klang

@@ -136,7 +136,7 @@ impl Data {
     }
 
     /// The game's files: the player's copy where one is found (`explicit`, `OPENBALLANCE_DATA`, the profile's
-    /// `levels/original`, `./data`), else none; the game plays its own levels without it.
+    /// `levels/original`, `./data`), else none; the game plays its shipped levels without it.
     pub fn find(explicit: Option<PathBuf>) -> Data {
         Data::locate(explicit).unwrap_or_else(|_| Data::new(None))
     }

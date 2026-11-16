@@ -30,7 +30,8 @@ In your data folder (see [Levels and folders](levels.md)):
 
 ## Reporting a problem
 
-Where to send reports will be named here soon. Meanwhile turn on *Save replays* (Options, Replays) and keep the `.replay`
+[Report a problem](https://github.com/eugene-vereshchagin/drahtseilakt/issues/new){.button} — or *Report a problem* in *Options* in the game — opens the form for a new report
+in your browser (a GitHub account is needed). Say what happened and on which level. Turn on *Save replays* (Options, Replays) and keep the `.replay`
 file of the run that shows the problem: it shows exactly what happened. The development logs of `replays/<level>/` are
 written only when the game is started with `--debug`, with the environment variable `DRAHTSEILAKT_DEV_LOGS=1`, or with
 `dev-logs on` in `settings.txt`.

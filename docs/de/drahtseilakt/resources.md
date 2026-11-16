@@ -37,7 +37,7 @@ Menüs bei gewählter Oberfläche des Originals, die chinesischen und kyrillisch
 | menu sounds | `Sounds/Menu_click, Menu_load` | Klangthemen (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | Klangthemen (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | eigene: in *system* achtzehn Stücke und acht Atmosphären, Music/music.txt gibt jedem Teil einen Pool (Themen 1–3 die ersten neun Stücke, Themen 4 und 5 neun weitere); in *neuro* fünfzehn synthetisierte Phrasen, eine je Teil, eigene Atmosphären und Zielmusik |
-| original levels | `3D Entities/Level/Level_NN.NMO` | unsere eigenen Level, `assets/levels/` (levels.md) |
+| original levels | `3D Entities/Level/Level_NN.NMO` | die mitgelieferten Sätze, `assets/levels/` (levels.md) |
 
 ## Die eigene Oberfläche
 

@@ -49,7 +49,6 @@ mod modrt;
 mod modules;
 mod music;
 mod options;
-mod ownlevels;
 mod partcheck;
 mod particles;
 mod physics;
@@ -72,6 +71,7 @@ mod sky;
 mod splashpic;
 mod supports;
 mod terrain;
+mod testlevels;
 mod titlescene;
 mod trafo;
 mod ui;
@@ -154,9 +154,8 @@ usage: drahtseilakt [options]
                       where the swinging sacks get a support (the sack-supports mod) in the original levels and the
                       shipped maps, each placed one measured again; with runs also against the ball's way in the
                       recorded runs of ./hints. Fails when one is too near the ball's space
-  --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints
-                      for designing our own: DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py);
-                      with --open LEVEL --replay RUN one of our levels along that run: DIR/level-stats-own.csv
+  --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in ./hints:
+                      DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 
 Without --level, --map or --open the window opens with the level menu.
@@ -591,7 +590,7 @@ fn main() -> ExitCode {
             println!("{copied} files copied to {}", levels::dir(levels::Kind::Original).display());
             return Ok(());
         }
-        // the copy of the original is optional: without it the game plays its own levels (decisions.md, "The game
+        // the copy of the original is optional: without it the game plays its shipped levels (decisions.md, "The game
         // plays out of the box"); a folder named with --data must itself be a copy (no other place is tried)
         let data = match o.data.clone() {
             Some(d) => Data::at(d)?,
@@ -599,7 +598,7 @@ fn main() -> ExitCode {
         };
         let mut o = o;
         if !data.has_copy() && !o.chosen {
-            // the level behind the menu at the start: our first own level, past the showcase (order 0, the check
+            // the level behind the menu at the start: the first shipped level past the showcase (order 0, the check
             // level with its sign boards, levels.md "The showcase level") unless it is the only one
             let shipped = levels::shipped();
             let first = shipped

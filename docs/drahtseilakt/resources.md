@@ -38,7 +38,7 @@ Chinese and Cyrillic names of community maps.
 | menu sounds | `Sounds/Menu_click, Menu_load` | sound themes (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | sound themes (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | ours: *system* eighteen tracks and eight atmospheres, Music/music.txt gives each part a pool (themes 1–3 the first nine tracks, themes 4 and 5 nine more); *neuro* fifteen synthesized phrases, one per part, its own atmospheres and end music |
-| original levels | `3D Entities/Level/Level_NN.NMO` | our own levels, `assets/levels/` (levels.md) |
+| original levels | `3D Entities/Level/Level_NN.NMO` | the shipped sets, `assets/levels/` (levels.md) |
 
 ## The own interface
 

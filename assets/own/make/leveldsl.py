@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Compiles a level description (`level.lvl`, a small text language) into a level of the open format beside it
-(docs/drahtseilakt/levels.md, "Our levels and how to edit them"), with levelkit.py, and writes the test player's hint
+(docs/drahtseilakt/levels.md, "The level kit"), with levelkit.py, and writes the test player's hint
 files for it (one a style: `pilot/safe.txt`, `pilot/speed.txt`, `pilot/collector.txt`; docs/drahtseilakt/autopilot.md).
 
 A description lays a track like a turtle: a cursor (a point on the floor's top and a heading) moves on with each
@@ -8,7 +8,7 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
 +Z there. A line is a command and its words; `#` begins a comment.
 
     title NAME...            the level's name (also title.ru, title.de, title.zh: its name in another language)
-    order N                  its place in the list of our levels
+    order N                  its place in the list of the shipped levels
     difficulty N             how hard it is, 1 (easy) to 10 (level.txt's difficulty; the menu sorts by it)
     author NAME... / sky NAME / music 1..5 / bonus N / ball wood|stone|paper|sticky / light R G B
                              (sky: A, B, C (above the clouds), Mountains, Forest, Sea, Storm, Sunset, Night, Desert,
@@ -90,7 +90,9 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
                              press F S U OF OS V T | pass F S U V [T] | hold F S U T
     nopilot STYLES           no automatic steps from here (until `autopilot STYLES`)
 
-Run: python3 -I assets/own/make/leveldsl.py assets/levels/<Level>/level.lvl ...   (or --all)
+Run: python3 -I assets/own/make/leveldsl.py DIR/level.lvl ...
+(The showcase level is made through compile_level by make_synthetic_level.py; the ten levels of our own once written in
+this language were removed on 2026-11-16, decisions.md.)
 Deterministic; needs Python 3 with numpy and Pillow (levelkit.py, ownkit.py beside it).
 """
 
@@ -108,7 +110,6 @@ import levelparts as P  # noqa: E402
 import ownkit as K  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LEVELS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "levels")
 STYLES = ("safe", "speed", "collector")
 LANGS = ("ru", "de", "zh", "fr", "es", "it")
 BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper", "sticky": "Sticky"}
@@ -125,11 +126,6 @@ SPACING = {"safe": 9.0, "speed": 14.0, "collector": 9.0}
 # the speeds the careful styles roll through the way's points at, and through a hard corner (hint step `pass`)
 PASS_V = {"safe": 8.0, "collector": 8.0}
 CORNER_V = 5.0
-# scripts/own-levels.sh tries the speed style with other spacings and keeps the fastest run (LEVELDSL_SPEED_SPACING).
-try:
-    SPACING["speed"] = min(max(float(os.environ.get("LEVELDSL_SPEED_SPACING", SPACING["speed"])), 4.0), 60.0)
-except ValueError:
-    pass
 # The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side (its slot 5.3, as
 # level 1 has it), the pusher's beam 1.2 wide in its channel.
 # How far a floor's end may be from a checkpoint piece's edge and still join it (the path drifts by a few thousandths).
@@ -1501,9 +1497,6 @@ def write_pilot(folder, t):
 
 def main(argv):
     paths = argv[1:]
-    if paths == ["--all"]:
-        paths = sorted(os.path.join(LEVELS, d, "level.lvl") for d in os.listdir(LEVELS)
-                       if os.path.isfile(os.path.join(LEVELS, d, "level.lvl")))
     if not paths:
         print(__doc__)
         return 2

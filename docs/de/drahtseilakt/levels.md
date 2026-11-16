@@ -92,14 +92,16 @@ Levels und ein Spieler wissen müssen, steht gesammelt auf [making-levels.md](ma
 
 ## Level, die mit dem Spiel kommen
 
-Unsere eigenen Level kommen mit dem Spiel in seinem `assets/levels/`, ein Ordner je Level im offenen Format, nur aus
-unseren eigenen Teilen gemacht (assets/own, [resources.md](resources.md)), sie spielen also ganz ohne Kopie des
-Originals. Das Menü zeigt sie mit den Leveln im offenen Format aus `levels/open/`: unter Start, wenn es keine Kopie
-gibt (die Liste „Our levels“), unter „Open format“ des erweiterten Modus immer. Sie entstehen durch Skripte in
-`assets/own/make/` (`levelkit.py` baut ein Level aus Bahnstücken und den Platzhaltern der Teile; `make_test_level.py`
-das erste, `Parts_Test`, einige hundert Einheiten Bahn mit jedem Teil darauf oder daneben und einem Stück Bahn jeder
-Sicherungsart, für die Tests; es ist durch `hidden = yes` in seiner level.txt aus der Liste der Spieler genommen und
-öffnet weiter mit `--open`), deren Ergebnisse im Repository liegen. Ihre Lizenz ist die des Spiels (GPL-3.0-only).
+Zwei Sätze von Leveln kommen mit dem Spiel, beide Community-Karten, vom Eigentümer ausgewählt (decisions.md, „Keine
+eigenen Level“): der **Drahtseilakt-Satz** (`assets/levels/drahtseilakt/01-…13-…`, ins offene Format konvertiert) und
+der **Community-Satz** (`assets/levels/community/`, die `.nmo`-Dateien der Karten), jeder in seiner `level.txt` und in
+CREDITS.md genannt. Neben ihnen enthält `assets/levels/drahtseilakt/` zwei Level von uns, nur aus unseren eigenen Teilen
+gemacht (assets/own, [resources.md](resources.md)) durch Skripte in `assets/own/make/` (`levelkit.py` baut ein Level
+aus Bahnstücken und den Platzhaltern der Teile): das Schaufensterlevel `00_Синтетический_уровень` (unten) und
+`Parts_Test` (`make_test_level.py`, einige hundert Einheiten Bahn mit jedem Teil darauf oder daneben und einem Stück
+Bahn jeder Sicherungsart, für die Tests; durch `hidden = yes` in seiner level.txt aus der Liste der Spieler genommen
+und weiter mit `--open` geöffnet). Ihre Textquellen liegen im Repository, die gebauten Dateien nicht. Ihre Lizenz ist
+die des Spiels (GPL-3.0-only).
 
 ### Das Schau-Level
 
@@ -162,30 +164,17 @@ Teile des Moduls drehen oder bewegen und wo ein herausgestoßenes Teil liegt; je
 Testspielers wird für das Level nicht mehr aufbewahrt.
 Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
 Menü nicht seine Schilder zeigt.
-Seit den Notizen 11 des Eigentümers (2026-11-16): die Bahn der Zugbrücke hat zu beiden Seiten ihrer Lücke eine Stufe, 1 lang und 0,5 tief, wie in Level 5, so dass das gefallene Deck bündig mit der Bahn liegt (die Prüfung misst die Höhe der Kugel darauf); die Mulden aller Checkpoints und des Starts werden ganz gezeichnet; keine zwei sichtbaren Flächen liegen in einer Ebene übereinander (der Baukasten lehnt sie ab, `check_coplanar`, und `our_levels_have_no_faces_flickering_in_one_plane` prüft jedes von ihm gebaute Level); Schilder stehen, wo kein Weg vorbeiführt; das Gitter des Ventilators ist ein Raster aus Stäben mit dunkler Mitte wie das des Originals; wo die Steinkugel auf blankem Boden fährt, hat jede scharfe Ecke ein Geländer an ihrer Außenseite (die schmalen Steinbahnen des Originals sind stattdessen Rinnen, 0,68 tief); die klebrige Kugel, die kein Level des Originals und keine konvertierte Community-Karte hat (sie stammt aus dem Mod BallSticky), steht im Community-Teil, mit einem Hang von 40 Grad, den sie aus dem Stand hinauffährt und die Holzkugel nicht.
+Seit den Notizen 11 des Eigentümers (2026-11-16): die Bahn der Zugbrücke hat zu beiden Seiten ihrer Lücke eine Stufe, 1 lang und 0,5 tief, wie in Level 5, so dass das gefallene Deck bündig mit der Bahn liegt (die Prüfung misst die Höhe der Kugel darauf); die Mulden aller Checkpoints und des Starts werden ganz gezeichnet; keine zwei sichtbaren Flächen liegen in einer Ebene übereinander (der Baukasten lehnt sie ab, `check_coplanar`, und `kit_levels_have_no_faces_flickering_in_one_plane` prüft jedes von ihm gebaute Level); Schilder stehen, wo kein Weg vorbeiführt; das Gitter des Ventilators ist ein Raster aus Stäben mit dunkler Mitte wie das des Originals; wo die Steinkugel auf blankem Boden fährt, hat jede scharfe Ecke ein Geländer an ihrer Außenseite (die schmalen Steinbahnen des Originals sind stattdessen Rinnen, 0,68 tief); die klebrige Kugel, die kein Level des Originals und keine konvertierte Community-Karte hat (sie stammt aus dem Mod BallSticky), steht im Community-Teil, mit einem Hang von 40 Grad, den sie aus dem Stand hinauffährt und die Holzkugel nicht.
 
-## Unsere Level und wie man sie bearbeitet
+## Der Levelbaukasten
 
-*2026-11-03.* Zehn eigene Level, vom ersten Rollen bis zum Spießrutenlauf, kommen mit dem Spiel (das
-Release-Kriterium aus roadmap.md). Jedes ist neu: sein Verlauf ist unserer, nur die Mechanik ist die des Originals.
-Das Menü listet sie in dieser Reihenfolge (`order` in level.txt; ihre Schwierigkeit, `difficulty`, läuft mit ihr von 1 bis 10), unter ihren Namen in der Sprache der Menüs:
+*2026-11-16.* Der Baukasten unten (`assets/own/make/leveldsl.py`, `levelkit.py`, `levelparts.py`, `levelcheck.py`) wurde
+für zehn eigene Level geschrieben (2026-11-03). Der Eigentümer hat sie am 2026-11-11 zurückgestellt und am 2026-11-16
+entfernen lassen (decisions.md, „Keine eigenen Level“); der Baukasten bleibt, weil das Schaufensterlevel und
+`Parts_Test` mit ihm gemacht sind und seine Prüfungen an ihnen laufen (`crates/game/src/testlevels.rs`). Was er über
+„unsere Level“ sagt, gilt für jedes mit ihm gemachte Level.
 
-| # | Level | Sektoren | Idee | Himmel, Musik, Bonus |
-|---|---|---|---|---|
-| 1 | First Roll (Erster Lauf) | 4 | das erste Level des Originals im Geist, doppelt so lang: eine Holzbrücke, Schienen gerade, in Kurven und Schleifen, Kisten, die von kahlen Strecken geschoben werden, der Stein-Transformator und zurück, lose Kugeln, die Papierkugel über drei Ventilatoren und eine Plattenbrücke, eine Kuppel, Wippen, zwei Steine auf ihren Kisten, vier Schieber, kahle Terrassen mit scharfen Kurven, Holzrampen hinauf zwischen Absätzen mit Geländer, Schienen in einer Spirale hinab; Rinnen auf den meisten Böden, Geländer, wo man fallen kann | Sunset, 1, 100 |
-| 2 | Wood and Stone (Holz und Stein) | 4 | die Holzkugel erklimmt die Rampen, die die Steinkugel nicht schafft; die Steinkugel schiebt Kisten und lose Kugeln über Kanten ohne Rand | B, 2, 200 |
-| 3 | Paper Winds (Papierwinde) | 4 | die Papierkugel fährt auf Ventilatoren zu den Böden darüber; Plattenbrücken tragen sie | C, 3, 300 |
-| 4 | Swing Time (Schaukelzeit) | 4 | was sich bewegt: schwingende Säcke, drehende Arme, ein Klappenrad, Schaukeln, die eine Lücke überbrücken, während sie vorbeischwingen | A, 4, 400 |
-| 5 | Bridges and Boards (Brücken und Bretter) | 5 | Wippen unter jeder Kugel; Plattenbrücken, die unter der Steinkugel brechen | B, 5, 500 |
-| 6 | Stone Work (Steinarbeit) | 5 | Kisten, lose Kugeln und Kuppeln im Weg: von der Steinkugel weggestoßen, von der Holzkugel umfahren | C, 1, 600 |
-| 7 | Rail Runner (Schienenläufer) | 5 | lange Schienen durch Kurven, hinauf und hinab; schmale Böden ohne Rand | A, 2, 700 |
-| 8 | Shifting Shapes (Wechselnde Gestalten) | 5 | jeder Sektor will eine andere Kugel: Papier für Ventilatoren und Plattenbrücken, Stein für Kisten, Holz für Rampen und Wippen | B, 3, 800 |
-| 9 | Leap of Faith (Sprung ins Ungewisse) | 5 | Tempo und Sprünge: lange Abfahrten, Rampen, die die Kugel über Lücken werfen, schnell genommene Schienen | C, 4, 900 |
-| 10 | The Gauntlet (Spießrutenlauf) | 6 | schmale Wege, jede Kugel und jedes Teil nacheinander | A, 5, 1000 |
-
-Jedes Level beginnt mit der Holzkugel und hat Kontrollpunkte mit ihren Flammen, Extrapunkte und ein Extraleben.
-
-**Ein Level wird als Text geschrieben.** Jeder Ordner enthält seine Beschreibung, `level.lvl`, in einer kleinen
+**Ein Level wird als Text geschrieben**: seine Beschreibung, `level.lvl`, in einer kleinen
 Sprache, die `assets/own/make/leveldsl.py` liest; es schreibt das Level daneben (`level.gltf`, `level.bin`,
 `textures/`, `level.txt`) mit `levelkit.py`. Nur die eigenen Texturen des Levels (sein Satz Platten, Randsteine,
 Schatten und Hänge) liegen als Dateien in seinem `textures/`; die Texturen, die alle Level teilen, sind als die des
@@ -272,7 +261,7 @@ Satz Dateien `Textures/Sky/Sky_<Name>_<Seite>` (Front, Right, Back, Left, Down u
 Levelordner oder den Texturen; ein Name besteht aus Buchstaben, Ziffern, `_` und `-`. `--sky NAME` auf der
 Kommandozeile spielt jedes Level unter einem anderen Himmel.
 
-**Das Wolkenmeer.** Unter `Sunset` und `Clouds` schweben unsere Level über einem Meer aus Haufenwolken, das das Spiel
+**Das Wolkenmeer.** Unter `Sunset` und `Clouds` schweben die Level des Baukastens über einem Meer aus Haufenwolken, das das Spiel
 als Volumen zeichnet (`crates/game/src/clouds.wgsl`): Wolkenballen aus kachelndem Rauschen, beleuchtet von der Sonne
 des Himmels (hell, wo sie sie trifft, blauviolett im Schatten) und vom Himmel darüber, in der Ferne im Dunst des
 Himmels am Horizont verschwindend; Säulen und Stützen tauchen in sie ein. Unter `Mountains`, `Forest`, `Mist` und
@@ -294,12 +283,7 @@ sind etwa zwei Drittel der Bodenkanten profiliert (der Boden steigt zur Kante um
 die einen abdriftenden Ball zur Mitte zurückrollt; ein Drittel ist blank), ab Level 6 nur ein Viertel bis ein Drittel
 (der Rest blank); erhöhte Wände sind selten (nur die hölzernen Halfpipes von Level 4 und einige Stücke in 12 und 13);
 Stahlgeländer (ein Rohr etwa 2,6 über dem Boden, auf Pfosten) laufen an etwa 490 und 420 Einheiten der Bodenkanten in
-den Leveln 1 und 2, 130 bis 540 in 3 bis 8, unter 90 in 9 bis 11 und keine in 12. Unsere Level
-gehen denselben Weg, eine Stufe deutlicher: Level 1 hat Rinnen und Geländer, wo man fallen kann (um den Start, an der
-Außenseite der Kurven, auf den Absätzen, neben Böden mit einem Abgrund), wie das erste Level des Originals, Level 2
-Geländer, 3 und 4 Ziegelränder (3 einen Sektor mit
-Geländer), 5 bis 8 Rinnen (5 einen Sektor mit Rändern, 8 den letzten blank), 9 und 10 blanke Böden (9 den ersten
-Sektor als Rinne). `safety ART` setzt sie von dort an (die erste in einer Datei ist die des Levels); `borders off`
+den Leveln 1 und 2, 130 bis 540 in 3 bis 8, unter 90 in 9 bis 11 und keine in 12. `safety ART` setzt sie von dort an (die erste in einer Datei ist die des Levels); `borders off`
 macht die Böden von dort an blank, `borders on` gibt ihnen die Art des Levels zurück. Was jede ist:
 
 - `railings`: Stahlgeländer an beiden Kanten, Holme 1,3 und 2,6 über dem Boden auf Pfosten alle 6 Einheiten, in der
@@ -312,7 +296,7 @@ macht die Böden von dort an blank, `borders on` gibt ihnen die Art des Levels z
 - `none`: der blanke Boden, seine Kanten nur durch den Ziegelstreifen markiert.
 
 Jeder Rand und jedes Geländer gehört zur Physik der Böden: der Test `borders_and_railings_keep_the_ball_on_the_track`
-(ownlevels.rs) wirft jeden Ball mit 12, 25 und 40 Einheiten in der Sekunde seitlich gegen die Geländer und Ränder von
+(testlevels.rs) wirft jeden Ball mit 12, 25 und 40 Einheiten in der Sekunde seitlich gegen die Geländer und Ränder von
 Parts_Test und schiebt ihn weiter dagegen, und er bleibt auf der Bahn; ein in die Rinne treibender Ball rollt zurück;
 vom blanken Boden geworfen fällt er.
 
@@ -332,7 +316,7 @@ Gerade, die in eine Kurve übergeht, oder eine Rampe, die in eine Ebene übergeh
 Querschnitt: kein Keil aus Nichts dazwischen; jeder Ring von Punkten gehört den Vierecken davor und danach (kein Riss,
 kein T-Stoß), und die Texturen liegen nach der Strecke entlang des Wegs. Die Stücke des Starts und der Checkpoints
 sind ebenso angeschlossen: an ihren Kanten, wo ein Boden weiterläuft, liegen ihre Ecken auf den Querschnittspunkten
-des Bodens selbst, und ihre Oberseite ist wie die Bahn texturiert. Der Test `our_floors_have_no_seams` (ownlevels.rs)
+des Bodens selbst, und ihre Oberseite ist wie die Bahn texturiert. Der Test `kit_floors_have_no_seams` (testlevels.rs)
 prüft die Böden jedes Levels, das der Baukasten gemacht hat (ab Version 2, in `asset.generator` von level.gltf): wo
 die Oberseite eines Bodens endet, liegt daneben in ihrer Höhe keine andere (`the_seam_finder_sees_a_crack` prüft die
 Suche selbst). Ein Checkpoint auf einem schmalen Weg bekommt eine kleinere Schale und mit ihr weniger Tiefe, so
@@ -441,18 +425,9 @@ mehr braucht, sagt es mit `pilot STYLES : STEPS` (die Schritte des Hinweises, ih
 Cursor; z. B. ein auf eine Schaukel abgestimmtes Warten) und `nopilot STYLES` / `autopilot STYLES` um ein Stück, das
 die Stile von selbst nehmen.
 
-**Um ein Level zu ändern**: seine `level.lvl` bearbeiten, dann
-
-```
-scripts/own-levels.sh assets/levels/03_Paper_Winds
-```
-
-baut es und lässt den Testspieler es in jedem Stil spielen; jeder Lauf, der ins Ziel kommt, wird als
-`pilot/<style>.replay` behalten (die Läufe werden in einem eigenen Datenordner unter `target/` gespielt). Der Test
-`crates/game/src/ownlevels.rs` spielt die drei Läufe jedes Levels ohne Kopie des Originals und schlägt fehl, wenn einer
-nicht ins Ziel kommt; so wird ein Level nie ohne einen Lauf ausgeliefert, der beweist, dass es zu schaffen ist.
-`scripts/video.sh assets/levels/03_Paper_Winds assets/levels/03_Paper_Winds/pilot/speed.replay out.mp4` macht aus
-einem Lauf ein Video. Ein Level wiegt 3,3 bis 3,8 MB, 2,6 MB davon die Texturen, die es mitbringt (das Format hält die Texturen eines Levels in seinem eigenen Ordner).
+**Um ein Level zu bauen** aus seiner Beschreibung: `python3 -I assets/own/make/leveldsl.py DIR/level.lvl` (das
+Schaufensterlevel: `make_synthetic_level.py`). `scripts/video.sh LEVEL RUN out.mp4` macht aus einem Lauf davon ein Video.
+Ein Level wiegt 3,3 bis 3,8 MB, 2,6 MB davon die Texturen, die es mitbringt (das Format hält die Texturen eines Levels in seinem eigenen Ordner).
 
 ## Das Originalspiel: standardmäßig kopiert
 
@@ -460,7 +435,7 @@ Das Spiel kopiert einmal, was es braucht, aus der eigenen Kopie des Spielers nac
 installierten Spiel (`drahtseilakt --import <Ballance-Ordner>`) oder direkt von der CD des Spiels oder ihrem
 Abbild (`drahtseilakt --import Ballance.cue`, auch `.bin`, `.iso`: das InstallShield-6-Archiv in `SETUP/`, gelesen
 von `crates/cdimage`). Die Kopie ist freiwillig (decisions.md, „Das Spiel läuft ohne
-Weiteres“): ohne sie startet das Spiel mit seinen eigenen Leveln, und die Options-Seite sagt, dass die Originallevel mit `drahtseilakt-toolbox` importiert werden (ein eigenes Programm; das Spiel hat kein Importfenster und startet es nie). Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird
+Weiteres“): ohne sie startet das Spiel mit den mitgelieferten Sätzen, und die Options-Seite sagt, dass die Originallevel mit `drahtseilakt-toolbox` importiert werden (ein eigenes Programm; das Spiel hat kein Importfenster und startet es nie). Die Kopie sind die eigenen Daten des Spielers auf seinem Rechner; nichts wird
 heruntergeladen, nichts kommt ins Repository. `--data DIR` spielt weiterhin aus jedem Ordner ohne Kopie.
 
 Das README des Ordners nennt, was von Hand zu kopieren ist: `base.cmo` und die Ordner `3D Entities`, `Textures`
@@ -475,7 +450,7 @@ dann nur ein README, das sagt, wo die Level sind, damit ein Spieler, der dort su
 
 ## Was mit dem Spiel kommt
 
-Das Spiel wird mit einigen Leveln in `levels/open/` installiert (unseren eigenen) und mit umgewandelten
+Das Spiel wird mit einigen Leveln in `levels/open/` installiert (unser Schau- und unser Testlevel) und mit umgewandelten
 Community-Karten, deren Autoren sie mit dem Spiel ausliefern möchten. Jedes solche Level braucht:
 
 - die Erlaubnis seines Autors und eine freie Lizenz, daneben festgehalten (`LICENSE` in seinem Ordner);

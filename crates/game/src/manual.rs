@@ -1,8 +1,15 @@
 //! The player's manual: local HTML pages (made by tools/make_manual.py into `assets/manual/`) opened with the system's
 //! opener when the player asks (Options, Help, or F1 in the menu). Never during a run, never online: only a file
-//! next to the game is opened, and a failure comes back as words for the menu's note.
+//! next to the game is opened, and a failure comes back as words for the menu's note. The one page outside the game,
+//! the form for problem reports (Options, Report a problem), is opened the same way: the game hands the system's
+//! browser a fixed address and never connects anywhere itself.
 
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+
+/// Where problems are reported: a new issue of the project on GitHub. Fixed, never built from anything the player or a
+/// file gives (it goes to the system's opener, on Windows through `cmd /c start`, so it must hold no shell characters).
+pub const REPORT_URL: &str = "https://github.com/eugene-vereshchagin/drahtseilakt/issues/new";
 
 /// The languages the manual is written in; the others read English.
 const LANGUAGES: [&str; 4] = ["en", "ru", "de", "zh"];
@@ -26,29 +33,38 @@ pub fn open(strings: &crate::lang::Strings, page: &str) -> Result<(), String> {
             .ours("manual missing")
             .replace("{path}", &path.display().to_string()));
     }
-    spawn(&path).map_err(|e| {
+    spawn(path.as_os_str()).map_err(|e| {
         strings
             .ours("manual failed")
             .replace("{error}", &e.to_string())
     })
 }
 
-#[cfg(target_os = "linux")]
-fn command(path: &Path) -> std::process::Command {
+/// Opens the page for problem reports in the system's browser, detached. Err is the menu's words.
+pub fn report_problem(strings: &crate::lang::Strings) -> Result<(), String> {
+    spawn(OsStr::new(REPORT_URL)).map_err(|e| {
+        strings
+            .ours("report failed")
+            .replace("{error}", &e.to_string())
+    })
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn command(path: &OsStr) -> std::process::Command {
     let mut c = std::process::Command::new("xdg-open");
     c.arg(path);
     c
 }
 
 #[cfg(target_os = "macos")]
-fn command(path: &Path) -> std::process::Command {
+fn command(path: &OsStr) -> std::process::Command {
     let mut c = std::process::Command::new("open");
     c.arg(path);
     c
 }
 
 #[cfg(windows)]
-fn command(path: &Path) -> std::process::Command {
+fn command(path: &OsStr) -> std::process::Command {
     use std::os::windows::process::CommandExt;
     let mut c = std::process::Command::new("cmd");
     // the empty title keeps `start` from taking the path for it; no console window
@@ -58,7 +74,7 @@ fn command(path: &Path) -> std::process::Command {
     c
 }
 
-fn spawn(path: &Path) -> std::io::Result<()> {
+fn spawn(path: &OsStr) -> std::io::Result<()> {
     let mut c = command(path);
     c.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -74,6 +90,21 @@ fn spawn(path: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The report address is the project's new-issue form, plain https, with nothing a shell (cmd's `start`) would
+    /// read as its own.
+    #[test]
+    fn the_report_address_is_fixed_and_plain() {
+        assert_eq!(
+            REPORT_URL,
+            "https://github.com/eugene-vereshchagin/drahtseilakt/issues/new"
+        );
+        assert!(
+            REPORT_URL
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "-./:".contains(c))
+        );
+    }
 
     #[test]
     fn page_paths_fall_back_to_english() {

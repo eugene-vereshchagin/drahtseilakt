@@ -2,7 +2,7 @@
 """The level builder's geometry checks (levelkit.LevelBuilder.write runs them; a level that violates one is not
 written, and each finding is named with its coordinates):
 
-  check_seams       no gaps, cracks or small steps at the floors' joints (the test of crates/game/src/ownlevels.rs,
+  check_seams       no gaps, cracks or small steps at the floors' joints (the test of crates/game/src/testlevels.rs,
                     `seams`, made stricter: a step under STEP_MAX between two pieces that should meet flush counts);
   check_scenery     no scenery (lamp towers, masts, plinths, garlands, wall blocks, columns, lanterns, signs) inside the
                     clearance volume of a floor the ball can roll on (the floor's top, its width, BALL_H + CLEAR_MARGIN

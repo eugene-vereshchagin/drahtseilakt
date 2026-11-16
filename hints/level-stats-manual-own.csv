@@ -1,5 +1,0 @@
-# Hand annotations for our own levels, the columns of hints/level-stats-manual.csv (see there), `level` the level's
-# `order`; for `scripts/level-stats.py --own`, which sets one of our levels against the target the report gives for its
-# number. Counted from the level's design (level.lvl), not from a walkthrough; expert_time_s is not known (0).
-level,hidden_routes,maze,backtracks,centrifugal,balls_as_keys,balls_ahead,timing,expert_time_s,confidence,source,notes_ru
-1,3,0,4,0,0,0,0,0,high,design,"С1: деревянный трансформатор сбоку от площадки перед подъёмом, на который каменный шар не взберётся; С2: с конца дороги спрыгнуть на нижний пол, каменный трансформатор там, ящик из-под камня таранить снизу и вернуться кругом на дорожку (возврат); С3: две пары толкателей сдвигаются с нижних полов рядом с их дорожкой (каждый раз назад по дорожке над тем же полом), второй камень на ящике (приём уже известен)"

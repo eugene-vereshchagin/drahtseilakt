@@ -58,7 +58,7 @@ keine.
 | `source` | wo die Toolbox es gefunden hat | von `import-maps` geschrieben; nicht gezeigt |
 
 Jeder Wert wird bereinigt: Steuerzeichen, Richtungsumschalter und andere unsichtbare Formatzeichen werden entfernt,
-mehrere Leerzeichen werden zu einem. Die level.txt unserer eigenen Level zum Beispiel:
+mehrere Leerzeichen werden zu einem. Eine level.txt zum Beispiel:
 
 ```
 title = Paper Winds
@@ -158,10 +158,11 @@ statt abzustürzen:
 
 Ein Level, das das Spiel nicht laden kann, sagt im Menü, warum, und wird nicht gestartet.
 
-## Unser eigener Level-Baukasten: was er prüft
+## Unser Level-Baukasten: was er prüft
 
-Unsere Level werden als Text geschrieben (`level.lvl`, [levels.md](levels.md), „Unsere Level und wie man sie
-bearbeitet“) und von `assets/own/make/leveldsl.py` mit `levelkit.py` gebaut. Ein mit dem Baukasten gemachtes Level wird
+Level des Baukastens werden als Text geschrieben (`level.lvl`, [levels.md](levels.md), „Der Levelbaukasten“) und von
+`assets/own/make/leveldsl.py` mit `levelkit.py` gebaut; heute sind das Schaufensterlevel und `Parts_Test` mit ihm gemacht
+(die zehn eigenen Level, für die er geschrieben wurde, wurden am 2026-11-16 entfernt). Ein mit dem Baukasten gemachtes Level wird
 abgelehnt, mit Angabe der Stellen, wenn es bricht, was ein Level spielbar macht (die Prüfungen auf Platz und ebenen
 Boden und der Nahttest kommen mit der Arbeit an Level 1, Zweig `own-level-1`, wo levels.md jede beschreibt):
 
@@ -175,9 +176,7 @@ Boden und der Nahttest kommen mit der Arbeit an Level 1, Zweig `own-level-1`, wo
   waagerechten Stück Boden an ihrem Fuß;
 - **Ränder, die halten**: Geländer, Ziegelränder und Rinnen halten eine gegen sie geworfene Kugel auf der Bahn (ein Test
   wirft jede Kugel mit 12, 25 und 40 Einheiten je Sekunde);
-- **ein Start und ein Ziel, ein Titel**, Kontrollpunkte in einer Richtung, die die Kamera einnehmen kann;
-- **es lässt sich schaffen**: der Testspieler spielt jedes Level in drei Stilen, und ein Level ohne einen Lauf, der es
-  schafft, wird nicht ausgeliefert (`scripts/own-levels.sh`).
+- **ein Start und ein Ziel, ein Titel**, Kontrollpunkte in einer Richtung, die die Kamera einnehmen kann.
 
 Ein Level kann auch von einem eigenen Skript auf dem Baukasten gebaut werden: `assets/own/make/make_synthetic_level.py`
 baut das mitgelieferte Schau-Level ([levels.md](levels.md), „Das Schau-Level") aus einer Beschreibung im Skript, mit
