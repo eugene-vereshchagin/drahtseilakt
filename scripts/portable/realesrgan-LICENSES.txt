@@ -3,6 +3,8 @@ models/), unchanged from the release archive pinned in the toolbox's third-party
 files; these are the licences of the projects it is built from (https://github.com/xinntao/Real-ESRGAN,
 https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan, https://github.com/nihui/realsr-ncnn-vulkan,
 https://github.com/Tencent/ncnn).
+The Windows build also carries vcomp140.dll, Microsoft's OpenMP runtime, as the release archive ships it
+(redistributable under the Microsoft Visual C++ redistributable terms).
 
 ----------------------------------------------------------------------------------------------------
 

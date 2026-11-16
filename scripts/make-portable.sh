@@ -160,21 +160,25 @@ EOF
 esac
 
 # --- Real-ESRGAN for the toolbox, from the pinned download, with its licences -------------------------------------
-zip="$toolbox/third_party/download/realesrgan.zip"
-pinned=$(awk '$1 == "sha256" { print $2; exit }' "$toolbox/third-party.txt")
+# the pinned download for this system: its block in third-party.txt (name, url, sha256) and the archive's file name
+case "$os" in
+    linux) esr_name=realesrgan-ncnn-vulkan zip="$toolbox/third_party/download/realesrgan.zip" esr_files=(realesrgan-ncnn-vulkan 'models/*') ;;
+    windows) esr_name=realesrgan-ncnn-vulkan-windows zip="$toolbox/third_party/download/realesrgan-windows.zip"
+        esr_files=(realesrgan-ncnn-vulkan.exe vcomp140.dll 'models/*') ;;
+    *) esr_name="" zip="" esr_files=() ;;
+esac
+pinned=$([ -n "$esr_name" ] && awk -v n="$esr_name" '$1 == "name" { on = ($2 == n) } on && $1 == "sha256" { print $2; exit }' "$toolbox/third-party.txt")
 if [ "$with_toolbox" = 0 ]; then
     :
-elif [ "$os" = linux ] && [ -f "$zip" ] && [ -n "$pinned" ]; then
+elif [ -n "$zip" ] && [ -f "$zip" ] && [ -n "$pinned" ]; then
     echo "$pinned  $zip" | sha256sum --check --quiet --strict || die "$zip does not match third-party.txt"
     mkdir -p "$out/realesrgan"
-    # the program and the models that come with it; the demo pictures and video stay out
-    unzip -q -o "$zip" realesrgan-ncnn-vulkan 'models/*' -d "$out/realesrgan"
-    chmod 755 "$out/realesrgan/realesrgan-ncnn-vulkan"
+    # the program (and on Windows the OpenMP runtime it needs) and the models; the demo pictures and video stay out
+    unzip -q -o "$zip" "${esr_files[@]}" -d "$out/realesrgan"
+    [ "$os" = windows ] || chmod 755 "$out/realesrgan/realesrgan-ncnn-vulkan"
     install -m 644 "$here/scripts/portable/realesrgan-LICENSES.txt" "$out/realesrgan/LICENSES.txt"
 else
-    # TODO windows: pin realesrgan-ncnn-vulkan-20220424-windows.zip in the toolbox's third-party.txt (URL, SHA-256)
-    # and unpack it here; until then the toolbox there enlarges textures with Lanczos only
-    say "no Real-ESRGAN for $os (not pinned or not downloaded): the toolbox enlarges textures with Lanczos"
+    die "Real-ESRGAN for $os is not pinned or not downloaded (toolbox third-party.txt, third_party/download/): a portable must be complete"
 fi
 
 # --- assets: everything that ships; development-only things stay out -----------------------------------------------
