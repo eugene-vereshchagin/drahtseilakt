@@ -2972,10 +2972,27 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     let path = hints_path(game, o);
     let mut hints = crate::hints::load(&path)?;
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    // each replay the trace steps follow is played once, as far as the furthest of them goes
+    let mut reach: std::collections::BTreeMap<PathBuf, u64> = std::collections::BTreeMap::new();
+    for step in hints.iter().flat_map(|h| &h.steps) {
+        if let crate::hints::Step::Trace(file, _, to, _) = step {
+            let r = reach.entry(dir.join(file)).or_default();
+            *r = (*r).max(*to);
+        }
+    }
+    let mut played = std::collections::BTreeMap::new();
     for h in &mut hints {
         for step in &mut h.steps {
             if let crate::hints::Step::Trace(file, from, to, gain) = step {
-                let track = load_track(&dir.join(&*file), *from, *to, *gain, data, o)?;
+                let file = dir.join(&*file);
+                let run = match played.entry(file.clone()) {
+                    std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
+                    std::collections::btree_map::Entry::Vacant(e) => {
+                        let until = reach.get(&file).copied().unwrap_or(*to);
+                        e.insert(play_track(&file, until, data, o)?)
+                    }
+                };
+                let track = load_track(&file, run, *from, *to, *gain);
                 *step = crate::hints::Step::Track(Box::new(track));
                 continue;
             }
@@ -3017,16 +3034,15 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
     Ok(hints)
 }
 
-/// A trace step's run: the replay `file` played (headless, from its own start) to tick `from`, then the ball's place
-/// and speed and the push of the player's arrows at each tick to `to`.
-fn load_track(
-    file: &Path,
-    from: u64,
-    to: u64,
-    gain: f32,
-    data: &Data,
-    o: &Options,
-) -> Result<crate::hints::Track, String> {
+/// A replay played (headless, from its own start) for the trace steps that follow it: at each tick from its first to
+/// the furthest a step needs, the ball's place and speed, the push of the player's arrows, whether the view was
+/// lifted, the body carrying the ball and the loose bodies' places.
+struct Played {
+    track: crate::hints::Track,
+    bodies: Vec<Vec<(usize, glam::Vec3)>>,
+}
+
+fn play_track(file: &Path, until: u64, data: &Data, o: &Options) -> Result<Played, String> {
     let bytes = crate::hints::read_plain(file, crate::hints::MAX_REPLAY_FILE)?;
     let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
     let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
@@ -3035,24 +3051,18 @@ fn load_track(
     watch.follow = None;
     watch.autopilot = false;
     let mut seen = Game::new(&watch, data)?;
-    while seen.sim.tick < from && !seen.sim.game_over {
-        seen.tick(0);
-    }
-    let mut track = crate::hints::Track {
-        gain,
-        ..Default::default()
+    let mut played = Played {
+        track: crate::hints::Track::default(),
+        bodies: Vec::new(),
     };
+    let track = &mut played.track;
     let mut changes = run.changes.iter().peekable();
     let mut input = 0u8;
-    let mut bodies = Vec::new();
-    for t in 0..to {
+    for t in 0..until {
         // the input of tick t + 1 is the one the replay plays from the state at tick t (as for a replay step)
         while let Some(&&(_, i)) = changes.peek().filter(|c| c.0 <= t + 1) {
             input = i;
             changes.next();
-        }
-        if t < from {
-            continue;
         }
         if seen.sim.game_over || seen.sim.finished {
             break;
@@ -3068,7 +3078,7 @@ fn load_track(
         track.lift.push(input & crate::sim::input::LIFT != 0);
         track.on.push(crate::hints::carrier(&seen.sim));
         let world = seen.sim.world();
-        bodies.push(
+        played.bodies.push(
             seen.sim
                 .loose()
                 .iter()
@@ -3077,7 +3087,30 @@ fn load_track(
         );
         seen.tick(0);
     }
-    crate::hints::fill_meet(&mut track, &bodies);
+    Ok(played)
+}
+
+/// A trace step's run: ticks `from` to `to` of the replay `file` as played (`play_track`).
+fn load_track(file: &Path, played: &Played, from: u64, to: u64, gain: f32) -> crate::hints::Track {
+    let all = &played.track;
+    let at = usize::try_from(from)
+        .unwrap_or(usize::MAX)
+        .min(all.pos.len());
+    let end = usize::try_from(to)
+        .unwrap_or(usize::MAX)
+        .min(all.pos.len())
+        .max(at);
+    let mut track = crate::hints::Track {
+        pos: all.pos[at..end].to_vec(),
+        vel: all.vel[at..end].to_vec(),
+        push: all.push[at..end].to_vec(),
+        lift: all.lift[at..end].to_vec(),
+        on: all.on[at..end].to_vec(),
+        meet: Vec::new(),
+        gain,
+    };
+    let bodies = &played.bodies[at..end];
+    crate::hints::fill_meet(&mut track, bodies);
     if std::env::var_os("TRACE_LOG").is_some() {
         let mut near = std::collections::BTreeMap::new();
         for (i, b) in bodies.iter().enumerate() {
@@ -3099,7 +3132,7 @@ fn load_track(
         track.meet.iter().filter(|o| o.is_some()).count(),
         bodies.first().map_or(0, Vec::len)
     );
-    Ok(track)
+    track
 }
 
 /// A report of where the test player is stuck, for whoever writes its hints: what it knows of the place, and two

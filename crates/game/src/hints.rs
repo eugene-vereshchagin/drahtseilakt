@@ -25,6 +25,12 @@
 //                           speed at the matching point of the run (by progress along it, kept near one tick a tick),
 //                           turned into the arrows nearest it in the view now. Lost (over 4 units off): it steers to
 //                           the run's way ahead until it is on it again (or gives the ball back to the autopilot)
+//   ram X Y Z DX DZ B V T [S] ram the loose body (or module part) nearest X Y Z along the world direction (DX, DZ)
+//                           through its middle (S units to the left of it, looking along the ram): to the run-up
+//                           point B units behind the body where it is now (or onto the line through it, half that
+//                           behind at least, going on without a stop), then on through it no faster than V for T
+//                           ticks (or until the ball stops), kept to the line through its middle as the body moves;
+//                           closed on the body, not on fixed coordinates
 //   full STEP               the step pushed as hard as the arrows of the view as it is allow: on a 45-degree map
 //                           its pushes are otherwise the original's on average (`in_view`), here two arrows along
 //                           an axis of the world (1.41 times) and one along a diagonal; not before turn, cross,
@@ -40,14 +46,17 @@ use std::path::{Path, PathBuf};
 pub const MAX_FILE: u64 = 64 * 1024;
 const MAX_HINTS: usize = 256;
 const MAX_STEPS: usize = 64;
-/// The most replay steps a hint file may have (each plays its replay from the start to find the stretch).
-const MAX_REPLAY_STEPS: usize = 16;
+/// The most replay steps a hint file may have (each plays its replay from the start to find the stretch): a level of
+/// five sectors followed closed-loop between its puzzles takes a few a sector.
+const MAX_REPLAY_STEPS: usize = 32;
 /// The largest replay a hint may name.
 pub const MAX_REPLAY_FILE: u64 = 4 * 1024 * 1024;
 const MAX_COORD: f32 = 100_000.0;
 const MAX_TICKS: u64 = 60 * 60 * 10;
 const MAX_RADIUS: f32 = 200.0;
 const MAX_LEAD: f32 = 50.0;
+/// How far ahead of (or behind) a body's middle a ride keeps at most: about a ball's size.
+const MAX_RIDE_AHEAD: f32 = 4.0;
 /// The fastest a press step rolls, and how far off its line it keeps at most.
 const MAX_PRESS_SPEED: f32 = 40.0;
 const MAX_PRESS_OFFSET: f32 = 3.0;
@@ -57,6 +66,14 @@ const PRESS_MOVING: f32 = 0.8;
 const PRESS_SETTLE: u64 = 20;
 /// The ticks a goto or become takes at most when the hint does not say.
 const GOTO_TICKS: u64 = 600;
+/// A ram's run-up: B units behind the body at least and at most, and how long it may take to get there. The ball
+/// charges once it is on the line through the body (within `RAM_ON_LINE`, not drifting across it faster than
+/// `RAM_DRIFT`) at least half the run-up behind it: come along the line, it charges on without stopping.
+const MIN_RAM_BACK: f32 = 2.0;
+const MAX_RAM_BACK: f32 = 30.0;
+const RAM_RUNUP_TICKS: u64 = 600;
+const RAM_ON_LINE: f32 = 1.0;
+const RAM_DRIFT: f32 = 4.0;
 const BECOME_TICKS: u64 = 1200;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,6 +99,10 @@ pub enum Step {
     /// round it this far from its middle (a ball's size by default; a crate is bigger), and pushing only while it
     /// is slower than the speed, when one is given (a crate on a slope slides on by itself).
     Shove(Vec3, Vec3, u64, f32, Option<f32>),
+    /// Ram the loose body (or module part) nearest the point along the direction, through its middle (offset to the
+    /// left, looking along it, by the last number): from a run-up this far behind it where it is, no faster than the
+    /// speed, for so many ticks of the charge at most.
+    Ram(Vec3, Vec3, f32, f32, u64, f32),
     /// Hold the ball where it is until the loose body (or module part) nearest the first point is within the
     /// distance of the second, for so many ticks at most: a swing or a lift to get on or off at the right moment.
     Await(Vec3, Vec3, f32, u64),
@@ -90,8 +111,10 @@ pub enum Step {
     /// most: a pendulum's phase met however wide it swings.
     Swing(Vec3, Vec3, f32, u64),
     /// Keep the ball over the loose body (or module part) nearest the first point until it is within the distance
-    /// of the second, for so many ticks at most: riding a swing across.
-    Ride(Vec3, Vec3, f32, u64),
+    /// of the second, for so many ticks at most: riding a swing across. The last number keeps it that far ahead of
+    /// the body's middle along the way the body goes (behind, negative): riding on the front of a ball rolling down
+    /// rails, not on its top.
+    Ride(Vec3, Vec3, f32, u64, f32),
     /// Roll along the straight line from where the step begins to the point, kept to it sideways (with the offset
     /// from it, a vector across: rails ridden leaning on their upper rail), not faster than the speed, for so many
     /// ticks at most.
@@ -492,6 +515,31 @@ fn step(words: &[&str]) -> Result<Step, String> {
             };
             Step::Shove(p, to, n, round, cap)
         }
+        "ram" => {
+            let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let dir = direction(w.next(), w.next())?;
+            let back = num(w.next())?;
+            if !(MIN_RAM_BACK..=MAX_RAM_BACK).contains(&back) {
+                return Err(format!(
+                    "ram runs up from {MIN_RAM_BACK} to {MAX_RAM_BACK} units behind"
+                ));
+            }
+            let speed = num(w.next())?;
+            if !(0.5..=MAX_PRESS_SPEED).contains(&speed) {
+                return Err(format!("ram is 0.5 to {MAX_PRESS_SPEED} fast"));
+            }
+            let n = ticks(w.next())?;
+            let side = match w.next() {
+                Some(v) => num(Some(v))?,
+                None => 0.0,
+            };
+            if side.abs() > MAX_PRESS_OFFSET {
+                return Err(format!(
+                    "ram keeps {MAX_PRESS_OFFSET} units off the middle at most"
+                ));
+            }
+            Step::Ram(p, dir, back, speed, n, side)
+        }
         "await" | "ride" | "swing" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
@@ -505,7 +553,15 @@ fn step(words: &[&str]) -> Result<Step, String> {
             } else if name == "swing" {
                 Step::Swing(p, q, d, t)
             } else {
-                Step::Ride(p, q, d, t)
+                // (how far ahead of the body's middle, when given)
+                let ahead = match w.next() {
+                    Some(a) => num(Some(a))?,
+                    None => 0.0,
+                };
+                if ahead.abs() > MAX_RIDE_AHEAD {
+                    return Err(format!("ride keeps {MAX_RIDE_AHEAD} units ahead at most"));
+                }
+                Step::Ride(p, q, d, t, ahead)
             }
         }
         "round" => {
@@ -1004,7 +1060,9 @@ impl Runner {
         let mut gone = 0.0;
         for (i, step) in steps.iter().enumerate() {
             let pushes = match *step {
-                Step::Press(_, _, v, _) | Step::Along(v, _) => v > cap,
+                Step::Press(_, _, v, _) | Step::Ram(_, _, _, v, _, _) | Step::Along(v, _) => {
+                    v > cap
+                }
                 Step::Round(_, _, v, _) => v.abs() > cap,
                 _ => false,
             };
@@ -1311,6 +1369,7 @@ fn adjust(step: &Step, flowed: bool, cap: Option<f32>) -> std::borrow::Cow<'_, S
             Step::Pass(p, v, n) if v > c => Some(Step::Pass(p, c, n)),
             Step::Press(p, side, v, n) if v > c => Some(Step::Press(p, side, c, n)),
             Step::Along(v, n) if v > c => Some(Step::Along(c, n)),
+            Step::Ram(p, d, b, v, n, side) if v > c => Some(Step::Ram(p, d, b, c, n, side)),
             Step::Round(p, r, v, n) if v.abs() > c => Some(Step::Round(p, r, c * v.signum(), n)),
             _ => None,
         };
@@ -1513,6 +1572,59 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let along = dir * 3.0 + (off - dir * off.dot(dir));
             Some(arrows(along - 0.8 * (v - flat(st.vel)), quarter))
         }
+        Step::Ram(at, dir, back, speed, n, side) => {
+            let body = *run.body.get_or_insert_with(|| nearest_body(sim, *at, true));
+            let st = sim.world().state(body)?;
+            let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
+            let across = Vec3::new(-dir.z, 0.0, dir.x);
+            // the line through the body's middle where it is now (and the offset beside it)
+            let mid = flat(st.pos) + across * *side;
+            let pos = flat(ball.position);
+            let v = flat(ball.velocity);
+            if !run.flown {
+                if t >= RAM_RUNUP_TICKS {
+                    return None;
+                }
+                let behind = mid - *dir * *back;
+                let off = behind - pos;
+                let rel = pos - mid;
+                let on_line = rel.dot(across).abs() < RAM_ON_LINE
+                    && v.dot(across).abs() < RAM_DRIFT
+                    && rel.dot(*dir) <= -0.5 * *back;
+                if on_line || off.length() < RAM_ON_LINE {
+                    // on the run-up's line behind it: charge from here (`nearest_at`: the charge's first tick)
+                    run.flown = true;
+                    run.nearest_at = sim.tick;
+                } else {
+                    // ahead of the body or beside it: round it on the side the ball is, wide, then to behind it
+                    let ahead = rel.dot(*dir) > -0.5 * *back;
+                    let to = if ahead {
+                        let beside = mid + across * rel.dot(across).signum() * *back;
+                        if (beside - pos).length() > 1.5 {
+                            beside
+                        } else {
+                            behind
+                        }
+                    } else {
+                        behind
+                    };
+                    return Some(arrows((to - pos).clamp_length_max(6.0) - 0.8 * v, quarter));
+                }
+            }
+            let charge = sim.tick.saturating_sub(run.nearest_at);
+            if v.length() > PRESS_MOVING {
+                run.back_until = sim.tick;
+            }
+            // done after its ticks, or stopped against it (the body will go no further)
+            if charge >= *n || (charge > PRESS_SETTLE && sim.tick > run.back_until + PRESS_SETTLE) {
+                return None;
+            }
+            // across: to the line through the body's middle, damped; along: on while slower than the speed
+            let off = (pos - mid).dot(across);
+            let a = -(1.5 * off + 0.8 * v.dot(across));
+            let f = if v.dot(*dir) < *speed { 1.0 } else { -0.3 };
+            Some(arrows(*dir * f + across * a.clamp(-1.0, 1.0), quarter))
+        }
         Step::Lead(at, d, n) => {
             if t >= *n {
                 return None;
@@ -1560,7 +1672,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             let turned = st.pos.distance(*q) <= *d && st.vel.dot(*q - st.pos) <= 0.0;
             (!turned).then(|| towards(run.from))
         }
-        Step::Ride(at, q, d, n) => {
+        Step::Ride(at, q, d, n, ahead) => {
             if t >= *n {
                 return None;
             }
@@ -1570,7 +1682,9 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 return None;
             }
             let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
-            let off = flat(st.pos - ball.position);
+            // ahead along the way the body goes (still: none)
+            let along = flat(st.vel).normalize_or_zero();
+            let off = flat(st.pos + along * *ahead - ball.position);
             let rel = flat(ball.velocity - st.vel);
             Some(arrows(off.clamp_length_max(6.0) - 0.8 * rel, quarter))
         }
@@ -1856,7 +1970,7 @@ mod tests {
         assert!(parse("at 0 0 0 r 5 : trace ../run.replay 0 9").is_err());
         let line = "at 0 0 0 r 5 : trace run.replay 1 2";
         assert!(
-            parse(&vec![line; 17].join("\n")).is_err(),
+            parse(&vec![line; MAX_REPLAY_STEPS + 1].join("\n")).is_err(),
             "traces count as replays"
         );
     }
@@ -1937,9 +2051,9 @@ mod tests {
             assert!(plain_name(bad).is_err(), "{bad}");
         }
         let line = "at 0 0 0 r 5 : replay run.replay 1 2";
-        assert!(parse(&vec![line; 16].join("\n")).is_ok());
+        assert!(parse(&vec![line; MAX_REPLAY_STEPS].join("\n")).is_ok());
         assert!(
-            parse(&vec![line; 17].join("\n")).is_err(),
+            parse(&vec![line; MAX_REPLAY_STEPS + 1].join("\n")).is_err(),
             "too many replay steps"
         );
     }
@@ -2018,7 +2132,13 @@ mod tests {
         );
         assert_eq!(
             swing[0].steps[1],
-            Step::Ride(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 0.5, 90)
+            Step::Ride(
+                Vec3::new(1.0, 2.0, 3.0),
+                Vec3::new(4.0, 5.0, 6.0),
+                0.5,
+                90,
+                0.0
+            )
         );
         assert_eq!(
             swing[0].steps[2],
@@ -2088,6 +2208,52 @@ mod tests {
         assert!(parse(&many).is_err());
         let long = format!("at 0 0 0 r 1 : {}", "wait 1 ; ".repeat(MAX_STEPS + 1));
         assert!(parse(&long).is_err());
+    }
+
+    #[test]
+    fn a_ride_keeps_ahead_of_the_body_when_told() {
+        let h = parse("at 0 0 0 r 1 : ride 1 2 3 4 5 6 2 900 2.4").unwrap();
+        assert_eq!(
+            h[0].steps[0],
+            Step::Ride(
+                Vec3::new(1.0, 2.0, 3.0),
+                Vec3::new(4.0, 5.0, 6.0),
+                2.0,
+                900,
+                2.4
+            )
+        );
+        assert!(parse("at 0 0 0 r 1 : ride 1 2 3 4 5 6 2 900 4.5").is_err());
+        assert!(parse("at 0 0 0 r 1 : ride 1 2 3 4 5 6 2 900 1 1").is_err());
+        assert!(parse("at 0 0 0 r 1 : await 1 2 3 4 5 6 2 900 1").is_err());
+    }
+
+    #[test]
+    fn a_ram_step_parses_with_its_caps() {
+        let h = parse("at 0 0 0 r 1 : ram 1 2 3 0 -2 8 10 110 ; full ram 1 2 3 1 0 5 6 60 -0.5")
+            .unwrap();
+        assert_eq!(
+            h[0].steps,
+            vec![
+                Step::Ram(Vec3::new(1.0, 2.0, 3.0), Vec3::NEG_Z, 8.0, 10.0, 110, 0.0),
+                Step::Ram(Vec3::new(1.0, 2.0, 3.0), Vec3::X, 5.0, 6.0, 60, -0.5),
+            ]
+        );
+        assert_eq!(h[0].full, vec![false, true]);
+        for bad in [
+            "ram 1 2 3 0 0 8 10 110",
+            "ram 1 2 3 1 0 1 10 110",
+            "ram 1 2 3 1 0 31 10 110",
+            "ram 1 2 3 1 0 8 41 110",
+            "ram 1 2 3 1 0 8 0.1 110",
+            "ram 1 2 3 1 0 8 10 999999",
+            "ram 1 2 3 1 0 8 10 110 4",
+            "ram 1 2 3 1 0 8 10 110 0 1",
+            "ram 1 2 3 1 0 8 NaN 110",
+            "ram 1 2 3 1 0 8 10",
+        ] {
+            assert!(parse(&format!("at 0 0 0 r 1 : {bad}")).is_err(), "{bad}");
+        }
     }
 
     #[test]
