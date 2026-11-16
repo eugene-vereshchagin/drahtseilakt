@@ -19,14 +19,14 @@ scripts/fuzz.sh 3600 2 nmo_file    # одна цель, час
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-Цели: `nmo_file`, `nmo_chunk`, `open_level`, `script_json` (крейт `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
+Цели: `nmo_file`, `nmo_chunk`, `nmo_patch`, `open_level`, `script_json` (крейт `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`,
 `settings`, `level_sim` — уровень, загруженный и сыгранный секунду: так чужая карта проходит дальше читателя, в
 физику и правила — и `module_sim` — файл модуля вместо того, что использует оригинальный уровень (папка уровня может
 принести свой), при наличии копии игрока (игра, `crates/game/src/fuzz_tests.rs`).
 
 Затравки — маленькие синтетические файлы, которые делают сами тесты, собственные файлы игры и, если они есть, файлы
-игрока (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, оригинальные и любительские уровни профиля): они читаются во время
+игрока (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, все папки уровней профиля, поставляемые любительские карты): они читаются во время
 прогона и никогда не попадают в репозиторий. `FUZZ_NO_REAL=1` их отключает.
 
 Настройки: `FUZZ_SECS` (время на цель), `FUZZ_SEED` (какие входы; `scripts/fuzz.sh` берёт новый каждый раз),

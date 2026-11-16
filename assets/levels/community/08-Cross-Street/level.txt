@@ -1,5 +1,8 @@
 # Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
 # if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+# Proprietary textures removed (2026-11-16): the pictures of the original Ballance the map carried (Wood_Metal (two copies), Modul11_Wood)
+# are replaced by our own (assets/own, made by assets/own/make), so nothing of the original game is shipped;
+# THIRD-PARTY.md, "Levels". Everything else is the author's.
 title = Cross Street v1.9
 title.zh = 十字街道1.9
 author = 平衡四边球
@@ -13,3 +16,10 @@ catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomM
 video = https://www.youtube.com/watch?v=nOBH4PcsDy8 (桜埜叶毣)
 video = https://www.youtube.com/watch?v=MZCdxCSu-0w (LacuS: Custom Level 88)
 sky = B
+note = proprietary textures removed
+note.ru = выкинуты проприетарные текстуры
+note.de = proprietäre Texturen entfernt
+note.zh = 已移除专有纹理
+note.fr = textures propriétaires retirées
+note.es = texturas propietarias eliminadas
+note.it = texture proprietarie rimosse

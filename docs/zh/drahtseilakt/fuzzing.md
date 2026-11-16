@@ -17,14 +17,14 @@ scripts/fuzz.sh 3600 2 nmo_file    # 单个目标，一小时
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-目标：`nmo_file`、`nmo_chunk`、`open_level`、`script_json`（crate `level`）；`image`、`gputex`、`gputex_data`、`level_txt`、`theme_txt`、`pack_txt`、`sound_table`
+目标：`nmo_file`、`nmo_chunk`、`nmo_patch`、`open_level`、`script_json`（crate `level`）；`image`、`gputex`、`gputex_data`、`level_txt`、`theme_txt`、`pack_txt`、`sound_table`
 （`gamedata`）；`disc_image`、`cue_sheet`、`iscab`（`cdimage`）；`replay`、`hints`、`zones`、`learned`、`wav`、`ogg`、`highscore`、
 `settings`、`level_sim`——加载关卡并运行一秒，让陌生人的地图越过读取器进入物理与规则——以及
 `module_sim`——用一个模块文件替换原版关卡所用的模块（关卡文件夹可自带模块），需要玩家的游戏副本（游戏本身，
 `crates/game/src/fuzz_tests.rs`）。
 
 种子包括测试自己生成的小型合成文件、游戏自带的文件，以及（若存在）玩家的文件（`OPENBALLANCE_DATA`、
-`OPENBALLANCE_MAPS`、配置目录中的原版与社区关卡）；它们在运行时读取，绝不写入仓库。`FUZZ_NO_REAL=1` 可排除它们。
+`OPENBALLANCE_MAPS`、配置目录中的所有关卡文件夹、随游戏提供的社区地图）；它们在运行时读取，绝不写入仓库。`FUZZ_NO_REAL=1` 可排除它们。
 
 设置：`FUZZ_SECS`（每个目标的时间）、`FUZZ_SEED`（选择哪些输入；`scripts/fuzz.sh` 每次取新的）、
 `FUZZ_TIMEOUT_MS`（单个输入的时限，10 秒）、`FUZZ_RSS_MB`（内存上限）、`FUZZ_REPRO=<文件>`（运行单个输入并报告结果）。

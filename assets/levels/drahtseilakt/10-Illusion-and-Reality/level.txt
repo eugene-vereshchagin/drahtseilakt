@@ -1,5 +1,8 @@
 # Converted to Drahtseilakt's open format from Illusion-and-Reality.nmo by Entity_303, with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+# Proprietary textures removed (2026-11-16): the pictures of the original Ballance the map carried (Floor_Top_Border (turned, as Floor_Top_FL), the alpha fade of Column_beige_fade under the map's Water_Column)
+# are replaced by our own (assets/own, made by assets/own/make), so nothing of the original game is shipped;
+# THIRD-PARTY.md, "Levels". Everything else is the author's.
 title = Illusion and Reality
 title.zh = 幻实
 author = Entity_303
@@ -11,3 +14,10 @@ type = Comprehensive
 source = https://tieba.baidu.com/p/9145563541
 video = https://www.youtube.com/watch?v=JAz1IGQi_Ig
 sky = Desert
+note = proprietary textures removed
+note.ru = выкинуты проприетарные текстуры
+note.de = proprietäre Texturen entfernt
+note.zh = 已移除专有纹理
+note.fr = textures propriétaires retirées
+note.es = texturas propietarias eliminadas
+note.it = texture proprietarie rimosse

@@ -97,6 +97,15 @@ folder's `level.txt` names the author and where the map was posted; `CREDITS.md`
 **Drahtseilakt set** (`assets/levels/drahtseilakt/`): converted from each author's `.nmo` to the open format,
 rounded and with textures upscaled; where a map did not embed a texture, ours (above) stands in.
 
+**No picture of the original game ships in a level** (owner's decision, 2026-11-16). Some maps carried copies of the
+original Ballance's textures inside them; every shipped picture (the open-format levels' files, the pictures saved in
+the community maps' `.nmo` files) is compared with every picture of the original game, pixel for pixel and by a
+perceptual hash that sees through rescaling, turning and small colour changes, in the colours and in the alpha
+(`gamedata::provenance`; the test `crates/gamedata/tests/shipped_originals.rs` fails on a match). Each match was
+replaced by our own picture of the same name (above), turned and sized as the map's (`own-pictures`; a map's saved
+picture is rewritten in place by `nmo::patch`, nothing else in the file changes). Those maps are marked
+"proprietary textures removed" below and in their `level.txt` (`note`, in every language of the interface).
+
 | # | Map | Author | Source | Permission |
 |---|---|---|---|---|
 | 1 | Map 260801 (260801图) | 小锂电池 | <https://forum.ballance.top/d/117> | none recorded; credited, removed on request |
@@ -108,12 +117,13 @@ rounded and with textures upscaled; where a map did not embed a texture, ours (a
 | 7 | The Long Night of Ages v1.1 (岁月长夜V1.1) | 四叶草 (dyethx) | <https://forum.ballance.top/d/113> | none recorded; credited, removed on request |
 | 8 | Dreaming Back to 2025 (梦回2025) | 其乐融融 | video only: <https://www.youtube.com/watch?v=MBJzOvgkLVk> | none recorded; credited, removed on request |
 | 9 | Evolution of Logic (逻辑时代) | dahkjdas | <https://tieba.baidu.com/p/6700441841> | none recorded; credited, removed on request |
-| 10 | Illusion and Reality (幻实) | Entity_303 | <https://tieba.baidu.com/p/9145563541> | none recorded; credited, removed on request |
+| 10 | Illusion and Reality (幻实) (proprietary textures removed) | Entity_303 | <https://tieba.baidu.com/p/9145563541> | none recorded; credited, removed on request |
 | 11 | Singular Forest (单轨森林) | ZYL | <https://tieba.baidu.com/p/8267347663> | none recorded; credited, removed on request |
-| 12 | Eastern Nights (东方夜谭) | perfectthought | video only: <https://www.youtube.com/watch?v=nM1oyg-Rhxg> | none recorded; credited, removed on request |
-| 13 | Queen Ball (Hard Ver.) | pseudoacetyl | video only: <https://www.youtube.com/watch?v=Sq10sBrBQ8g> | none recorded; credited, removed on request |
+| 12 | Eastern Nights (东方夜谭) (proprietary textures removed) | perfectthought | video only: <https://www.youtube.com/watch?v=nM1oyg-Rhxg> | none recorded; credited, removed on request |
+| 13 | Queen Ball (Hard Ver.) (proprietary textures removed) | pseudoacetyl | video only: <https://www.youtube.com/watch?v=Sq10sBrBQ8g> | none recorded; credited, removed on request |
 
-**Community set** (`assets/levels/community/`): the authors' unmodified `.nmo` files. The list and difficulty come
+**Community set** (`assets/levels/community/`): the authors' `.nmo` files, unmodified except for the pictures of
+the original game five of them carried (above), which are ours now. The list and difficulty come
 from the catalogue [BallanceCustomMaps](https://github.com/pseudoacetyl/BallanceCustomMaps) by pseudoacetyl (MIT;
 the licence covers the list, not the maps).
 
@@ -122,15 +132,15 @@ the licence covers the list, not the maps).
 | 1 | Scarborough Fair (斯卡布罗集市) | yyc12345 | 2020-07-16 | none recorded; credited, removed on request |
 | 2 | Ballance Windows v1.1 (平衡视窗V1.1) | hhmmdd123 | 2014-08-27 | none recorded; credited, removed on request |
 | 3 | Ballance Bewildering City v1.3 (平衡迷城V1.3) | 平衡总统 | 2015-02-23 | none recorded; credited, removed on request |
-| 4 | Moli Thinking (茉莉思考) | ZYL | 2013-02-23 | none recorded; credited, removed on request |
-| 5 | Totole Chicken (Bouillon) (太太乐鸡(精)) | 傲骨银狼ヶ璇 | 2010-08-27 | none recorded; credited, removed on request |
+| 4 | Moli Thinking (茉莉思考) (proprietary textures removed) | ZYL | 2013-02-23 | none recorded; credited, removed on request |
+| 5 | Totole Chicken (Bouillon) (太太乐鸡(精)) (proprietary textures removed) | 傲骨银狼ヶ璇 | 2010-08-27 | none recorded; credited, removed on request |
 | 6 | Family Portrait (全家福) | vipeazone | 2012-03-01 | none recorded; credited, removed on request |
 | 7 | The SBlender | speedystoneball | 2023-05-28 | none recorded; credited, removed on request |
-| 8 | Cross Street v1.9 (十字街道1.9) | 平衡四边球 | 2016-08-07 | none recorded; credited, removed on request |
-| 9 | Scary Maze v1.2 (恐怖迷宫V1.2) | Sterd | 2012-08-05 | none recorded; credited, removed on request |
+| 8 | Cross Street v1.9 (十字街道1.9) (proprietary textures removed) | 平衡四边球 | 2016-08-07 | none recorded; credited, removed on request |
+| 9 | Scary Maze v1.2 (恐怖迷宫V1.2) (proprietary textures removed) | Sterd | 2012-08-05 | none recorded; credited, removed on request |
 | 10 | Temporarily Nameless (暂无名图) | lydjjlyd | 2018-12-28 | none recorded; credited, removed on request |
 | 11 | Dangerous Sections of Roads (危险路段) | 平衡总统 | 2015-06-29 | none recorded; credited, removed on request |
-| 12 | Twilight City (暮光之城) | Nice_melodies | 2016-08-07 | none recorded; credited, removed on request |
+| 12 | Twilight City (暮光之城) (proprietary textures removed) | Nice_melodies | 2016-08-07 | none recorded; credited, removed on request |
 | 13 | Metropolis Cross (都会十字) | dahkjdas | 2020-12-31 | none recorded; credited, removed on request |
 
 The hidden test levels `Parts_Test` and `00_Синтетический_уровень` are this project's (GPL-3.0-only).

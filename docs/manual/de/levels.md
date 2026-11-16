@@ -5,8 +5,8 @@
 Zwei Kartensätze stecken im Spiel, Sie können also sofort losspielen:
 
 - **Ausgewählte Karten**: 13 von uns gewählte Karten von Community-Autoren, mit abgerundeten Formen und von uns verbesserten Texturen: nicht die, die der Autor ursprünglich verwendet hat.
-- **Community-Karten, Mitgeliefert**: 13 weitere Community-Karten in den Dateien, wie ihre Autoren sie gemacht haben, mit
-  Namensnennung.
+- **Community-Karten, Mitgeliefert**: 13 weitere Community-Karten in den Dateien, wie ihre Autoren sie gemacht haben, ohne die
+  Texturen des Originals, mit Namensnennung.
 
 Alle gehören ihren Autoren und werden mit Dank gezeigt. Bittet ein Autor darum, entfernen wir seine Karte.
 

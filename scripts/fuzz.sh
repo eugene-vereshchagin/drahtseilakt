@@ -22,6 +22,7 @@ export FUZZ_SECS=$secs
 declare -A where=(
   [nmo_file]="level/fuzz fuzz_nmo_file"
   [nmo_chunk]="level/fuzz fuzz_nmo_chunk"
+  [nmo_patch]="level/fuzz fuzz_nmo_patch"
   [open_level]="level/fuzz fuzz_open_level"
   [script_json]="level/fuzz fuzz_script_json"
   [image]="gamedata/fuzz fuzz_image"
@@ -41,7 +42,7 @@ declare -A where=(
   [level_sim]="game/drahtseilakt fuzz_tests::fuzz_level_sim"
   [module_sim]="game/drahtseilakt fuzz_tests::fuzz_module_sim"
 )
-order=(nmo_file nmo_chunk open_level script_json level_sim module_sim image ogg disc_image cue_sheet iscab wav replay hints settings highscore
+order=(nmo_file nmo_chunk nmo_patch open_level script_json level_sim module_sim image ogg disc_image cue_sheet iscab wav replay hints settings highscore
   level_txt theme_txt pack_txt sound_table)
 targets=("$@")
 [ ${#targets[@]} -eq 0 ] && targets=("${order[@]}")
@@ -58,7 +59,7 @@ export CARGO_TARGET_DIR=${FUZZ_TARGET_DIR:-$PWD/target/fuzz}
 export RUSTFLAGS="${RUSTFLAGS:-} -C overflow-checks=on -C debug-assertions=on"
 cargo test --release --offline -p level -p gamedata -p cdimage -p drahtseilakt --no-run --message-format=json 2>/dev/null |
   grep '"executable":"[^"]*/deps/' | grep '"test":true' |
-  sed -E 's@.*crates/([a-z]+)#[^"]*".*"name":"([a-z_]+)".*"executable":"([^"]+)".*@\1 \2 \3@' |
+  sed -E 's@.*crates/([a-z]+)#[^"]*".*"name":"([a-z0-9_-]+)".*"executable":"([^"]+)".*@\1 \2 \3@' |
   while read -r crate name exe; do mkdir -p "$bin/$crate" && cp "$exe" "$bin/$crate/$name"; done
 
 echo "fuzzing ${#targets[@]} targets, $secs s each, $parallel at once, FUZZ_SEED=$FUZZ_SEED"

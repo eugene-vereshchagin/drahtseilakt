@@ -10,6 +10,7 @@ pub mod curve2d;
 pub mod document;
 pub mod error;
 pub mod file;
+pub mod patch;
 pub mod scene;
 
 pub use document::{Document, Object, class};

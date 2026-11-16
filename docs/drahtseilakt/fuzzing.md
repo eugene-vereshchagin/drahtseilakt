@@ -19,14 +19,14 @@ scripts/fuzz.sh 3600 2 nmo_file    # one target, an hour
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-Targets: `nmo_file`, `nmo_chunk`, `open_level`, `script_json` (crate `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
+Targets: `nmo_file`, `nmo_chunk`, `nmo_patch`, `open_level`, `script_json` (crate `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`,
 `settings`, `level_sim` — a level loaded and played for a second, which takes a stranger's map past its reader
 into the physics and the rules — and `module_sim` — a module file in place of one an original level uses (a level
 folder may bring its own), with the player's copy (the game, `crates/game/src/fuzz_tests.rs`).
 
 Seeds are small synthetic files the tests make, the game's own shipped files, and — when present — the player's
-files (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, the profile's original and community levels), read at run time and
+files (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, every level folder of the profile, the shipped community maps), read at run time and
 never written into the repository. `FUZZ_NO_REAL=1` leaves them out.
 
 Settings: `FUZZ_SECS` (time per target), `FUZZ_SEED` (which inputs; `scripts/fuzz.sh` takes a new one each run),

@@ -1,6 +1,7 @@
 // Fuzz targets of the level readers (docs/drahtseilakt/fuzzing.md), on the stable fuzzer in crates/fuzzkit:
 //   nmo_file    a whole .nmo/.cmo: container, object table, every scene decoder on every object, the level model;
 //   nmo_chunk   one state chunk through every scene decoder;
+//   nmo_patch   the picture patcher (nmo::patch) on a whole file: every saved picture rewritten, and any object/slot;
 //   open_level  the open format: level.gltf and level.bin;
 //   script_json a converted map's behaviour graphs (the scene's `scripts` extras), read and run a few ticks.
 // They are #[ignore]: `FUZZ_SECS=600 cargo test --release --offline -p level --test fuzz -- --ignored`. Seeds are
@@ -246,6 +247,10 @@ fn plain_file(
         out.extend_from_slice(&(i.data.len() as u32).to_le_bytes());
         out.extend_from_slice(&i.data);
     }
+    // the checksum the reader computes, so the file is a valid one (the patcher refuses a wrong checksum)
+    if let Ok(f) = nmo::read(&out) {
+        out[8..12].copy_from_slice(&f.computed_checksum.to_le_bytes());
+    }
     out
 }
 
@@ -303,6 +308,171 @@ fn nmo_seeds() -> Vec<Vec<u8>> {
     out
 }
 
+/// The picture patcher on a whole file. The input's checksum is made right first, so mutations reach past it (with
+/// a wrong one the patcher must refuse). Every picture the reader finds (at most a few) is rewritten with its colours
+/// turned over, which must succeed and read back (the patcher finds the planes exactly where the reader does) unless
+/// the file is one the patcher does not write (not version 8 or 9, chunk-compressed, larger than a map); then
+/// objects and slots picked by the input's first bytes, which may be refused but never panic.
+pub fn run_nmo_patch(input: &[u8]) {
+    use nmo::patch::{NewPicture, replace_pictures};
+    let Ok(file) = nmo::read(input) else { return };
+    if !file.checksum_matches() {
+        assert!(
+            replace_pictures(input, &[]).is_err(),
+            "a wrong checksum is refused"
+        );
+    }
+    let mut fixed = input.to_vec();
+    fixed[8..12].copy_from_slice(&file.computed_checksum.to_le_bytes());
+    let bytes = &fixed[..];
+    let h = &file.header;
+    let patchable = matches!(h.file_version, 8 | 9)
+        && h.write_mode & 1 == 0
+        && h.data_unpacked <= 64 << 20
+        && h.header1_unpacked <= 64 << 20;
+    let Ok(doc) = Document::parse(&file) else {
+        return;
+    };
+    let mut found: Vec<(usize, usize, u32, u32, Vec<u8>)> = Vec::new();
+    for (i, o) in doc.of_class(class::TEXTURE) {
+        let Some(c) = &o.chunk else { continue };
+        let Ok(t) = scene::texture(c) else { continue };
+        let slots = std::iter::once(t.embedded).chain(t.slots.into_iter().map(|s| s.embedded));
+        for (slot, p) in slots.enumerate() {
+            if let Some((w, h, mut rgba)) = p {
+                // colours turned over, alpha kept (a picture without an alpha plane reads opaque and stays so)
+                rgba.chunks_exact_mut(4)
+                    .for_each(|px| px[..3].iter_mut().for_each(|v| *v = !*v));
+                found.push((i, slot, w, h, rgba));
+            }
+        }
+        if found.len() >= 4 {
+            break;
+        }
+    }
+    let pictures: Vec<NewPicture<'_>> = found
+        .iter()
+        .map(|(object, slot, width, height, rgba)| NewPicture {
+            object: *object,
+            slot: *slot,
+            width: *width,
+            height: *height,
+            rgba,
+        })
+        .collect();
+    match replace_pictures(bytes, &pictures) {
+        Ok(out) => {
+            assert!(patchable, "a file the patcher does not write was patched");
+            let after = nmo::read(&out).unwrap();
+            assert!(after.checksum_matches());
+            assert_eq!(after.data.len(), file.data.len());
+        }
+        Err(e) => assert!(
+            !patchable,
+            "a picture the reader found could not be patched: {e}"
+        ),
+    }
+    // any object and slot the input names, of any sides: refused or patched, never a panic
+    let pick = |k: usize| bytes.get(k).copied().unwrap_or(0) as usize;
+    let rgba = vec![7u8; 4 * (pick(2) % 5 + 1) * (pick(3) % 5 + 1)];
+    let _ = replace_pictures(
+        bytes,
+        &[NewPicture {
+            object: pick(0) % (doc.objects.len() + 2),
+            slot: pick(1) % 3,
+            width: (pick(2) % 5 + 1) as u32,
+            height: (pick(3) % 5 + 1) as u32,
+            rgba: &rgba,
+        }],
+    );
+}
+
+/// A file with one texture of two saved pictures (one with alpha, one without): the patcher's seed.
+fn texture_nmo() -> Vec<u8> {
+    let plane = |w: usize, h: usize, seed: u32| -> Vec<u32> {
+        let n = w * h;
+        let mut v = vec![n as u32];
+        v.extend((0..n.div_ceil(4) as u32).map(|k| k.wrapping_mul(0x0101_0101).wrapping_add(seed)));
+        v
+    };
+    let mut pics = vec![2u32];
+    pics.extend([32, 3, 2, 0xFF00_0000, 0xFF_0000, 0xFF00, 0xFF, 0]);
+    for s in 0..4 {
+        pics.extend(plane(3, 2, s));
+    }
+    pics.extend([32, 2, 2, 0xFF00_0000, 0xFF_0000, 0xFF00, 0xFF, 0]);
+    for s in 0..3 {
+        pics.extend(plane(2, 2, s));
+    }
+    let tex = chunk_of(&[(0x0001_0000, vec![2, 0, 0]), (0x0002_0000, pics)]);
+    let (mut h1, mut data) = (Vec::new(), Vec::new());
+    data.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+    data.extend_from_slice(&4u32.to_le_bytes());
+    data.extend_from_slice(&7u32.to_le_bytes());
+    for (k, (class, c)) in [
+        (class::MATERIAL, chunk_of(&[(0x1000, vec![0; 12])])),
+        (class::TEXTURE, tex),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let name = format!("T{k}");
+        h1.extend_from_slice(&(k as u32 + 1).to_le_bytes());
+        h1.extend_from_slice(&class.to_le_bytes());
+        h1.extend_from_slice(&0u32.to_le_bytes());
+        h1.extend_from_slice(&(name.len() as u32).to_le_bytes());
+        h1.extend_from_slice(name.as_bytes());
+        let raw = chunk_raw(c);
+        data.extend_from_slice(&(raw.len() as u32).to_le_bytes());
+        data.extend_from_slice(&raw);
+    }
+    plain_file(&h1, &data, 1, 2, &[])
+}
+
+/// Files with saved pictures: the synthetic one, the community maps the game ships (`assets/levels/community`, the
+/// files the patcher is for) and the player's maps that have any, each as stored and again written plain (like
+/// `nmo_seeds`: mutations then reach the object table and chunks instead of the compressed stream).
+fn patch_seeds() -> Vec<Vec<u8>> {
+    let mut out = vec![texture_nmo()];
+    let shipped: Vec<std::path::PathBuf> = fuzzkit::real_roots()
+        .into_iter()
+        .filter(|r| r.ends_with("assets/levels"))
+        .map(|r| r.join("community"))
+        .collect();
+    let mut files = fuzzkit::read_all(&fuzzkit::files_under(&shipped, &["nmo"], 32, 8 << 20));
+    files.extend(real_nmo());
+    let mut seen = std::collections::HashSet::new();
+    for bytes in files {
+        if out.len() >= 48 || !seen.insert(fuzzkit::fnv(&bytes)) {
+            continue;
+        }
+        let Ok(f) = nmo::read(&bytes) else { continue };
+        let Ok(doc) = Document::parse(&f) else {
+            continue;
+        };
+        let has = doc.of_class(class::TEXTURE).any(|(_, o)| {
+            o.chunk
+                .as_ref()
+                .and_then(|c| scene::texture(c).ok())
+                .is_some_and(|t| {
+                    t.embedded.is_some() || t.slots.iter().any(|s| s.embedded.is_some())
+                })
+        });
+        if has {
+            let h = &f.header;
+            out.push(plain_file(
+                &f.header1,
+                &f.data,
+                h.manager_count,
+                h.object_count,
+                &f.included,
+            ));
+            out.push(bytes);
+        }
+    }
+    out
+}
+
 fn chunk_seeds() -> Vec<Vec<u8>> {
     let mut out: Vec<Vec<u8>> = synthetic_chunks().iter().map(chunk_raw).collect();
     let mut seen = std::collections::HashSet::new();
@@ -334,6 +504,14 @@ fn fuzz_nmo_file() {
     let mut t = Target::new("nmo_file", test_name!("fuzz_nmo_file"), Kind::Binary);
     t.max_len = 16 << 20;
     fuzzkit::fuzz(t, nmo_seeds, run_nmo_file);
+}
+
+#[test]
+#[ignore]
+fn fuzz_nmo_patch() {
+    let mut t = Target::new("nmo_patch", test_name!("fuzz_nmo_patch"), Kind::Binary);
+    t.max_len = 16 << 20;
+    fuzzkit::fuzz(t, patch_seeds, run_nmo_patch);
 }
 
 #[test]
@@ -775,6 +953,7 @@ fn fuzz_script_json() {
 fn fuzz_regressions() {
     fuzzkit::regressions("nmo_file", run_nmo_file);
     fuzzkit::regressions("nmo_chunk", run_nmo_chunk);
+    fuzzkit::regressions("nmo_patch", run_nmo_patch);
     fuzzkit::regressions("open_level", run_open_level);
     fuzzkit::regressions("script_json", run_script_json);
 }
@@ -787,6 +966,32 @@ fn fuzz_seeds_are_read() {
         let doc = Document::parse(&f).unwrap();
         assert!(doc.objects.iter().all(|o| o.chunk.is_some()));
         level::from_nmo::load_file(&f).unwrap();
+    }
+    // the patcher's seed holds two pictures the reader finds, and patching them succeeds
+    let t = texture_nmo();
+    let f = nmo::read(&t).unwrap();
+    let doc = Document::parse(&f).unwrap();
+    let tex = scene::texture(doc.objects[1].chunk.as_ref().unwrap()).unwrap();
+    assert!(tex.embedded.is_some() && tex.slots[0].embedded.is_some());
+    assert!(
+        f.checksum_matches(),
+        "a seed the patcher would refuse first"
+    );
+    run_nmo_patch(&t);
+    // every patch seed is patched (none stops at the checksum or the version), the shipped maps among them
+    let seeds = patch_seeds();
+    for s in &seeds {
+        assert!(nmo::read(s).unwrap().checksum_matches());
+        assert!(nmo::patch::replace_pictures(s, &[]).is_ok());
+    }
+    let shipped =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels/community");
+    if std::env::var_os("FUZZ_NO_REAL").is_none() && shipped.is_dir() {
+        assert!(
+            seeds.len() > 2,
+            "the shipped maps seed the patcher: {}",
+            seeds.len()
+        );
     }
     let open = open_seeds();
     let p = fuzzkit::split_parts(&open[0], 2);

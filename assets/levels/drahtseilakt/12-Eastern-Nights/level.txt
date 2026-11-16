@@ -1,5 +1,8 @@
 # Converted to Drahtseilakt's open format from Eastern-Nights.nmo by perfectthought, with thanks to its author. The map belongs to its
 # author; if the author objects, the level will be removed. Picked by the project's owner (2026-11-10).
+# Proprietary textures removed (2026-11-16): the pictures of the original Ballance the map carried (Stick_Bottom with the alpha fade of Column_beige_fade (as Stick_Bottom_New))
+# are replaced by our own (assets/own, made by assets/own/make), so nothing of the original game is shipped;
+# THIRD-PARTY.md, "Levels". Everything else is the author's.
 title = Eastern Nights
 title.zh = 东方夜谭
 author = perfectthought
@@ -9,3 +12,10 @@ order = 12
 catalogue-difficulty = 5
 video = https://www.youtube.com/watch?v=nM1oyg-Rhxg
 sky = Night
+note = proprietary textures removed
+note.ru = выкинуты проприетарные текстуры
+note.de = proprietäre Texturen entfernt
+note.zh = 已移除专有纹理
+note.fr = textures propriétaires retirées
+note.es = texturas propietarias eliminadas
+note.it = texture proprietarie rimosse

@@ -21,14 +21,14 @@ scripts/fuzz.sh 3600 2 nmo_file    # ein Ziel, eine Stunde
 FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -- --ignored --nocapture
 ```
 
-Ziele: `nmo_file`, `nmo_chunk`, `open_level`, `script_json` (Crate `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
+Ziele: `nmo_file`, `nmo_chunk`, `nmo_patch`, `open_level`, `script_json` (Crate `level`); `image`, `gputex`, `gputex_data`, `level_txt`, `theme_txt`, `pack_txt`, `sound_table`
 (`gamedata`); `disc_image`, `cue_sheet`, `iscab` (`cdimage`); `replay`, `hints`, `zones`, `learned`, `wav`, `ogg`, `highscore`,
 `settings`, `level_sim` — ein Level geladen und eine Sekunde gespielt, womit eine fremde Karte über den Leser
 hinaus in Physik und Regeln gelangt — und `module_sim` — eine Moduldatei anstelle einer, die ein Original-Level
 benutzt (ein Levelordner darf eigene mitbringen), mit der Kopie des Spielers (das Spiel, `crates/game/src/fuzz_tests.rs`).
 
 Startdateien sind kleine synthetische Dateien der Tests, die mitgelieferten Dateien des Spiels und — falls vorhanden —
-die Dateien des Spielers (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, die Original- und Community-Level des Profils), zur
+die Dateien des Spielers (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, alle Level-Ordner des Profils, die mitgelieferten Community-Karten), zur
 Laufzeit gelesen und nie ins Repository geschrieben. `FUZZ_NO_REAL=1` lässt sie weg.
 
 Einstellungen: `FUZZ_SECS` (Zeit je Ziel), `FUZZ_SEED` (welche Eingaben; `scripts/fuzz.sh` nimmt jedes Mal einen neuen),
