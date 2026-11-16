@@ -287,6 +287,13 @@ const LEVEL_TEXTURES: [&str; 53] = [
     "Wood_Plain",
 ];
 
+/// Whether `name` is one of the original's texture names (compared as texture_key compares them): what an own-format
+/// level's material may stand for (level::Original) or name as `game:` and still be the original's.
+pub fn is_original_texture(name: &str) -> bool {
+    let key = texture_key(name);
+    LEVEL_TEXTURES.iter().any(|t| texture_key(t) == key)
+}
+
 /// The game's texture a map's texture means when it carries no pixels and names no file, if its name says so
 /// (`materials`: the names of the materials that draw with it, for a texture without a name):
 /// - the texture's name is the game's texture's (`Floor_Top_Profil`, also with an editor's copy suffix after a dot);

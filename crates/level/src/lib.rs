@@ -63,6 +63,20 @@ pub struct Level {
     /// The slots after the first of the textures that have several (an animation's frames), by texture index; at most
     /// `nmo::scene::MAX_SLOTS - 1` each. Only a `.nmo` map carries them; a script's Set Current Slot shows one.
     pub texture_slots: Vec<(usize, Vec<TextureSource>)>,
+    /// The materials of an own-format level that stand for one of the original's textures (`extras.drahtseilakt.
+    /// original` of a material, open-format.md): drawn with that texture of the chosen texture pack when the pack is
+    /// not ours, so one picture has one look. At most one per material. Only the open format carries them.
+    pub originals: Vec<Original>,
+}
+
+/// What one material of a level stands for in the original: the original's texture `texture` (a texture name, as
+/// `game:` names one), drawn the way the original draws it (`texgen`, e.g. its rails' chrome) when the chosen texture
+/// pack has it in place of the material's own picture.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Original {
+    pub material: usize,
+    pub texture: String,
+    pub texgen: Option<TexGen>,
 }
 
 /// Slot entries a level keeps in all, over every texture: each one holds its own source, so the total is bounded, not

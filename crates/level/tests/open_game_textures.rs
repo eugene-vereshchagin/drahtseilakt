@@ -120,3 +120,32 @@ fn a_game_texture_that_could_be_a_path_is_refused() {
     }
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn what_a_material_stands_for_in_the_original_is_kept_and_checked() {
+    let d = dir("original");
+    let mut l = level();
+    l.originals.push(level::Original {
+        material: 0,
+        texture: "Rail_Environment".into(),
+        texgen: Some(level::TexGen::Chrome),
+    });
+    level::open::export(&l, &d).unwrap();
+    let (back, _) = level::open::import_read(&d).unwrap();
+    assert_eq!(back.originals, l.originals);
+    let text = std::fs::read_to_string(d.join("level.gltf")).unwrap();
+    let bin = std::fs::read(d.join("level.bin")).unwrap();
+    let said = "\"texture\": \"Rail_Environment\"";
+    assert!(text.contains(said), "{text}");
+    // a name that could be a path, or an unknown way of drawing it: the level is refused
+    for bad in ["\"texture\": \"../x\"", "\"texture\": 7"] {
+        let t = text.replace(said, bad);
+        assert!(
+            level::open::import_bytes(&d, t.as_bytes(), &bin).is_err(),
+            "{bad}"
+        );
+    }
+    let t = text.replace("\"texgen\": \"chrome\"", "\"texgen\": \"mirror\"");
+    assert!(level::open::import_bytes(&d, t.as_bytes(), &bin).is_err());
+    let _ = std::fs::remove_dir_all(&d);
+}

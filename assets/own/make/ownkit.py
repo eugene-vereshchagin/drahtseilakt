@@ -592,6 +592,11 @@ def write_open(out_dir, meshes, nodes, materials, groups=(), sky=None, start_bal
             v["alphaCutoff"] = mt["cutoff"]
         if mt["texgen"]:
             x["texgen"] = mt["texgen"]
+        # what the picture stands for in the original, or that it stands for nothing of it (levelkit.ORIGINAL_OF)
+        if mt.get("original"):
+            x["original"] = dict(mt["original"])
+        if mt.get("own_only"):
+            x["own_only"] = True
         if mt["unlit"]:
             v["extensions"] = {"KHR_materials_unlit": {}}
             unlit_used = True

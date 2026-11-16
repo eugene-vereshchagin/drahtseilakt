@@ -3,8 +3,9 @@
 //
 // - A texture pack is a folder of pictures named by the textures' names (the copy's texture names, compared as
 //   resources::texture_key compares them). Built in: `own` (assets/own/Textures and Track, our free textures),
-//   `original` (the player's copy), `remastered` (a remastered level's own upscaled files, else the copy's). The
-//   player's packs are the data folder's `textures/<pack>/`.
+//   `original` (the player's copy), `remastered` (a remastered level's own upscaled files; elsewhere the export's
+//   upscaled picture of the texture by name, remaster_picture; else the copy's). The player's packs are the data
+//   folder's `textures/<pack>/`.
 // - A model pack changes only the look of the parts and balls (the mesh drawn); the physics always uses the measured
 //   shapes the level takes now (assets.rs, Data::part), so replays and play never change. Built in: `level` (the
 //   level's own choice: no other look), `own` (assets/own/3D Entities), `original` (the copy's parts). The player's
@@ -416,6 +417,52 @@ pub fn picture(dir: &Path, name: &str) -> Option<PathBuf> {
         .cloned()
 }
 
+/// The remaster's enlarged picture of the original's texture `name`: the toolbox's export of the original levels
+/// (levels/remastered/Level_NN/textures/, its files named `NNNN_<texture>.png`), the first level that has it, its
+/// files indexed once. None without an export: the remaster's pack then draws the copy's (its fallback).
+pub fn remaster_picture(name: &str) -> Option<PathBuf> {
+    static INDEX: Mutex<Option<std::collections::HashMap<String, PathBuf>>> = Mutex::new(None);
+    let key = crate::resources::texture_key(name);
+    let mut index = INDEX.lock().ok()?;
+    index
+        .get_or_insert_with(|| {
+            remaster_index(&crate::profile::dir(crate::profile::Kind::Remastered))
+        })
+        .get(&key)
+        .cloned()
+}
+
+/// The pictures of a remaster export under `root` by their texture's key: each `Level_NN/textures/` of levels 1 to
+/// 13 in order (a real folder), its PNG files with the number before the name left off, the first level's winning.
+pub fn remaster_index(root: &Path) -> std::collections::HashMap<String, PathBuf> {
+    let mut index = std::collections::HashMap::new();
+    for n in 1..=13 {
+        let dir = root.join(format!("Level_{n:02}")).join("textures");
+        for path in picture_index(&dir).into_values() {
+            if !path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("png"))
+            {
+                continue;
+            }
+            let file = path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or_default();
+            let bare = match file.split_once('_') {
+                Some((num, rest)) if !num.is_empty() && num.bytes().all(|b| b.is_ascii_digit()) => {
+                    rest
+                }
+                _ => continue,
+            };
+            index
+                .entry(crate::resources::texture_key(bare))
+                .or_insert(path);
+        }
+    }
+    index
+}
+
 /// The settings' choice of a kind, if the player made one.
 pub fn from_settings(kind: Kind) -> Option<String> {
     crate::profile::setting(kind.key()).filter(|k| plain(k) && k.len() <= MAX_KEY)
@@ -566,6 +613,41 @@ mod tests {
             std::fs::create_dir_all(root.join(format!("p{i:02}"))).unwrap();
         }
         assert_eq!(packs_in(Kind::Models, &root).len(), MAX_PACKS);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_remasters_pictures_are_found_by_the_textures_name() {
+        let root = std::env::temp_dir().join(format!(
+            "drahtseilakt-remaster-index-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        for (level, file) in [
+            ("Level_02", "0001_Floor_Side.png"),
+            ("Level_01", "0007_Floor_Side.png"),
+            ("Level_01", "Brick.png"),
+            ("Level_01", "0002_Wood_Plain.dtx"),
+            ("Level_14", "0000_Rail_Environment.png"),
+        ] {
+            let d = root.join(level).join("textures");
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join(file), b"x").unwrap();
+        }
+        let index = remaster_index(&root);
+        let key = crate::resources::texture_key;
+        assert_eq!(
+            index.get(&key("Floor_Side")),
+            Some(
+                &root
+                    .join("Level_01")
+                    .join("textures")
+                    .join("0007_Floor_Side.png")
+            ),
+            "the first level's wins"
+        );
+        // a file without the export's number, a compressed one, a level past 13: not the remaster's pictures
+        assert_eq!(index.len(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

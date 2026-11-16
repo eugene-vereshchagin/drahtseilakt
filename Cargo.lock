@@ -637,6 +637,7 @@ dependencies = [
  "level",
  "libc",
  "nmo",
+ "serde_json",
 ]
 
 [[package]]
