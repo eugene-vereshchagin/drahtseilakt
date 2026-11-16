@@ -3325,6 +3325,16 @@ type Saved = (
     crate::edges::EdgeStats,
 );
 
+/// A hint marked `retry N` (hints.rs): the run saved just before it fired, to try it again from there when it
+/// fails, and how often it has been tried again so far.
+struct RetrySave {
+    hint: usize,
+    state: Saved,
+    tries: u32,
+    /// Whether it has fired (from the save, it fires on the next tick but for a varied opening of the player's).
+    fired: bool,
+}
+
 /// The test player's run, tick by tick (headless in `pilot_run`, or in the window with --watch): its hints and
 /// reports, going back when the ball is lost, giving up when the way stands still.
 struct PilotRun {
@@ -3345,6 +3355,10 @@ struct PilotRun {
     /// The watcher's zones file beside the hints (zones.rs), and the learned table shared by the levels (learned.rs).
     zones_path: PathBuf,
     learned_path: PathBuf,
+    /// The hint marked `retry` that runs now, and the run saved before it.
+    retry: Option<RetrySave>,
+    /// Each hint marked `retry` that ran: its line, the tries it took and whether the last got through, in order.
+    retried: Vec<(usize, u32, bool)>,
 }
 
 impl PilotRun {
@@ -3410,6 +3424,8 @@ impl PilotRun {
             went_back: None,
             zones_path,
             learned_path,
+            retry: None,
+            retried: Vec::new(),
         })
     }
 
@@ -3433,6 +3449,81 @@ impl PilotRun {
             );
             self.rewinds.save(s.tick, state);
         }
+        // a hint marked `retry` about to fire: the run as it is before it, to try it again from (not again for the
+        // same hint while it is being tried)
+        if self.rewinds.enabled()
+            && let Some(i) = self.pilot.hints.would_fire(s)
+            && self.pilot.hints.retry_of(i) > 0
+            && self.retry.as_ref().is_none_or(|r| r.hint != i)
+        {
+            self.retry = Some(RetrySave {
+                hint: i,
+                state: (
+                    s.clone(),
+                    game.replay_out.clone(),
+                    self.pilot.clone(),
+                    self.best,
+                    self.since,
+                    self.hint_at,
+                    self.near_edges,
+                ),
+                tries: 0,
+                fired: false,
+            });
+        }
+    }
+
+    /// A hint marked `retry` that failed (`why`) is tried again from the run saved before it, varied, while it has
+    /// tries left: whether it went back.
+    fn retry_hint(&mut self, game: &mut Game, why: &str) -> bool {
+        let Some(r) = self.retry.as_mut() else {
+            return false;
+        };
+        let line = self.pilot.hints.line_of(r.hint);
+        if r.tries >= self.pilot.hints.retry_of(r.hint) || !self.rewinds.take_one() {
+            println!(
+                "{} hint (line {line}) {why}: no tries left ({} tries), taken as it comes",
+                clock(game.sim.tick),
+                r.tries + 1
+            );
+            self.retried.push((line, r.tries + 1, false));
+            self.retry = None;
+            return false;
+        }
+        r.tries += 1;
+        r.fired = false;
+        let (sim, replay, p, b, sn, h, ne) = r.state.clone();
+        let msg = format!(
+            "{} hint (line {line}) {why} at ({:.1} {:.1} {:.1}): back to {} (try {} of {}, {} rewinds)",
+            clock(game.sim.tick),
+            game.sim.ball.position.x,
+            game.sim.ball.position.y,
+            game.sim.ball.position.z,
+            clock(sim.tick),
+            r.tries + 1,
+            self.pilot.hints.retry_of(r.hint) + 1,
+            self.rewinds.total()
+        );
+        println!("{msg}");
+        self.went_back = Some(msg);
+        // (seeded by the hint's line, the try and the tick: reproducible)
+        let seed = (line as u32)
+            .wrapping_mul(0x9E37_79B9)
+            .wrapping_add(r.tries.wrapping_mul(0x85EB_CA6B))
+            ^ (sim.tick as u32).wrapping_mul(0xC2B2_AE35);
+        let (hint, tries) = (r.hint, r.tries);
+        game.sim = sim;
+        game.replay_out = replay;
+        let (zones, learned) = (self.pilot.zones.clone(), self.pilot.learned.clone());
+        self.pilot = p;
+        self.pilot.zones = zones;
+        self.pilot.learned = learned;
+        self.pilot.hints.vary(hint, tries, seed);
+        (self.best, self.since, self.hint_at, self.near_edges) = (b, game.sim.tick.max(sn), h, ne);
+        self.heard = game.sim.events.len();
+        // (the states saved on the failed try are not gone back to)
+        self.rewinds.drop_after(game.sim.tick);
+        true
     }
 
     /// One tick with input `i` (the player's), and what follows from it: back to a saved state when the ball was
@@ -3460,6 +3551,42 @@ impl PilotRun {
         let as_the_player = fell && !stray && pilot.lost_as_the_player(&game.sim);
         // lost, or standing still too long: back to a state saved before, varied (a try of its own, reproducible)
         let still = game.sim.tick - self.since > self.give_up.min(crate::autopilot::REWIND_STILL);
+        // a hint marked `retry` that failed (its ball lost, stuck or off course while it runs, or its check not
+        // met): tried again from its start, varied
+        let failed_check = pilot.hints.take_failed();
+        let running_hint = pilot.hints.running_hint();
+        let off_course = pilot.hints.off_course();
+        if let Some(hint) = self.retry.as_ref().map(|r| r.hint) {
+            let running = running_hint == Some(hint);
+            let why = if failed_check == Some(hint) {
+                Some("check not met")
+            } else if running && fell {
+                Some("lost")
+            } else if running && off_course {
+                Some("off course")
+            } else if running && still {
+                Some("stuck")
+            } else {
+                None
+            };
+            if let Some(why) = why {
+                if self.retry_hint(game, why) {
+                    return;
+                }
+            } else if let Some(r) = self.retry.as_mut() {
+                if running {
+                    r.fired = true;
+                } else {
+                    // (ended and through, or it did not fire after all)
+                    if r.fired {
+                        let line = self.pilot.hints.line_of(hint);
+                        self.retried.push((line, r.tries + 1, true));
+                    }
+                    self.retry = None;
+                }
+            }
+        }
+        let pilot = &mut self.pilot;
         // (standing still: from where it last got on, a state saved there too)
         let failed_at = if as_the_player {
             None
@@ -3586,6 +3713,9 @@ impl PilotRun {
             self.pilot.reached(),
             self.pilot.route.points.len()
         );
+        if !self.retried.is_empty() {
+            println!("{}", retries_line(&self.retried));
+        }
         println!("{}", self.near_edges.line());
         if let Some(path) = &o.record {
             std::fs::write(path, game.replay_out.to_text())
@@ -3594,6 +3724,21 @@ impl PilotRun {
         }
         Ok(())
     }
+}
+
+/// The tries of the hints marked `retry` (`PilotRun::retried`), for the summary: `line L: N tries` each.
+fn retries_line(retried: &[(usize, u32, bool)]) -> String {
+    let each: Vec<String> = retried
+        .iter()
+        .map(|(l, n, ok)| {
+            format!(
+                "line {l}: {n} {}{}",
+                if *n == 1 { "try" } else { "tries" },
+                if *ok { "" } else { " (failed)" }
+            )
+        })
+        .collect();
+    format!("retries: {}", each.join(", "))
 }
 
 /// Runs the test player to --ticks (or the finish), prints how far it got and saves its run at --record. Where it

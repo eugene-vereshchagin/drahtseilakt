@@ -173,8 +173,20 @@ Datei, die `--hints FILE` nennt. Die bisher geschriebenen Hinweise liegen im Rep
 Replays, die sie benutzen; sie enthalten keine Spieldaten. Ein Hinweis je Zeile, `#` beginnt einen Kommentar:
 
 ```
-at X Y Z r R [sector N] [kind wood|stone|paper|sticky] : SCHRITT ; SCHRITT ; ...
+at X Y Z r R [sector N] [kind wood|stone|paper|sticky] [retry N] : SCHRITT ; SCHRITT ; ...
 ```
+
+`retry N` (1 bis 50) markiert einen Hinweis, dessen Ausgang an Unterschieden hängt, die zu klein sind, um Schritte
+dagegen zu schreiben (eine Kiste auf eine andere gerammt, ein bewegtes Teil in seiner Phase getroffen): ein Spieler
+versucht so eine Stelle noch einmal. Bevor der Hinweis auslöst, wird der Lauf gesichert; scheitert er (die Kugel
+verloren, stehend oder vom Kurs ab, während er läuft, oder ein `check` nicht erfüllt), geht der Lauf zu dieser
+Sicherung zurück und der Hinweis läuft erneut, variiert und geseedet (reproduzierbar): eine Startverzögerung bis 3
+Takte je Versuch (höchstens 15) ohne Pfeile, `pass`- und `press`-Punkte bis 0.3 quer verschoben, Geschwindigkeiten
+bis 6% schneller oder langsamer, Stöße bis 3 Takte länger oder kürzer, die Verstärkung eines `trace` bis 15% daneben
+(die volle Breite ab dem vierten Versuch). Jeder Versuch zählt gegen `--rewinds` (0: keiner), der behaltene Lauf
+enthält nur den gelungenen Versuch, und nach N erneuten Versuchen wird das Scheitern hingenommen. Die
+Zusammenfassung nennt die Versuche jedes solchen Hinweises (`retries: line L: N tries`). Hinweise ohne die Marke
+laufen wie bisher.
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,
 einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat: die Transformatoren
@@ -203,6 +215,7 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 | `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
 | `until X Y Z N [T]` | die Kugel auf dem Punkt halten, bis die Uhr des Sektors (die Takte, seit seine Module in die Physik kamen: an seinem Checkpoint, bei einem Start mit `--sector N` oder neu nach einer verlorenen Kugel) N erreicht (höchstens T Takte, 1800): ein Rätsel im selben Augenblick des Sektors begonnen, seine beweglichen Dinge, wo sie waren, ob der Lauf am Checkpoint begann oder aus dem Sektor davor kam |
+| `check X Y Z D [T]` | die Erfolgsbedingung des Hinweises: die Kugel jetzt oder, ohne Pfeile, binnen T Takten höchstens D vom Punkt; nicht erfüllt, ist der Hinweis gescheitert (einer mit `retry` wird erneut versucht, ein anderer endet einfach dort) |
 | `full STEP` | der Schritt (einer, der schiebt: nicht `turn`, `cross`, `trace` oder `wait`) schiebt so stark, wie die Pfeile der Ansicht, wie sie ist, erlauben, statt im Mittel mit dem Schub des Originals: auf einer 45-Grad-Karte zwei Pfeile entlang einer Weltachse (1,41-mal), einer diagonal (siehe „Modifizierte Originale“); auf den Originallevels dasselbe wie ohne |
 | `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
