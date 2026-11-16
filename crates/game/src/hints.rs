@@ -168,6 +168,10 @@ pub enum Step {
     /// A success condition in time: the sector's clock (`Sim::sector_clock`) not past the number as the hint comes
     /// here, else the hint has failed (a moving thing of the sector, a convoy of balls, met too late).
     Before(u64),
+    /// A success condition on a thing moved: the loose body or module part nearest the first point within the
+    /// distance of the second now, else the hint has failed (a crate rammed into its pocket, judged where it came to
+    /// be rather than by where the ball is).
+    Placed(Vec3, Vec3, f32),
 }
 
 /// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
@@ -494,6 +498,7 @@ fn full_step(words: &[&str]) -> Result<(bool, Step), String> {
             | Step::Trace(..)
             | Step::Wait(_)
             | Step::Check(..)
+            | Step::Placed(..)
             | Step::Retry(..)
             | Step::Before(_)
     ) {
@@ -690,6 +695,15 @@ fn step(words: &[&str]) -> Result<Step, String> {
             Step::Retry(n, width)
         }
         "before" => Step::Before(ticks(w.next())?),
+        "placed" => {
+            let at = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let q = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
+            let d = num(w.next())?;
+            if !(d > 0.0 && d <= MAX_LEAD) {
+                return Err(format!("placed is within 0 to {MAX_LEAD} units"));
+            }
+            Step::Placed(at, q, d)
+        }
         "check" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let d = num(w.next())?;
@@ -1454,6 +1468,33 @@ impl Runner {
                 self.begin(sim);
                 continue;
             }
+            // a thing not where it was to be moved to: the hint has failed here
+            if let Step::Placed(at, q, d) = *step {
+                let body = nearest_body(sim, at, true);
+                let st = sim.world().state(body);
+                let off = st.map_or(f32::INFINITY, |st| st.pos.distance(q));
+                if !self.quiet {
+                    let b = st.map_or(Vec3::splat(f32::NAN), |st| st.pos);
+                    eprintln!(
+                        "  placed at tick {}: ({:.2} {:.2} {:.2}), {off:.2} from its point{}",
+                        sim.tick,
+                        b.x,
+                        b.y,
+                        b.z,
+                        if off > d { ", not met" } else { "" }
+                    );
+                }
+                if off > d {
+                    let hint = run.hint;
+                    self.running = None;
+                    self.ended = true;
+                    self.failed = Some(hint);
+                    return None;
+                }
+                run.step += 1;
+                self.begin(sim);
+                continue;
+            }
             // a check not met: the hint has failed here
             if let Step::Check(p, d, n) = *step
                 && sim.ball.position.distance(p) > d
@@ -1721,7 +1762,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
     // drives nothing)
     if !matches!(
         step,
-        Step::Pass(..) | Step::Check(..) | Step::Retry(..) | Step::Before(_)
+        Step::Pass(..) | Step::Check(..) | Step::Placed(..) | Step::Retry(..) | Step::Before(_)
     ) {
         run.passed = None;
     }
@@ -1771,7 +1812,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
         Step::Wait(n) => (t < *n).then_some(0),
         // (the ball not there yet: no arrows while the check waits for it)
         Step::Check(p, d, n) => (ball.position.distance(*p) > *d && t < *n).then_some(0),
-        Step::Retry(..) | Step::Before(_) => None,
+        Step::Retry(..) | Step::Before(_) | Step::Placed(..) => None,
         Step::Turn(n) => {
             // a press every fourth tick, released between
             let presses = u64::from(n.unsigned_abs());
@@ -2667,6 +2708,11 @@ mod tests {
             Step::Check(Vec3::new(3.0, 0.0, 4.0), 1.5, 120)
         );
         assert_eq!(h[0].steps[2], Step::Check(Vec3::new(3.0, 0.0, 4.0), 2.0, 0));
+        assert_eq!(
+            parse("at 0 0 0 r 1 : placed 1 2 3 4 5 6 1.5").unwrap()[0].steps[0],
+            Step::Placed(Vec3::new(1.0, 2.0, 3.0), Vec3::new(4.0, 5.0, 6.0), 1.5)
+        );
+        assert!(parse("at 0 0 0 r 1 : full placed 1 2 3 4 5 6 1.5").is_err());
         assert_eq!(parse("at 0 0 0 r 1 : wait 1").unwrap()[0].retry, 0);
         assert_eq!(
             parse("at 0 0 0 r 1 : wait 1 ; retry 7 ; wait 2").unwrap()[0].steps[1],
