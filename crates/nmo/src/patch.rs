@@ -8,7 +8,6 @@
 
 use crate::bytes::Reader;
 use crate::checksum::Adler32;
-use crate::chunk::Chunk;
 use crate::document::class;
 use crate::error::{Error, Part, Result};
 use crate::file::limits;
@@ -26,6 +25,15 @@ pub struct NewPicture<'a> {
 
 /// The most pictures one call rewrites.
 const MAX_PICTURES: usize = 4_096;
+
+/// The largest unpacked header 1 or data part patched (the biggest shipped map is about 3 MiB unpacked).
+const MAX_UNPACKED: u64 = 64 * 1024 * 1024;
+/// The file versions whose checksum and object layout the patcher writes (version 8's: the checksum covers the
+/// header and both stored parts). Older files sum differently and lay their objects out differently.
+const PATCH_VERSIONS: [u32; 2] = [8, 9];
+/// Write mode bits: chunks compressed one by one (old files; not patched), the whole data part compressed.
+const CHUNK_COMPRESSED_OLD: u32 = 1;
+const WHOLE_COMPRESSED: u32 = 8;
 
 const HEADER_LEN: usize = 64;
 /// Byte offsets in the fixed header (file.rs reads them in this order).
@@ -140,36 +148,55 @@ fn slot_planes(words: &[u32]) -> Vec<SlotPlanes> {
     out
 }
 
-/// The file with the given pictures put into its textures. Refused (the file is left as it was) when the file does
-/// not read, an object is not a texture, a slot has no saved picture, the pixels are not exactly the slot's sides, a
-/// picture with transparency would go where the saved one has no alpha, or the result does not read back as asked.
-pub fn replace_pictures(bytes: &[u8], pictures: &[NewPicture<'_>]) -> Result<Vec<u8>> {
-    if pictures.len() > MAX_PICTURES {
-        return Err(Error::TooLarge {
-            part: Part::Data,
-            what: "pictures to replace",
-            value: pictures.len() as u64,
-            limit: MAX_PICTURES as u64,
-        });
-    }
-    let file = crate::read(bytes)?;
-    let doc = crate::Document::parse(&file)?;
-    let chunks = object_chunks(&file)?;
-    let mut data = file.data.clone();
-    for p in pictures {
+/// One plane to rewrite: its bytes in the data part, which channel of which new picture goes there, and the sides
+/// of the saved picture.
+struct PlaneWrite {
+    base: usize,
+    end: usize,
+    channel: usize,
+    picture: usize,
+    width: usize,
+    height: usize,
+}
+
+/// The object chunk's words as the reader parsed them are exactly the bytes in the file from byte 8 on, so a word
+/// index in `words` names a byte in the data part.
+fn words_are_the_bytes(raw: &[u8], words: &[u32]) -> bool {
+    let Some(count) = u32::try_from(words.len()).ok() else {
+        return false;
+    };
+    let Some(body) = words
+        .len()
+        .checked_mul(4)
+        .and_then(|n| n.checked_add(8))
+        .and_then(|end| raw.get(8..end))
+    else {
+        return false;
+    };
+    raw.get(4..8) == Some(&count.to_le_bytes()[..])
+        && body
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(words)
+            .all(|(b, w)| *b == w.to_le_bytes())
+}
+
+/// Where the new pictures go, checked against the file before anything is written.
+fn plan(file: &crate::File, pictures: &[NewPicture<'_>]) -> Result<Vec<PlaneWrite>> {
+    let doc = crate::Document::parse(file)?;
+    let chunks = object_chunks(file)?;
+    let mut writes = Vec::new();
+    for (index, p) in pictures.iter().enumerate() {
         let object = doc.get(p.object).ok_or(bad("texture object index"))?;
         if object.class_id != class::TEXTURE {
             return Err(bad("object to patch is not a texture"));
         }
         let chunk = object.chunk.as_ref().ok_or(bad("texture without data"))?;
         let &(start, len) = chunks.get(p.object).ok_or(bad("texture object index"))?;
-        let raw = file
-            .data
-            .get(start..start.saturating_add(len))
-            .ok_or(bad("object span"))?;
-        // the words the reader parsed are the ones in the file, from byte 8 of the chunk on
-        let reparsed = Chunk::parse(raw, Part::Data)?;
-        if reparsed.words != chunk.words {
+        let chunk_end = start.checked_add(len).ok_or(bad("object span"))?;
+        let raw = file.data.get(start..chunk_end).ok_or(bad("object span"))?;
+        if !words_are_the_bytes(raw, &chunk.words) {
             return Err(bad("texture chunk"));
         }
         let section = chunk
@@ -189,7 +216,7 @@ pub fn replace_pictures(bytes: &[u8], pictures: &[NewPicture<'_>]) -> Result<Vec
         {
             return Err(bad("new picture's size is not the saved picture's"));
         }
-        if slot.planes[3].is_none() && p.rgba.chunks_exact(4).any(|px| px.get(3) != Some(&0xFF)) {
+        if slot.planes[3].is_none() && p.rgba.as_chunks::<4>().0.iter().any(|px| px[3] != 0xFF) {
             return Err(bad("transparent picture where the saved one has no alpha"));
         }
         // the byte where word `w` of the section starts in the data part
@@ -197,59 +224,123 @@ pub fn replace_pictures(bytes: &[u8], pictures: &[NewPicture<'_>]) -> Result<Vec
             let word = section.start.checked_add(w)?;
             start.checked_add(8)?.checked_add(word.checked_mul(4)?)
         };
-        for (channel, plane) in slot.planes.iter().enumerate() {
+        for (k, plane) in slot.planes.iter().enumerate() {
             let Some(plane) = plane else { continue };
             let base = at(*plane).ok_or(bad("plane offset"))?;
             let end = base.checked_add(pixels).ok_or(bad("plane offset"))?;
             // the plane must lie inside this object's chunk
-            if end > start.saturating_add(len) {
+            if end > chunk_end {
                 return Err(bad("plane outside its chunk"));
             }
-            let target = data
-                .get_mut(base..end)
-                .ok_or(bad("plane outside the data"))?;
-            // planes are blue, green, red, alpha; the file's first row is the picture's bottom one
-            let source = [2usize, 1, 0, 3]
-                .get(channel)
-                .copied()
-                .ok_or(bad("channel"))?;
-            for (i, byte) in target.iter_mut().enumerate() {
-                let (row, col) = (
-                    i.checked_div(slot.width).unwrap_or(0),
-                    i.checked_rem(slot.width).unwrap_or(0),
-                );
-                let top_row = slot.height.saturating_sub(1).saturating_sub(row);
-                let px = top_row.saturating_mul(slot.width).saturating_add(col);
-                let k = px.saturating_mul(4).saturating_add(source);
-                *byte = p.rgba.get(k).copied().ok_or(bad("new picture"))?;
-            }
+            // planes are blue, green, red, alpha
+            let channel = [2usize, 1, 0, 3].get(k).copied().ok_or(bad("channel"))?;
+            writes.push(PlaneWrite {
+                base,
+                end,
+                channel,
+                picture: index,
+                width: slot.width,
+                height: slot.height,
+            });
         }
     }
-    let out = assemble(bytes, &file, &data)?;
-    check(&out, &file, pictures)?;
+    Ok(writes)
+}
+
+/// The file with the given pictures put into its textures. Refused (the file is left as it was) when the file is
+/// not a version 8 or 9 file saved whole (not chunk by chunk), its checksum does not match, its data part is larger
+/// than any map, it does not read, an object is not a texture, a slot has no saved picture, the pixels are not
+/// exactly the slot's sides, a picture with transparency would go where the saved one has no alpha, or the result
+/// does not read back exactly as intended.
+pub fn replace_pictures(bytes: &[u8], pictures: &[NewPicture<'_>]) -> Result<Vec<u8>> {
+    if pictures.len() > MAX_PICTURES {
+        return Err(Error::TooLarge {
+            part: Part::Data,
+            what: "pictures to replace",
+            value: pictures.len() as u64,
+            limit: MAX_PICTURES as u64,
+        });
+    }
+    // what the header says is checked before anything is unpacked
+    let header = crate::file::read_header(bytes)?;
+    if !PATCH_VERSIONS.contains(&header.file_version) {
+        return Err(Error::UnsupportedVersion {
+            file_version: header.file_version,
+        });
+    }
+    if header.write_mode & CHUNK_COMPRESSED_OLD != 0 {
+        return Err(Error::Malformed {
+            part: Part::Header,
+            what: "write mode (chunks compressed one by one)",
+        });
+    }
+    for (part, what, value) in [
+        (Part::Header1, "unpacked size", header.header1_unpacked),
+        (Part::Data, "unpacked size", header.data_unpacked),
+    ] {
+        if u64::from(value) > MAX_UNPACKED {
+            return Err(Error::TooLarge {
+                part,
+                what,
+                value: value.into(),
+                limit: MAX_UNPACKED,
+            });
+        }
+    }
+    let mut file = crate::read(bytes)?;
+    // a stored checksum that is already wrong would come out as a fresh, valid one: refuse instead
+    if !file.checksum_matches() {
+        return Err(Error::Malformed {
+            part: Part::Header,
+            what: "checksum",
+        });
+    }
+    let writes = plan(&file, pictures)?;
+    let mut data = std::mem::take(&mut file.data);
+    for w in &writes {
+        let p = pictures.get(w.picture).ok_or(bad("new picture"))?;
+        let target = data
+            .get_mut(w.base..w.end)
+            .ok_or(bad("plane outside the data"))?;
+        // the file's first row is the picture's bottom one
+        for (i, byte) in target.iter_mut().enumerate() {
+            let (row, col) = (
+                i.checked_div(w.width).unwrap_or(0),
+                i.checked_rem(w.width).unwrap_or(0),
+            );
+            let top_row = w.height.saturating_sub(1).saturating_sub(row);
+            let px = top_row.saturating_mul(w.width).saturating_add(col);
+            let k = px.saturating_mul(4).saturating_add(w.channel);
+            *byte = p.rgba.get(k).copied().ok_or(bad("new picture"))?;
+        }
+    }
+    let out = assemble(bytes, &file.header, &data)?;
+    check(&out, &file, &data, pictures)?;
     Ok(out)
 }
 
+/// The data part as it is stored: packed when the file was saved whole-compressed and packing makes it smaller,
+/// plain otherwise (a part whose stored size equals its unpacked size is read as plain).
+fn stored_data(header: &crate::Header, data: &[u8]) -> Vec<u8> {
+    if header.write_mode & WHOLE_COMPRESSED != 0 {
+        let z = miniz_oxide::deflate::compress_to_vec_zlib(data, 6);
+        if z.len() < data.len() {
+            return z;
+        }
+    }
+    data.to_vec()
+}
+
 /// The file again around a new data part: the fixed header with the data's packed size and the checksum made
-/// anew, header 1 and the included files as they were stored.
-fn assemble(bytes: &[u8], file: &crate::File, data: &[u8]) -> Result<Vec<u8>> {
-    let h = &file.header;
+/// anew (the version 8 checksum: header, header 1 and data as stored), header 1 and the included files as they
+/// were stored.
+fn assemble(bytes: &[u8], h: &crate::Header, data: &[u8]) -> Result<Vec<u8>> {
     let mut r = Reader::new(bytes, Part::Header);
     let head = r.bytes(HEADER_LEN)?;
     let header1_raw = r.bytes(h.header1_packed as usize)?;
     let _old_data = r.bytes(h.data_packed as usize)?;
     let tail = r.bytes(r.remaining())?;
-    let packed = if h.data_packed == h.data_unpacked {
-        data.to_vec()
-    } else {
-        let z = miniz_oxide::deflate::compress_to_vec_zlib(data, 6);
-        // a packed part as long as the unpacked one would be read as stored plain: store it plain then
-        if z.len() == data.len() {
-            data.to_vec()
-        } else {
-            z
-        }
-    };
+    let packed = stored_data(h, data);
     let packed_len = u32::try_from(packed.len())
         .ok()
         .filter(|&n| u64::from(n) <= limits::MAX_PART)
@@ -273,20 +364,33 @@ fn assemble(bytes: &[u8], file: &crate::File, data: &[u8]) -> Result<Vec<u8>> {
     sum.update(header1_raw);
     sum.update(&packed);
     put(&mut head, AT_CHECKSUM, sum.finish())?;
-    let mut out = head;
+    let total = HEADER_LEN
+        .checked_add(header1_raw.len())
+        .and_then(|n| n.checked_add(packed.len()))
+        .and_then(|n| n.checked_add(tail.len()))
+        .ok_or(bad("file size"))?;
+    let mut out = Vec::with_capacity(total);
+    out.extend_from_slice(&head);
     out.extend_from_slice(header1_raw);
     out.extend_from_slice(&packed);
     out.extend_from_slice(tail);
     Ok(out)
 }
 
-/// The patched file reads back with a good checksum, the same objects and object table, and every patched slot
-/// holding exactly the new picture.
-fn check(out: &[u8], before: &crate::File, pictures: &[NewPicture<'_>]) -> Result<()> {
+/// The patched file reads back with a good checksum, the same header (but the data's packed size and the
+/// checksum), header 1 and included files, exactly the intended data part, and every patched slot holding exactly
+/// the new picture as the scene reader sees it.
+fn check(out: &[u8], before: &crate::File, data: &[u8], pictures: &[NewPicture<'_>]) -> Result<()> {
     let after = crate::read(out)?;
+    let same_header = crate::Header {
+        checksum: before.header.checksum,
+        data_packed: before.header.data_packed,
+        ..after.header.clone()
+    } == before.header;
     if !after.checksum_matches()
+        || !same_header
         || after.header1 != before.header1
-        || after.data.len() != before.data.len()
+        || after.data != data
         || after.included != before.included
     {
         return Err(bad("patched file does not read back"));
@@ -308,4 +412,60 @@ fn check(out: &[u8], before: &crate::File, pictures: &[NewPicture<'_>]) -> Resul
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+mod tests {
+    use super::*;
+
+    fn header(write_mode: u32) -> crate::Header {
+        crate::Header {
+            checksum: 0,
+            ck_version: 0x1302_2002,
+            file_version: 8,
+            write_mode,
+            header1_packed: 0,
+            data_packed: 0,
+            data_unpacked: 0,
+            manager_count: 0,
+            object_count: 0,
+            max_id_saved: 0,
+            product_version: 0,
+            product_build: 0,
+            header1_unpacked: 0,
+        }
+    }
+
+    /// Bytes zlib cannot shrink.
+    fn noise(n: usize) -> Vec<u8> {
+        let mut x = 0x9E37_79B9u32;
+        (0..n)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 17;
+                x ^= x << 5;
+                x.to_le_bytes()[3]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn data_is_packed_only_when_saved_whole_compressed_and_packing_shrinks_it() {
+        let flat = vec![7u8; 4_096];
+        let random = noise(4_096);
+        assert!(miniz_oxide::deflate::compress_to_vec_zlib(&random, 6).len() >= random.len());
+        // whole-compressed: flat data packs, noise and a tiny part are stored plain
+        let packed = stored_data(&header(WHOLE_COMPRESSED), &flat);
+        assert!(packed.len() < flat.len());
+        assert_eq!(
+            miniz_oxide::inflate::decompress_to_vec_zlib(&packed).ok(),
+            Some(flat.clone())
+        );
+        assert_eq!(stored_data(&header(WHOLE_COMPRESSED), &random), random);
+        assert_eq!(stored_data(&header(WHOLE_COMPRESSED), &[1, 2]), vec![1, 2]);
+        // not whole-compressed (other bits set): always plain
+        assert_eq!(stored_data(&header(0), &flat), flat);
+        assert_eq!(stored_data(&header(4 | 2), &flat), flat);
+    }
 }

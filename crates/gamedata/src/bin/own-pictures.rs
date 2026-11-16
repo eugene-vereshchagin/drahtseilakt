@@ -244,9 +244,10 @@ impl Run<'_> {
     }
 
     fn map(&mut self, path: &Path) -> Result<(), String> {
-        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let bytes = read_plain(path)?;
         let mut new = Vec::new();
-        for found in provenance::pictures_in(path) {
+        // the pictures and the patch come from the same bytes: nothing read twice
+        for found in provenance::pictures_in_bytes(path, &bytes) {
             let Some((object, _, slot)) = &found.inside else {
                 continue;
             };
@@ -284,7 +285,18 @@ impl Run<'_> {
         let originals_dir = dir.join("textures.original");
         let mut replaced = std::collections::HashSet::new();
         for f in provenance::files_under(&originals_dir) {
+            let png = f.extension().is_some_and(|e| e.eq_ignore_ascii_case("png"));
             for found in provenance::pictures_in(&f) {
+                if !png {
+                    // only a .png is rewritten as one; any other file of the original's stays for a person
+                    if let Some((orig, _, hit)) =
+                        best_hit(&provenance::print(&found.picture), self.originals)
+                    {
+                        println!("LEFT {}: {hit:?} of {orig}, not a .png", found.label());
+                        self.left += 1;
+                    }
+                    continue;
+                }
                 if let Some(p) = self.own_for(&found.label(), &found.picture) {
                     replaced.insert(f.file_name().map(|n| n.to_owned()));
                     if self.write {
@@ -328,13 +340,114 @@ impl Run<'_> {
     }
 }
 
-/// Writes beside and moves into place, so a failed write never leaves half a file.
+/// The most a map file read here may hold (the patcher refuses far less).
+const MAP_MAX: u64 = 256 * 1024 * 1024;
+
+/// A map's bytes, only from a plain file: a symbolic link or anything else is refused, not followed.
+fn read_plain(path: &Path) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let fail = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
+    let meta = std::fs::symlink_metadata(path).map_err(|e| fail(&e))?;
+    if meta.file_type().is_symlink() {
+        return Err(fail(&"a symbolic link; not followed"));
+    }
+    if !meta.is_file() {
+        return Err(fail(&"not a plain file"));
+    }
+    let file = gamedata::package::open_plain(path, &meta).map_err(|e| fail(&e))?;
+    let mut bytes = Vec::new();
+    file.take(MAP_MAX.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|e| fail(&e))?;
+    if u64::try_from(bytes.len()).map_or(true, |n| n > MAP_MAX) {
+        return Err(fail(&"too large"));
+    }
+    Ok(bytes)
+}
+
+/// Names for the file written beside `path` before it moves into place: hidden, in the same folder, and
+/// unpredictable (a per-process random key hashed with the time and the attempt).
+fn temp_names(path: &Path) -> impl Iterator<Item = PathBuf> + '_ {
+    use std::hash::{BuildHasher, Hasher};
+    let key = std::collections::hash_map::RandomState::new();
+    let dir = path
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
+        .to_path_buf();
+    let stem = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    (0..32u32).map(move |attempt| {
+        let mut h = key.build_hasher();
+        h.write_u32(attempt);
+        h.write_u32(std::process::id());
+        if let Ok(t) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            h.write_u128(t.as_nanos());
+        }
+        dir.join(format!(".{stem}.{:016x}.own-pictures.tmp", h.finish()))
+    })
+}
+
+/// Replaces the plain file `path` with `bytes`: written to a new file beside it (never one that exists, never
+/// through a link), with the old file's permissions, synced, then moved into place. On any failure the original
+/// stays as it was and the new file is removed.
 fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let mut tmp = path.as_os_str().to_owned();
-    tmp.push(".own-pictures.tmp");
-    let tmp = PathBuf::from(tmp);
-    std::fs::write(&tmp, bytes).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+    replace_file_via(path, bytes, temp_names(path))
+}
+
+fn replace_file_via(
+    path: &Path,
+    bytes: &[u8],
+    names: impl Iterator<Item = PathBuf>,
+) -> Result<(), String> {
+    use std::io::Write;
+    let fail = |p: &Path, e: &dyn std::fmt::Display| format!("{}: {e}", p.display());
+    let meta = std::fs::symlink_metadata(path).map_err(|e| fail(path, &e))?;
+    if !meta.file_type().is_file() {
+        return Err(fail(path, &"not a plain file; left as it is"));
+    }
+    for tmp in names {
+        // create_new is O_CREAT | O_EXCL: an existing name, a link among them, is never opened
+        let mut file = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)
+        {
+            Ok(f) => f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(fail(&tmp, &e)),
+        };
+        let written = file
+            .set_permissions(meta.permissions())
+            .and_then(|()| file.write_all(bytes))
+            .and_then(|()| file.sync_all())
+            .map_err(|e| fail(&tmp, &e));
+        drop(file);
+        let moved = written.and_then(|()| {
+            // the target must still be the plain file looked at, not a link swapped in meanwhile
+            match std::fs::symlink_metadata(path) {
+                Ok(m) if m.file_type().is_file() => {
+                    std::fs::rename(&tmp, path).map_err(|e| fail(path, &e))
+                }
+                Ok(_) => Err(fail(path, &"no longer a plain file; left as it is")),
+                Err(e) => Err(fail(path, &e)),
+            }
+        });
+        if moved.is_err() {
+            let _ = std::fs::remove_file(&tmp);
+            return moved;
+        }
+        // the move itself made durable where the system allows syncing a folder
+        if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty())
+            && let Ok(d) = std::fs::File::open(dir)
+        {
+            let _ = d.sync_all();
+        }
+        return Ok(());
+    }
+    Err(fail(path, &"no free name for the new file beside it"))
 }
 
 fn main() -> ExitCode {
@@ -374,4 +487,133 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, clippy::indexing_slicing)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "drahtseilakt-own-pictures-{name}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn entries(d: &Path) -> Vec<String> {
+        let mut v: Vec<String> = std::fs::read_dir(d)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn a_file_is_replaced_whole_and_nothing_is_left_beside_it() {
+        let d = scratch("replace");
+        let f = d.join("map.nmo");
+        std::fs::write(&f, b"old").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o640)).unwrap();
+        }
+        replace_file(&f, b"new bytes").unwrap();
+        assert_eq!(std::fs::read(&f).unwrap(), b"new bytes");
+        assert_eq!(entries(&d), vec!["map.nmo".to_owned()]);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&f).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o640, "the permissions stay");
+        }
+        // two names from one call differ
+        let names: Vec<PathBuf> = temp_names(&f).take(2).collect();
+        assert_ne!(names[0], names[1]);
+        assert_eq!(names[0].parent(), Some(d.as_path()));
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn a_failure_leaves_the_original_intact() {
+        let d = scratch("fail");
+        let f = d.join("map.nmo");
+        std::fs::write(&f, b"old").unwrap();
+        // the new file cannot be made: nothing changes
+        let r = replace_file_via(&f, b"new", std::iter::once(d.join("missing/x.tmp")));
+        assert!(r.is_err());
+        assert_eq!(std::fs::read(&f).unwrap(), b"old");
+        // no free name: nothing changes
+        std::fs::write(d.join("taken.tmp"), b"someone's").unwrap();
+        let r = replace_file_via(&f, b"new", std::iter::once(d.join("taken.tmp")));
+        assert!(r.is_err());
+        assert_eq!(std::fs::read(&f).unwrap(), b"old");
+        assert_eq!(std::fs::read(d.join("taken.tmp")).unwrap(), b"someone's");
+        // a folder in the file's place is refused
+        let r = replace_file(&d.join("missing"), b"new");
+        assert!(r.is_err());
+        std::fs::create_dir(d.join("sub")).unwrap();
+        assert!(replace_file(&d.join("sub"), b"new").is_err());
+        assert!(d.join("sub").is_dir());
+        assert_eq!(
+            entries(&d),
+            vec![
+                "map.nmo".to_owned(),
+                "sub".to_owned(),
+                "taken.tmp".to_owned()
+            ]
+        );
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn links_are_never_followed() {
+        let d = scratch("links");
+        let f = d.join("map.nmo");
+        let victim = d.join("victim");
+        std::fs::write(&f, b"old").unwrap();
+        std::fs::write(&victim, b"victim").unwrap();
+        // a link where the new file would go is skipped, its target untouched
+        let planted = d.join("planted.tmp");
+        std::os::unix::fs::symlink(&victim, &planted).unwrap();
+        let r = replace_file_via(
+            &f,
+            b"new",
+            [planted.clone(), d.join("free.tmp")].into_iter(),
+        );
+        assert!(r.is_ok(), "{r:?}");
+        assert_eq!(std::fs::read(&f).unwrap(), b"new");
+        assert_eq!(std::fs::read(&victim).unwrap(), b"victim");
+        assert!(
+            std::fs::symlink_metadata(&planted)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        // only a link where the new file would go: refused
+        let r = replace_file_via(&f, b"newer", std::iter::once(planted.clone()));
+        assert!(r.is_err());
+        assert_eq!(std::fs::read(&f).unwrap(), b"new");
+        assert_eq!(std::fs::read(&victim).unwrap(), b"victim");
+        // PATH a link: refused, read or written, and the link's target untouched
+        let link = d.join("link.nmo");
+        std::os::unix::fs::symlink(&victim, &link).unwrap();
+        assert!(read_plain(&link).is_err());
+        assert!(replace_file(&link, b"new").is_err());
+        assert_eq!(std::fs::read(&victim).unwrap(), b"victim");
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(read_plain(&f).unwrap(), b"new");
+        std::fs::remove_dir_all(&d).unwrap();
+    }
 }

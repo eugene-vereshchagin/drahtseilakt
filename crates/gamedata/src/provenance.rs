@@ -408,9 +408,14 @@ pub fn pictures_in(path: &Path) -> Vec<Found> {
     let Ok(bytes) = std::fs::read(path) else {
         return Vec::new();
     };
+    pictures_in_bytes(path, &bytes)
+}
+
+/// The pictures in a file already read: `bytes` are the contents of `path`, whose extension picks the decoder.
+pub fn pictures_in_bytes(path: &Path, bytes: &[u8]) -> Vec<Found> {
     let ext = ext_of(path);
     if ext.as_deref().is_some_and(|x| IMAGE_EXTS.contains(&x)) {
-        return crate::assets::decode_image(&bytes, ext.as_deref())
+        return crate::assets::decode_image(bytes, ext.as_deref())
             .map(|(width, height, rgba)| Found {
                 file: path.to_path_buf(),
                 inside: None,
@@ -423,7 +428,7 @@ pub fn pictures_in(path: &Path) -> Vec<Found> {
             .into_iter()
             .collect();
     }
-    pictures_in_virtools(path, &bytes)
+    pictures_in_virtools(path, bytes)
 }
 
 fn pictures_in_virtools(path: &Path, bytes: &[u8]) -> Vec<Found> {

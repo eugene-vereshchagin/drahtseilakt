@@ -89,7 +89,7 @@ pub fn read(bytes: &[u8]) -> Result<File> {
     })
 }
 
-fn read_header(bytes: &[u8]) -> Result<Header> {
+pub(crate) fn read_header(bytes: &[u8]) -> Result<Header> {
     let mut r = Reader::new(bytes, Part::Header);
     if r.array::<8>().ok() != Some(SIGNATURE) {
         return Err(Error::NotVirtools);

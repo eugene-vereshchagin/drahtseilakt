@@ -26,7 +26,7 @@ into the physics and the rules — and `module_sim` — a module file in place o
 folder may bring its own), with the player's copy (the game, `crates/game/src/fuzz_tests.rs`).
 
 Seeds are small synthetic files the tests make, the game's own shipped files, and — when present — the player's
-files (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, the profile's original and community levels), read at run time and
+files (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, every level folder of the profile, the shipped community maps), read at run time and
 never written into the repository. `FUZZ_NO_REAL=1` leaves them out.
 
 Settings: `FUZZ_SECS` (time per target), `FUZZ_SEED` (which inputs; `scripts/fuzz.sh` takes a new one each run),

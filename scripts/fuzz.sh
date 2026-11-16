@@ -59,7 +59,7 @@ export CARGO_TARGET_DIR=${FUZZ_TARGET_DIR:-$PWD/target/fuzz}
 export RUSTFLAGS="${RUSTFLAGS:-} -C overflow-checks=on -C debug-assertions=on"
 cargo test --release --offline -p level -p gamedata -p cdimage -p drahtseilakt --no-run --message-format=json 2>/dev/null |
   grep '"executable":"[^"]*/deps/' | grep '"test":true' |
-  sed -E 's@.*crates/([a-z]+)#[^"]*".*"name":"([a-z_]+)".*"executable":"([^"]+)".*@\1 \2 \3@' |
+  sed -E 's@.*crates/([a-z]+)#[^"]*".*"name":"([a-z0-9_-]+)".*"executable":"([^"]+)".*@\1 \2 \3@' |
   while read -r crate name exe; do mkdir -p "$bin/$crate" && cp "$exe" "$bin/$crate/$name"; done
 
 echo "fuzzing ${#targets[@]} targets, $secs s each, $parallel at once, FUZZ_SEED=$FUZZ_SEED"

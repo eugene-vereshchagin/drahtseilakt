@@ -24,7 +24,7 @@ FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -
 `crates/game/src/fuzz_tests.rs`）。
 
 种子包括测试自己生成的小型合成文件、游戏自带的文件，以及（若存在）玩家的文件（`OPENBALLANCE_DATA`、
-`OPENBALLANCE_MAPS`、配置目录中的原版与社区关卡）；它们在运行时读取，绝不写入仓库。`FUZZ_NO_REAL=1` 可排除它们。
+`OPENBALLANCE_MAPS`、配置目录中的所有关卡文件夹、随游戏提供的社区地图）；它们在运行时读取，绝不写入仓库。`FUZZ_NO_REAL=1` 可排除它们。
 
 设置：`FUZZ_SECS`（每个目标的时间）、`FUZZ_SEED`（选择哪些输入；`scripts/fuzz.sh` 每次取新的）、
 `FUZZ_TIMEOUT_MS`（单个输入的时限，10 秒）、`FUZZ_RSS_MB`（内存上限）、`FUZZ_REPRO=<文件>`（运行单个输入并报告结果）。

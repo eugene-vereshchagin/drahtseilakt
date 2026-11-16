@@ -28,7 +28,7 @@ hinaus in Physik und Regeln gelangt — und `module_sim` — eine Moduldatei ans
 benutzt (ein Levelordner darf eigene mitbringen), mit der Kopie des Spielers (das Spiel, `crates/game/src/fuzz_tests.rs`).
 
 Startdateien sind kleine synthetische Dateien der Tests, die mitgelieferten Dateien des Spiels und — falls vorhanden —
-die Dateien des Spielers (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, die Original- und Community-Level des Profils), zur
+die Dateien des Spielers (`OPENBALLANCE_DATA`, `OPENBALLANCE_MAPS`, alle Level-Ordner des Profils, die mitgelieferten Community-Karten), zur
 Laufzeit gelesen und nie ins Repository geschrieben. `FUZZ_NO_REAL=1` lässt sie weg.
 
 Einstellungen: `FUZZ_SECS` (Zeit je Ziel), `FUZZ_SEED` (welche Eingaben; `scripts/fuzz.sh` nimmt jedes Mal einen neuen),

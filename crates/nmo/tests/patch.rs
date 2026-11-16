@@ -82,9 +82,45 @@ fn pixels(w: u32, h: u32, seed: u8, opaque: bool) -> Vec<u8> {
         .collect()
 }
 
+/// How a sample file is saved.
+#[derive(Clone, Copy)]
+struct Saved {
+    version: u32,
+    write_mode: u32,
+    pack_header1: bool,
+    pack_data: bool,
+}
+
+impl Saved {
+    fn plain() -> Saved {
+        Saved {
+            version: 8,
+            write_mode: 0,
+            pack_header1: false,
+            pack_data: false,
+        }
+    }
+    fn packed() -> Saved {
+        Saved {
+            write_mode: 8,
+            pack_header1: true,
+            pack_data: true,
+            ..Saved::plain()
+        }
+    }
+}
+
 /// A file with a manager, a material, a texture of two saved pictures (3x2 with alpha, 2x3 without), a texture
 /// with only a file name; stored packed or plain, with an included file.
 fn sample(compress: bool) -> Vec<u8> {
+    sample_saved(if compress {
+        Saved::packed()
+    } else {
+        Saved::plain()
+    })
+}
+
+fn sample_saved(saved: Saved) -> Vec<u8> {
     let objects: Vec<(u32, &str, Vec<u8>)> = vec![
         (30, "Mat", chunk(&[(0x1000, vec![0; 12])])),
         (
@@ -116,20 +152,20 @@ fn sample(compress: bool) -> Vec<u8> {
         data.extend_from_slice(&(raw.len() as u32).to_le_bytes());
         data.extend_from_slice(raw);
     }
-    let pack = |d: &[u8]| {
+    let pack = |d: &[u8], compress: bool| {
         if compress {
             miniz_oxide::deflate::compress_to_vec_zlib(d, 1)
         } else {
             d.to_vec()
         }
     };
-    let (p1, pd) = (pack(&h1), pack(&data));
+    let (p1, pd) = (pack(&h1, saved.pack_header1), pack(&data, saved.pack_data));
     let fields: [u32; 14] = [
         0,
         0x1302_2002,
-        8,
+        saved.version,
         0,
-        if compress { 8 } else { 0 },
+        saved.write_mode,
         p1.len() as u32,
         pd.len() as u32,
         data.len() as u32,
@@ -380,4 +416,103 @@ fn shipped_maps_patched_with_their_own_pictures_stay_the_same() {
         }
     }
     eprintln!("{maps} shipped maps patched with their own pictures");
+}
+
+fn one_picture(rgba: &[u8]) -> [NewPicture<'_>; 1] {
+    [NewPicture {
+        object: 1,
+        slot: 0,
+        width: 3,
+        height: 2,
+        rgba,
+    }]
+}
+
+fn header_u32(bytes: &[u8], at: usize) -> u32 {
+    u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap())
+}
+
+#[test]
+fn only_version_8_and_9_files_saved_whole_are_patched() {
+    let rgba = pixels(3, 2, 33, false);
+    for version in [5, 6, 7] {
+        let file = sample_saved(Saved {
+            version,
+            ..Saved::packed()
+        });
+        assert!(
+            nmo::read(&file).is_ok(),
+            "the reader takes version {version}"
+        );
+        let r = replace_pictures(&file, &one_picture(&rgba));
+        assert!(
+            matches!(r, Err(nmo::Error::UnsupportedVersion { file_version }) if file_version == version),
+            "version {version}: {r:?}"
+        );
+    }
+    let v9 = sample_saved(Saved {
+        version: 9,
+        ..Saved::packed()
+    });
+    assert!(replace_pictures(&v9, &one_picture(&rgba)).is_ok());
+    for mode in [1, 9] {
+        let old = sample_saved(Saved {
+            write_mode: mode,
+            ..Saved::packed()
+        });
+        assert!(
+            replace_pictures(&old, &one_picture(&rgba)).is_err(),
+            "chunk-compressed write mode {mode}"
+        );
+    }
+}
+
+#[test]
+fn a_file_with_a_wrong_checksum_is_refused() {
+    let rgba = pixels(3, 2, 34, false);
+    for compress in [false, true] {
+        let good = sample(compress);
+        assert!(replace_pictures(&good, &one_picture(&rgba)).is_ok());
+        for k in 8..12 {
+            let mut bad = good.clone();
+            bad[k] ^= 0x01;
+            assert!(!nmo::read(&bad).unwrap().checksum_matches());
+            assert!(
+                replace_pictures(&bad, &one_picture(&rgba)).is_err(),
+                "checksum byte {k} flipped"
+            );
+        }
+    }
+}
+
+#[test]
+fn parts_stored_differently_keep_header1_and_follow_the_write_mode() {
+    let rgba = pixels(3, 2, 35, false);
+    // header 1 packed, data plain, and the reverse, under either write mode
+    for (pack_header1, pack_data) in [(true, false), (false, true)] {
+        for write_mode in [0, 8] {
+            let before = sample_saved(Saved {
+                write_mode,
+                pack_header1,
+                pack_data,
+                ..Saved::plain()
+            });
+            let after = replace_pictures(&before, &one_picture(&rgba)).unwrap();
+            let (fb, fa) = (nmo::read(&before).unwrap(), nmo::read(&after).unwrap());
+            assert!(fa.checksum_matches());
+            assert_eq!(pictures(&after, 1)[0].2, rgba);
+            // header 1 is copied as it was stored
+            assert_eq!(header_u32(&after, 28), header_u32(&before, 28));
+            let h1 = 64..64 + header_u32(&before, 28) as usize;
+            assert_eq!(after[h1.clone()], before[h1]);
+            assert_eq!(fa.header1, fb.header1);
+            // the data part is packed exactly when the file was saved whole-compressed
+            let (packed, unpacked) = (header_u32(&after, 32), header_u32(&after, 36));
+            assert_eq!(
+                packed < unpacked,
+                write_mode == 8,
+                "header1 packed {pack_header1}, data packed {pack_data}, mode {write_mode}"
+            );
+        }
+    }
 }

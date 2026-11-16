@@ -143,7 +143,9 @@ fn env_u64(key: &str, default: u64) -> u64 {
 // Seeds
 
 /// The folders the player's files are read from as seeds (never copied into the repository): OPENBALLANCE_DATA,
-/// OPENBALLANCE_MAPS and the profile's original and community level folders, those that exist. None with FUZZ_NO_REAL.
+/// OPENBALLANCE_MAPS, every level folder of the profile (`levels/ballance-original`, `levels/modified`, ...; the whole
+/// `levels` folder, so a renamed or new one is found too) and the community maps the game ships (`assets/levels`, not
+/// in git), those that exist. None with FUZZ_NO_REAL.
 pub fn real_roots() -> Vec<PathBuf> {
     if std::env::var_os("FUZZ_NO_REAL").is_some() {
         return Vec::new();
@@ -154,10 +156,9 @@ pub fn real_roots() -> Vec<PathBuf> {
         .map(PathBuf::from)
         .collect();
     if let Some(home) = std::env::var_os("HOME") {
-        let levels = PathBuf::from(home).join(".local/share/drahtseilakt/levels");
-        out.push(levels.join("original"));
-        out.push(levels.join("community"));
+        out.push(PathBuf::from(home).join(".local/share/drahtseilakt/levels"));
     }
+    out.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/levels"));
     out.retain(|p| p.is_dir());
     out
 }
