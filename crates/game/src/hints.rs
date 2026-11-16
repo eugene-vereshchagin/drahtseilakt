@@ -165,6 +165,9 @@ pub enum Step {
     /// from its start): the run is saved as the step after it begins. Its points are moved up to the distance
     /// across (`VARY_POINT` by default).
     Retry(u32, f32),
+    /// A success condition in time: the sector's clock (`Sim::sector_clock`) not past the number as the hint comes
+    /// here, else the hint has failed (a moving thing of the sector, a convoy of balls, met too late).
+    Before(u64),
 }
 
 /// A recorded run as a `trace` step follows it: for each tick of the stretch, the ball's place and speed before it,
@@ -492,6 +495,7 @@ fn full_step(words: &[&str]) -> Result<(bool, Step), String> {
             | Step::Wait(_)
             | Step::Check(..)
             | Step::Retry(..)
+            | Step::Before(_)
     ) {
         return Err("\"full\" is for a step that pushes in the original's view".into());
     }
@@ -685,6 +689,7 @@ fn step(words: &[&str]) -> Result<Step, String> {
             }
             Step::Retry(n, width)
         }
+        "before" => Step::Before(ticks(w.next())?),
         "check" => {
             let p = Vec3::new(num(w.next())?, num(w.next())?, num(w.next())?);
             let d = num(w.next())?;
@@ -1419,6 +1424,32 @@ impl Runner {
                 self.begin(sim);
                 continue;
             }
+            // in time or not: on at once, or the hint has failed here
+            if let Step::Before(c) = *step {
+                let clock = sim.sector_clock();
+                let late = clock.is_some_and(|k| k > c);
+                if !self.quiet {
+                    eprintln!(
+                        "  before {c}: the sector's clock at {}{}",
+                        clock.map_or_else(|| "-".to_owned(), |k| k.to_string()),
+                        if late {
+                            ", late: the hint has failed"
+                        } else {
+                            ""
+                        }
+                    );
+                }
+                if late {
+                    let hint = run.hint;
+                    self.running = None;
+                    self.ended = true;
+                    self.failed = Some(hint);
+                    return None;
+                }
+                run.step += 1;
+                self.begin(sim);
+                continue;
+            }
             // a check not met: the hint has failed here
             if let Step::Check(p, d, n) = *step
                 && sim.ball.position.distance(p) > d
@@ -1732,7 +1763,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
         Step::Wait(n) => (t < *n).then_some(0),
         // (the ball not there yet: no arrows while the check waits for it)
         Step::Check(p, d, n) => (ball.position.distance(*p) > *d && t < *n).then_some(0),
-        Step::Retry(..) => None,
+        Step::Retry(..) | Step::Before(_) => None,
         Step::Turn(n) => {
             // a press every fourth tick, released between
             let presses = u64::from(n.unsigned_abs());
@@ -2633,6 +2664,10 @@ mod tests {
             parse("at 0 0 0 r 1 : wait 1 ; retry 7 ; wait 2").unwrap()[0].steps[1],
             Step::Retry(7, VARY_POINT)
         );
+        assert_eq!(
+            parse("at 0 0 0 r 1 : before 3500").unwrap()[0].steps[0],
+            Step::Before(3500)
+        );
         for bad in [
             "at 0 0 0 r 1 retry 0 : wait 1",
             "at 0 0 0 r 1 retry 51 : wait 1",
@@ -2651,6 +2686,10 @@ mod tests {
             "at 0 0 0 r 1 : wait 1 ; retry 3 2.5",
             "at 0 0 0 r 1 : wait 1 ; retry 3 -1",
             "at 0 0 0 r 1 : wait 1 ; retry 3 1 1",
+            "at 0 0 0 r 1 : before",
+            "at 0 0 0 r 1 : before -5",
+            "at 0 0 0 r 1 : before 99999999",
+            "at 0 0 0 r 1 : full before 5",
         ] {
             assert!(parse(bad).is_err(), "{bad}");
         }
