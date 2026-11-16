@@ -56,7 +56,7 @@ are read; a larger file or a link is ignored as if there were none.
 | `source` | where the toolbox found it | written by `import-maps`; not shown |
 
 Every value is cleaned: control characters, direction overrides and other invisible format characters are removed,
-runs of spaces become one. Our own levels' level.txt, for example:
+runs of spaces become one. A level.txt, for example:
 
 ```
 title = Paper Winds
@@ -150,10 +150,11 @@ A level comes from a stranger, so the game reads it as hostile and refuses what 
 
 A level the game cannot load says why in the menu and is not started.
 
-## Our own level kit: what it checks
+## Our level kit: what it checks
 
-Our levels are written as text (`level.lvl`, [levels.md](levels.md), "Our levels and how to edit them") and built by
-`assets/own/make/leveldsl.py` with `levelkit.py`. A level made with the kit is refused, with the places named, when it
+Levels of the kit are written as text (`level.lvl`, [levels.md](levels.md), "The level kit") and built by
+`assets/own/make/leveldsl.py` with `levelkit.py`; today the showcase level and `Parts_Test` are made with it (the ten
+levels of our own it was written for were removed on 2026-11-16). A level made with the kit is refused, with the places named, when it
 breaks what makes a level playable (the room and flat-floor checks and the seam test arrive with the level 1 work,
 branch `own-level-1`, where levels.md describes each):
 
@@ -165,9 +166,7 @@ branch `own-level-1`, where levels.md describes each):
 - **flat floor under parts**: a transformer's pad, a box or a dome stands on a flat, level patch of floor at its foot;
 - **borders that hold**: railings, brick borders and gutters keep a ball thrown at them on the track (a test throws
   each ball at 12, 25 and 40 units a second);
-- **a start and a finish, a title**, checkpoints on a heading the camera can take;
-- **it can be finished**: the test player plays every level in three styles, and a level without a finishing run is
-  not shipped (`scripts/own-levels.sh`).
+- **a start and a finish, a title**, checkpoints on a heading the camera can take.
 
 A level may also be made by a script of its own on top of the kit: `assets/own/make/make_synthetic_level.py` builds
 the shipped showcase level ([levels.md](levels.md), "The showcase level") from a description held in the script, with

@@ -44,7 +44,9 @@ It clones and rewinds with the run. Caps: `MAX_ENTITIES` rows in all (the same l
 
 ## 地图现状
 
-184 张带脚本的地图（连同 `community-unsorted/` 共 584 张）：148 张只有模板，36 张有自己的脚本。173 张的所有构建块均为运行时所知；36 张自带脚本的地图中 8 张的每个构建块完整生效（AAAAAA Class Islands Scenery、Be Besieged on All Sides 2.0、Painstaking Journey、Queen Ball (Easy Ver.)、Take the leap、Traveling on Rubber Walls、Trial of the Ballance King、反向Level_11），17 张带有受限构建块（九张传送门地图：对象复制尚未实现，球的传送本身可用；脚本物理；纹理；按键）。11 张地图含未知构建块；工作顺序（组与渐变、脚本物理、复制、经引擎的声音与文字、外观、其余逻辑，“永不”：鼠标、字体、2D）见英文页。
+184 张带脚本的地图（连同 `community-unsorted/` 共 584 张）：148 张只有模板，36 张有自己的脚本。173 张的所有构建块均为运行时所知；36 张自带脚本的地图中 8 张的每个构建块完整生效（AAAAAA Class Islands Scenery、Be Besieged on All Sides 2.0、Painstaking Journey、Queen Ball (Easy Ver.)、Take the leap、Traveling on Rubber Walls、Trial of the Ballance King、反向Level_11；其中 Traveling on Rubber Walls 已于 2026-11-16 从收藏中删除，见下），17 张带有受限构建块（九张传送门地图：对象复制尚未实现，球的传送本身可用；脚本物理；纹理；按键）。11 张地图含未知构建块；工作顺序（组与渐变、脚本物理、复制、经引擎的声音与文字、外观、其余逻辑，“永不”：鼠标、字体、2D）见英文页。
+
+*2026-11-16：* 三张地图的脚本引用了完全没有顶点的网格（它们是开放格式转换唯一没能保持一致的地图：导出把这种网格变成了普通对象）——20th Anniversary Commemorative Map、Fake Strength v4.4 和 Traveling on Rubber Walls——已从所有者的收藏（`ref/Maps`）中删除。上面的数字是删除之前普查的结果；转换器审计现在涵盖 589 张地图，全部一致（STATUS/convert-audit.md）。
 
 ## 第 0 阶段（2026-11-11）：核心一致性
 

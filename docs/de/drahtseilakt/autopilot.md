@@ -577,5 +577,5 @@ Den Läufen des Inhabers folgend (`--autopilot --follow`), mit Zurückgehen und 
   gelöst). Vom Levelstart an ist Sektor 2 noch nicht zuverlässig (die Stöße der Kiste hängen davon ab, woher die Kugel
   kommt); Sektoren 4 und 5 sind offen.
 - Videos der beendeten Läufe: `scripts/video.sh`, außerhalb des Repositorys aufbewahrt.
-- Unsere zehn Level (levels.md, „Unsere Level und wie man sie bearbeitet“), 2026-11-03: jedes vom Start an in drei
-  Stilen geschafft, mit den Hinweisdateien, die ihre Beschreibungen schreiben (`assets/levels/<Level>/pilot/`).
+- (Unsere zehn Level, 2026-11-03, jedes in drei Stilen geschafft: am 16.11.2026 mit den Leveln entfernt, decisions.md,
+  „Keine eigenen Level“.)

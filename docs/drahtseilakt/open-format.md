@@ -22,7 +22,7 @@ A folder holding:
   ([packs.md](packs.md)): the level's own `game/Textures/` picture of that name first, then the pack and its fallbacks,
   then ours, then the copy's (names compared as texture names are: without case, `_`, `-`, spaces or extension). The
   name is 1 to 128 characters, none of them `/`, `\`, `:` or a control character, not beginning with a dot; it is only
-  compared with the textures' names, never made a path. Our levels name the textures they share this way (the track's
+  compared with the textures' names, never made a path. The levels of our kit name the textures they share this way (the track's
   sides, the borders' bricks, wood, rails, posts, checkpoint plates), so a texture pack changes them too, and keep their
   own special textures as files. `--export` keeps a `game:` image as it is. Levels made before keep working: their
   files are theirs;
@@ -123,13 +123,13 @@ level may carry the `.dtx` without the PNG.
   and says so; a remastered `Level_NN` takes them from the copy's table instead. The game files of `game/` stand in
   only for the level's own parts, sky, particles, shadow and a run's sounds: the interface's files (menus, font, the
   level table, menu sounds) never come from a level: they are the interface's (ours, or the copy's), and every file read is capped.
-- **The fog** `settings.fog` (our levels), only drawn: what is far from the camera fades into the air's colour,
+- **The fog** `settings.fog` (the kit's levels), only drawn: what is far from the camera fades into the air's colour,
   `color` seen towards the horizon and `color_down` seen straight down (three numbers 0..1; without `color_down` one
   colour all round), `density` of it a unit of distance (1 - e^(-density × distance), 0..1), and what lies below
   `below` fades into it as well, wholly `depth` under it. Lit surfaces only (the sky, sprites and the sea of cloud
   keep their own colour); none in the original's levels. `color`, `density`, `below` and `depth` are needed; values
   out of range are held to it, a malformed one refuses the level.
-- **The sea of cloud** `settings.clouds` (our levels; levels.md, "The sea of cloud"), only drawn: `top` (the height
+- **The sea of cloud** `settings.clouds` (the kit's levels; levels.md, "The sea of cloud"), only drawn: `top` (the height
   of its tops; needed), `thickness`, `cover` (0..1), `scale` (a cloud's size), `sun` (the direction towards the sun),
   `sun_color`, `sky` (the light from above), `shadow` (in the shade; colours in linear light, 1 white), `haze` (of the
   horizon's haze a unit of distance), `under` (0..1: how much of the world under it the haze there hides) and `wind`

@@ -249,20 +249,45 @@ Fertig, wenn: die meisten Karten spielbar sind; der Bericht führt die übrigen 
 
 ## Kriterien für die Veröffentlichung
 
-*2026-11-03, Bedingung des Eigentümers (decisions.md, „Das Spiel läuft ohne Weiteres“).* Das Spiel erscheint, wenn:
+*Am 2026-11-16 auf die heutigen Entscheidungen des Eigentümers umgeschrieben* (decisions.md, „Keine eigenen Level“,
+„Das Spiel läuft ohne Weiteres“; die Fassung vom 2026-11-03 verlangte zehn eigene Level). Das Spiel erscheint, wenn
+alles Folgende gilt. Stand 2026-11-16: **erledigt**, **teilweise**, **offen**.
 
+- **Keine eigenen Level.** Das Spiel liefert die vom Eigentümer ausgewählten Community-Karten aus, ihren Autoren
+  zugeschrieben: den Drahtseilakt-Satz (`assets/levels/drahtseilakt/01-…13-…`, ins offene Format konvertiert) und den
+  Community-Satz (`assets/levels/community/`, die `.nmo` der Karten), dazu unser synthetisches Schaufensterlevel
+  `00_Синтетический_уровень` und das versteckte Testlevel `Parts_Test`. **Erledigt** (Ordner seit 2026-11-12, levels.md
+  „Level, die mit dem Spiel kommen“; die zehn eigenen Level am 2026-11-16 entfernt).
 - **Eigene Teile**: Jedes Teil, das ein Level verwenden kann (die drei Kugeln und ihre Bruchstücke, Transformatoren,
   Ventilatoren, Schieber, Zugbrücken, die Kiste, das Steinkugel-Rätsel, Schaukeln und Seilbrücken, Start und Ziel,
   Kontrollpunkte, Extraleben und Extrapunkte, Kuppeln), hat ein eigenes Modell, von einem Skript in
-  `assets/own/make` nach den gemessenen Maßen und der Physik des Originals gemacht.
-- **Mindestens zehn eigene Level** abgestufter Schwierigkeit, mit dem Spiel im offenen Format ausgeliefert.
-- **Der Testspieler** schafft jedes davon in mehreren Stilen (vorsichtig, schnell, ...), mit Videos der Läufe.
-- **Keine Kopie nötig**: Das Spiel startet und spielt ganz ohne Kopie des Originals; der Import bleibt angeboten.
-
-Stand: Das Spiel startet ohne Kopie und spielt unsere eigenen Level mit unseren Teilen: zehn Level abgestufter
-Schwierigkeit (levels.md, „Unsere Level und wie man sie bearbeitet“), jedes vom Testspieler in drei Stilen geschafft
-(safe, speed, collector), seine Läufe daneben aufbewahrt und von einem Test geprüft, und das Testlevel
-`assets/levels/Parts_Test`.
+  `assets/own/make` nach den gemessenen Maßen und der Physik des Originals gemacht. **Erledigt**; ihr Aussehen wird
+  weiter verbessert (resources.md).
+- **Keine Kopie nötig**: Das Spiel startet und spielt ganz ohne Kopie des Originals; der Import der Originallevel
+  bleibt über die Toolbox angeboten. **Erledigt.**
+- **Läufe des Autopiloten und Videos** sind von den Originalleveln und von den veränderten Sätzen (45°-Kamera,
+  unsichtbare Bahn), die Videos für YouTube (4K, jedes mit seinem README). Läufe des Autopiloten auf den mitgelieferten
+  Community-Karten sind **keine** Bedingung für die Veröffentlichung (Eigentümer, 2026-11-14). Läufe: **erledigt** für
+  die 13 Originallevel (`hints/runs/`), den 45°-Satz und den unsichtbaren Satz (`hints/runs/modified/`); Videos:
+  **teilweise** (einzelne Level aufgenommen, die ganze Reihe und der Upload offen).
+- **Builds für jede Desktop-Plattform**: Linux, Windows und macOS (BSD willkommen), als Installer und als portabler
+  Ordner. **Teilweise**: der portable Linux-Build existiert und wird aktuell gehalten; die Builds für Windows und macOS
+  sind in der CI vorbereitet (`.github/workflows/drahtseilakt.yml`) und warten auf den Befehl des Eigentümers;
+  Installer und BSD sind offen.
+- **Die Toolbox wird mit dem Spiel ausgeliefert** (`drahtseilakt-toolbox`, ein eigenes Programm). **Teilweise**: die CI
+  kann sie neben dem Spiel bauen; in den Paketen ist sie noch nicht.
+- **Ein öffentliches, sauberes Repository**: die Veröffentlichung ist ein neues Repository ohne Historie und Daten des
+  privaten (decisions.md, „Das private Repository ist ein Backup“). **Offen.**
+- **Eine Lizenzübersicht**: die Lizenz des Spiels und die jedes ausgelieferten Assets (Schriften, Karten, Klänge) an
+  einem Ort. **Teilweise**: LICENSE und CREDITS.md gibt es; die Übersicht ist offen.
+- **Debug standardmäßig aus**: das Spiel eines Spielers startet ohne den Debug-Lauf; Sitzungsprotokolle werden nur in
+  einem Debug-Lauf geschrieben; Gottmodus und die Debug-Schalter gibt es nur in Debug-Builds. **Teilweise**: Protokolle
+  folgen dem Debug-Schalter, und der Gottmodus ist ein Entwicklungs-Mod, den ein Release-Paket nicht ausliefert
+  (`mods-dev/`); der Debug-Lauf ist bis zu dieser Aufräumarbeit noch standardmäßig an (`DEBUG_BY_DEFAULT` in main.rs),
+  und `--debug` funktioniert weiter in einem Release-Binary.
+- **Fuzzing des Mod-Formats** (`mod.txt`), wie bei jedem anderen Parser. **Offen** (vom Eigentümer zurückgestellt).
+- **Problemmeldungen**: *Problem melden* in den Optionen und in der Anleitung öffnet das Meldeformular im Browser.
+  **Erledigt** 2026-11-16 (menu.md, „Die Anleitung“).
 
 ## Was Spieler mit Mods ergänzt haben
 

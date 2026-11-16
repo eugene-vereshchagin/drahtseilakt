@@ -7,7 +7,7 @@ What the levels look like comes from two kinds of **packs**, chosen separately, 
 - a **model pack** gives the look of the parts and the balls: the meshes drawn for a box, a fan, the wooden ball.
 
 A model pack changes only what is **drawn**. The physics always uses the shapes the game measured (the original's for
-the copy's levels, ours for our own levels: [resources.md](resources.md), "Our own parts"), so a pack never changes how
+the copy's levels, ours for the levels made for our parts: [resources.md](resources.md), "Our own parts"), so a pack never changes how
 a level plays, and every replay plays the same with any pack. This page is for pack authors and players.
 
 ## Choosing a pack

@@ -13,10 +13,10 @@ Englisch, Spanisch, Italienisch und Französisch; `GameSettings.Language` wählt
 | Bildschirm | Zeilen von oben nach unten | Hinweise |
 |---|---|---|
 | Hauptmenü (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit fragt „Do you want to quit the game?“ (Yes / No) |
-| Hauptmenü ohne Kopie (unseres) | Start, Highscore, Options, Credits, Exit | Start listet „Our levels“ (die mitgelieferten und `levels/open/`); Options zeigt eine Notiz, dass die Originallevel mit `drahtseilakt-toolbox` importiert werden (ein eigenes Programm; das Spiel hat kein Importfenster und startet die Toolbox nie) (decisions.md, „Das Spiel läuft ohne Weiteres“) |
+| Hauptmenü ohne Kopie (unseres) | Start, Highscore, Options, Credits, Exit | Start listet die mitgelieferten Sätze (den Drahtseilakt-Satz, den Community-Satz) und die Level des Spielers; Options zeigt eine Notiz, dass die Originallevel mit `drahtseilakt-toolbox` importiert werden (ein eigenes Programm; das Spiel hat kein Importfenster und startet die Toolbox nie) (decisions.md, „Das Spiel läuft ohne Weiteres“) |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | ein Level ist spielbar, sobald das vorige geschafft ist (`DB_Levelfreischaltung`); die anderen sind grau. Das Add-on mit Level 13 ersetzt Menu.nmo und fügt seine Zeile hinzu |
 | Highscore (`Menu_Highscore`) | „Highscore Level N“, zehn Namen mit Punkten, Back; links und rechts wechseln das Level | die Vorgaben der Kopie sind die Arrays `DB_Highscore_LvNN` in base.cmo („Mr. Default“) |
-| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | bei uns vor Back noch Language und Extended |
+| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | bei uns: Graphics, Controls, Sound, Replays, Language, Help, Problem melden, Extended, Back |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | Vorgaben der Kopie (`DB_Options`): keine Synchronisation, Wolken |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: je eine Taste; Invert Rotation? (Yes/No); OK | Vorgaben: Pfeile, Shift, Leertaste; `DB_Options` speichert eine Taste als ihre Zeile in `all_keys` aus `Language.nmo` (die Scancodes von DirectInput der Reihe nach) |
 | Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | Lautstärke der Musik und der Effekte (bei uns beide in jedem Modus, wie der Inhaber das Original kennt) |
@@ -57,7 +57,7 @@ Persönliche ist der Name in der Highscore-Liste.
     wenn die Option an ist. Ihre Textur sind graue Wolken auf Schwarz und ihr Material mischt nicht, also zeichnen wir
     sie zum Himmel dahinter addiert (unsere Lesart; das Material der Kopie sagt es nicht). Die Videoverfolgung zeichnet
     ohne sie;
-  - `cloud-quality low|medium|high|off` (die Einstellungsdatei; sonst `medium`): wie fein das Wolkenmeer unserer Level
+  - `cloud-quality low|medium|high|off` (die Einstellungsdatei; sonst `medium`): wie fein das Wolkenmeer der Baukasten-Level
     gezeichnet wird (levels.md, „Das Wolkenmeer"): Schritte hindurch, Schritte zur Sonne, kleine Ballen an den Rändern;
     `off` zeichnet keins, und *Clouds?* aus blendet es ebenfalls aus;
   - *Fullscreen?* (`fullscreen off|borderless|exclusive`): randlos nimmt den Modus des Desktops, exklusiv ändert ihn,
@@ -210,7 +210,14 @@ Jede wählbare Zeile jedes Bildschirms sagt auf dem Notizfeld, was sie ist, wie 
 
 ## Die Anleitung
 
-Optionen hat eine Zeile *Hilfe*, und F1 überall im Menü tut dasselbe: Es öffnet die Anleitung für Spieler, lokale HTML-Seiten in `assets/manual/<Sprache>/index.html` (Englisch, Russisch, Deutsch, Chinesisch; Französisch, Spanisch und Italienisch öffnen Englisch), mit dem Öffner des Systems (`xdg-open`, `open`, `cmd /c start`), abgekoppelt. In der Liste der eigenen Level öffnet F1 die Seite über Level. Geöffnet wird nur diese lokale Datei, nur auf Wunsch des Spielers, nie während eines Laufs und nie über das Netz; fehlt die Datei, sagt das Hilfefeld, wo gesucht wurde. `tools/make_manual.py` baut die Seiten aus den Spieler-Dokumenten (`python3 -I tools/make_manual.py`, braucht das Modul `markdown`); `assets/manual/` wird erzeugt und liegt nicht in git, ein Build, der `assets/` ausliefert, führt den Generator zuerst aus.
+Optionen hat eine Zeile *Hilfe*, und F1 überall im Menü tut dasselbe: Es öffnet die Anleitung für Spieler, lokale HTML-Seiten in `assets/manual/<Sprache>/index.html` (Englisch, Russisch, Deutsch, Chinesisch; Französisch, Spanisch und Italienisch öffnen Englisch), mit dem Öffner des Systems (`xdg-open`, `open`, `cmd /c start`), abgekoppelt. In der Liste der eigenen Level öffnet F1 die Seite über Level. Geöffnet wird nur diese lokale Datei, nur auf Wunsch des Spielers, nie während eines Laufs und nie über das Netz; fehlt die Datei, sagt das Hilfefeld, wo gesucht wurde.
+
+*Problem melden* (Optionen, unter *Hilfe*; 2026-11-16, der Eigentümer: ein Knopf, keine Adresse zum Abtippen) öffnet das
+Formular für ein neues Issue des Projekts, `https://github.com/eugene-vereshchagin/drahtseilakt/issues/new`, im Browser
+des Systems, über denselben Öffner. Die Adresse ist eine Konstante (`manual.rs`, `REPORT_URL`; ein Test hält sie als
+schlichtes https ohne ein Zeichen, das eine Shell liest), nie aus einer Eingabe gebaut; das Spiel übergibt sie dem
+Öffner und verbindet sich selbst nirgends hin. Schlägt der Öffner fehl, sagt das Hilfefeld es. Die Fehlerseite der
+Anleitung hat denselben Link, als Knopf gezeichnet. `tools/make_manual.py` baut die Seiten aus den Spieler-Dokumenten (`python3 -I tools/make_manual.py`, braucht das Modul `markdown`); `assets/manual/` wird erzeugt und liegt nicht in git, ein Build, der `assets/` ausliefert, führt den Generator zuerst aus.
 
 ## Reihenfolge der Arbeit
 

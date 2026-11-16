@@ -13,10 +13,10 @@ English, Spanish, Italian and French; `GameSettings.Language` chooses the column
 | Screen | Lines, top to bottom | Notes |
 |---|---|---|
 | Main (`Menu_Main`) | Start, Highscore, Options, Credits, Exit | Exit asks "Do you want to quit the game?" (Yes / No) |
-| Main without a copy (ours) | Start, Highscore, Options, Credits, Exit | Start lists "Our levels" (the shipped ones and `levels/open/`); Options shows a note that the original levels are imported with `drahtseilakt-toolbox` (a separate program; the game has no import window and never runs the toolbox) (decisions.md, "The game plays out of the box") |
+| Main without a copy (ours) | Start, Highscore, Options, Credits, Exit | Start lists the shipped sets (the Drahtseilakt set, the community set) and the player's levels; Options shows a note that the original levels are imported with `drahtseilakt-toolbox` (a separate program; the game has no import window and never runs the toolbox) (decisions.md, "The game plays out of the box") |
 | Start (`Menu_Start`) | Level 1 … Level 12, Back | a level is playable once the one before it is finished (`DB_Levelfreischaltung`); the others are grey. The level 13 add-on replaces Menu.nmo and adds its line |
 | Highscore (`Menu_Highscore`) | "Highscore Level N", ten names with points, Back; left and right change the level | the copy's defaults are the arrays `DB_Highscore_LvNN` in base.cmo ("Mr. Default") |
-| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | ours adds Language and Extended before Back |
+| Options (`Menu_Options`) | Graphics, Controls, Sound, Back | ours: Graphics, Controls, Sound, Replays, Language, Help, Report a problem, Extended, Back |
 | Graphics (`Menu_Opt_Graphics`) | Screen Resolution, Synch to Screen? (Yes/No), Clouds? (Yes/No), OK | the copy's defaults (`DB_Options`): no synch, clouds |
 | Controls (`Menu_Opt_Keys`) | Forward, Backward, Left, Right, Rotation, Overview: one key each; Invert Rotation? (Yes/No); OK | defaults: arrows, Shift, Space; `DB_Options` keeps a key as its row in `Language.nmo`'s `all_keys` (DirectInput's scan codes in order) |
 | Sound (`Menu_Opt_Sound`) | Music Volume, Sound Volume, OK | the music's and the effects' volume (ours shows both in every mode, as the owner knows the original) |
@@ -54,7 +54,7 @@ per-player thing is the name in the highscore list.
   - *Clouds?* shows the levels' cloud layer (`clouds on|off`), their `SkyLayer` object, which `Gameplay.nmo` shows
     when the option is on. Its texture is grey clouds on black and its material does not blend, so we draw it added
     to the sky behind it (our reading; the copy's material does not say). The video tracking draws without it;
-  - `cloud-quality low|medium|high|off` (the settings file; `medium` if not given): how finely our levels' sea of
+  - `cloud-quality low|medium|high|off` (the settings file; `medium` if not given): how finely the kit levels' sea of
     cloud is drawn (levels.md, "The sea of cloud"): steps through it, steps towards the sun, small billows on its
     edges; `off` draws none, and *Clouds?* off hides it too;
   - *Fullscreen?* (`fullscreen off|borderless|exclusive`): borderless takes the desktop's mode, exclusive changes
@@ -194,7 +194,13 @@ Every selectable line on every screen says on the notes panel what it is, how it
 
 ## The manual
 
-Options has a *Help* line, and F1 anywhere in the menu does the same: it opens the player's manual, local HTML pages in `assets/manual/<lang>/index.html` (English, Russian, German, Chinese; French, Spanish and Italian open English), with the system's opener (`xdg-open`, `open`, `cmd /c start`), detached. On the player's levels list F1 opens the levels page. Only that local file is opened, only when the player asks, never during a run, and never over the network; if the file is missing the help panel says where it looked. `tools/make_manual.py` builds the pages from the player-facing docs (`python3 -I tools/make_manual.py`, needs the `markdown` module); `assets/manual/` is generated and not in git, so a build that ships `assets/` runs the generator first.
+Options has a *Help* line, and F1 anywhere in the menu does the same: it opens the player's manual, local HTML pages in `assets/manual/<lang>/index.html` (English, Russian, German, Chinese; French, Spanish and Italian open English), with the system's opener (`xdg-open`, `open`, `cmd /c start`), detached. On the player's levels list F1 opens the levels page. Only that local file is opened, only when the player asks, never during a run, and never over the network; if the file is missing the help panel says where it looked.
+
+*Report a problem* (Options, below *Help*; 2026-11-16, the owner: a button, not an address to copy) opens the
+project's new-issue form, `https://github.com/eugene-vereshchagin/drahtseilakt/issues/new`, in the system's browser
+through the same opener. The address is a constant (`manual.rs`, `REPORT_URL`; a test keeps it plain https with no
+character a shell reads), never built from input; the game hands it to the opener and connects nowhere itself. If the
+opener fails, the help panel says so. The manual's troubleshooting page has the same link, drawn as a button. `tools/make_manual.py` builds the pages from the player-facing docs (`python3 -I tools/make_manual.py`, needs the `markdown` module); `assets/manual/` is generated and not in git, so a build that ships `assets/` runs the generator first.
 
 ## Order of work
 

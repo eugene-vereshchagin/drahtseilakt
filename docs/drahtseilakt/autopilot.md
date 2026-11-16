@@ -562,5 +562,5 @@ Following the owner's runs (`--autopilot --follow`), with going back and keeping
   before CP3, where the paper ball waits for the stones to lift it (not yet done). From the level's start, sector 2
   is not yet reliable (the crate's pushes are sensitive to where the ball comes from); sectors 4 and 5 are open.
 - Videos of the finished runs: `scripts/video.sh`, kept outside the repository.
-- Our ten levels (levels.md, "Our levels and how to edit them"), 2026-11-03: each finished from the start in three
-  styles, with the hint files their descriptions write (`assets/levels/<level>/pilot/`).
+- (Our ten levels, 2026-11-03, each finished in three styles: removed with the levels on 2026-11-16, decisions.md,
+  "No levels of our own".)

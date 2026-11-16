@@ -320,6 +320,8 @@ nicht mehr.
 
 ## Das Spiel läuft ohne Weiteres
 
+*Ergänzt 2026-11-16: keine eigenen Level, siehe „Keine eigenen Level“ unten.*
+
 *2026-11-03, Bedingung des Eigentümers für die Veröffentlichung.* Der Aufbau eines Originallevels und die Modelle
 seiner Teile (`3D Entities/PH/*.nmo`, `Balls.nmo` und der Rest) sind Werk von Cyparade und Atari; die Mechanik ist
 frei. Vor der Veröffentlichung braucht das Spiel daher eigene Teile und eigene Level, und es muss *bevor* jemand
@@ -438,3 +440,26 @@ in einen Ordner legt (eine Karte aus dem Internet), spielt daher, wie es ist –
 erscheinen dafür, nachdem es über die Toolbox importiert wurde, und das Spiel sagt das dort, wo die Ansicht gewählt
 wird, und bietet den Import an. Das Remaster ist eine Ansicht jedes Levels, kein eigener Satz von Levels. Mitgelieferte
 Sätze bleiben zwei: die Auswahl des Eigentümers in unserem offenen Format und die Community-Auswahl als ihre `.nmo`.
+
+## Keine eigenen Level
+
+*Entscheidung des Eigentümers, 2026-11-16* („unsere 10 Level müssen jetzt wirklich entfernt werden“). Die zehn eigenen
+Level, die am 2026-11-03 geplant wurden („Das Spiel läuft ohne Weiteres“; levels.md hatte damals „Unsere Level und wie
+man sie bearbeitet“), wurden am 2026-11-11 zurückgestellt, als die Community-Auswahl des Eigentümers an ihre Stelle trat,
+und werden jetzt mit allem entfernt, was nur ihnen diente: ihr Läufe-Test (`ownlevels.rs`, seine Baukasten-Prüfungen
+bleiben als `testlevels.rs`), `scripts/own-levels.sh`, der Level-stats-Vergleich eines unserer Level mit seinem Ziel
+(`--level-stats --open`, `scripts/level-stats.py --own`, `hints/level-stats-manual-own.csv`) und die Docs, die sie
+beschrieben. Was das Spiel stattdessen ausliefert: den Drahtseilakt-Satz (die Auswahl des Eigentümers im offenen
+Format), den Community-Satz (`.nmo`), das Schaufensterlevel `00_Синтетический_уровень` und das versteckte
+`Parts_Test`, beide mit dem Levelbaukasten gemacht, der dafür bleibt. Die Einträge oben, die von „unseren eigenen
+Leveln“ sprechen, bleiben, wie sie geschrieben wurden; dieser Eintrag ersetzt sie. Kriterien für die
+Veröffentlichung: [roadmap.md](roadmap.md), „Kriterien für die Veröffentlichung“.
+
+## „Problem melden“ öffnet das Meldeformular im Browser
+
+*Entscheidung des Eigentümers, 2026-11-16* („Problemmeldungen müssen ein Knopf sein, der zu den GitHub-Issues führt und
+nicht nur die URL zeigt“). Die Optionen haben *Problem melden*, und die Fehlerseite des Handbuchs einen Link in
+Knopfform: beide öffnen `https://github.com/eugene-vereshchagin/drahtseilakt/issues/new` im Browser des Systems. Das
+weitet den Eintrag oben („Das Handbuch des Spielers kommt als lokales HTML“) um genau eine entfernte Adresse aus: eine
+Konstante im Spiel, die dem Öffner des Systems nur übergeben wird, wenn der Spieler es verlangt. Das Spiel selbst hat
+weiterhin keinen Netzwerkcode und verbindet sich nirgends hin.

@@ -234,19 +234,42 @@ Done when: most maps play; the report lists the rest, each with its reason.
 
 ## Release criteria
 
-*2026-11-03, the owner's condition (decisions.md, "The game plays out of the box").* The game is released when:
+*Rewritten 2026-11-16 to the owner's current decisions* (decisions.md, "No levels of our own", "The game plays out
+of the box"; the version of 2026-11-03 asked for ten levels of our own). The game is released when all of the
+following hold. State as of 2026-11-16: **done**, **partly**, **open**.
 
+- **No levels of our own.** The game ships the community maps the owner picked, credited to their authors: the
+  Drahtseilakt set (`assets/levels/drahtseilakt/01-…13-…`, converted to the open format) and the community set
+  (`assets/levels/community/`, the maps' `.nmo`), plus our synthetic showcase level `00_Синтетический_уровень` and the
+  hidden test level `Parts_Test`. **Done** (folders since 2026-11-12, levels.md "Levels shipped with the game"; the ten
+  own levels removed 2026-11-16).
 - **Own parts**: every part a level can use (the three balls and their pieces, transformers, fans, pushers,
   drawbridges, the box, the stone-ball puzzle, swings and rope bridges, the start and the finish, checkpoints, extra
   life and points, domes) has our own model, made by a script in `assets/own/make` to the original's measured sizes
-  and physics.
-- **At least ten own levels** of graded difficulty, shipped with the game in the open format.
-- **The test player** finishes each of them in several styles (careful, fast, ...), with videos of the runs.
-- **No copy needed**: the game starts and plays with no copy of the original at all; the import stays on offer.
-
-State: the game starts with no copy and plays our own levels with our own parts: ten levels of graded difficulty
-(levels.md, "Our levels and how to edit them"), each finished by the test player in three styles (safe, speed,
-collector), its runs kept beside it and checked by a test, and the test level `assets/levels/Parts_Test`.
+  and physics. **Done**; their looks are still being improved (resources.md).
+- **No copy needed**: the game starts and plays with no copy of the original at all; importing the original levels
+  stays on offer through the toolbox. **Done.**
+- **Autopilot runs and videos** are of the original levels and of the modified sets (45° camera, invisible track),
+  the videos for YouTube (4K, each with its README). Autopilot passes of the shipped community maps are **not** a
+  release condition (owner, 2026-11-14). Runs: **done** for the 13 original levels (`hints/runs/`), the 45° set and
+  the invisible set (`hints/runs/modified/`); videos: **partly** (single levels recorded, the full series and the
+  upload open).
+- **Builds for every desktop platform**: Linux, Windows and macOS (BSD welcome), as installers and as a portable
+  folder. **Partly**: the Linux portable build exists and is kept current; the Windows and macOS builds are prepared in
+  CI (`.github/workflows/drahtseilakt.yml`) and wait for the owner's command; installers and BSD are open.
+- **The toolbox ships with the game** (`drahtseilakt-toolbox`, a separate program). **Partly**: CI can build it beside
+  the game; it is not yet in the packages.
+- **A public, clean repository**: the release is a new repository without the private one's history and data
+  (decisions.md, "The private repository is a backup"). **Open.**
+- **A licence summary**: the game's licence and every shipped asset's (fonts, maps, sounds) in one place. **Partly**:
+  LICENSE and CREDITS.md exist; the summary is open.
+- **Debug off by default**: a player's game starts without the debug run; session logs are written only in a debug
+  run; god mode and the debug switches exist only in debug builds. **Partly**: logs follow the debug switch and god
+  mode is a development mod a release package does not ship (`mods-dev/`); the debug run is still on by default until
+  this cleanup (`DEBUG_BY_DEFAULT` in main.rs), and `--debug` still works in a release binary.
+- **Fuzzing of the mod format** (`mod.txt`), like every other parser. **Open** (deferred by the owner).
+- **Problem reports**: *Report a problem* in Options and in the manual opens the issue form in the browser.
+  **Done** 2026-11-16 (menu.md, "The manual").
 
 ## What players added with mods
 

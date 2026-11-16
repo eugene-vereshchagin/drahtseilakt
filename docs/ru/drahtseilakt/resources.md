@@ -36,7 +36,7 @@
 | menu sounds | `Sounds/Menu_click, Menu_load` | звуковые темы (assets/sounds) |
 | ball hit and roll sounds | `Sounds/Hit_<ball>_<floor>, Roll_<ball>_<floor>` | звуковые темы (assets/sounds) |
 | music | `Sounds/Music_Atmo_1..3, Music_Theme_<n>_1..3, Music_Final, Music_LastFinal, Music_EndCheckpoint` | свои: в *system* восемнадцать треков и восемь атмосфер, Music/music.txt даёт каждой части пул (темам 1–3 первые девять треков, темам 4 и 5 ещё девять); в *neuro* пятнадцать синтезированных фраз, по одной на часть, свои атмосферы и музыка финиша |
-| original levels | `3D Entities/Level/Level_NN.NMO` | наши собственные уровни, `assets/levels/` (levels.md) |
+| original levels | `3D Entities/Level/Level_NN.NMO` | поставляемые наборы, `assets/levels/` (levels.md) |
 
 ## Свой интерфейс
 
