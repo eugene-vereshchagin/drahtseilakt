@@ -25,6 +25,10 @@
 //                           speed at the matching point of the run (by progress along it, kept near one tick a tick),
 //                           turned into the arrows nearest it in the view now. Lost (over 4 units off): it steers to
 //                           the run's way ahead until it is on it again (or gives the ball back to the autopilot)
+//   full STEP               the step pushed as hard as the arrows of the view as it is allow: on a 45-degree map
+//                           its pushes are otherwise the original's on average (`in_view`), here two arrows along
+//                           an axis of the world (1.41 times) and one along a diagonal; not before turn, cross,
+//                           trace or wait
 //
 // The file is untrusted (hints may be shared): its size, the number of hints and steps and every number are capped,
 // and a malformed line refuses the whole file with its line number.
@@ -330,6 +334,9 @@ pub struct Hint {
     pub sector: Option<usize>,
     pub kind: Option<BallKind>,
     pub steps: Vec<Step>,
+    /// The steps written `full` (by index; none past its end): pushed as hard as the arrows of the view as it is
+    /// allow, not at the original's push (`in_view`).
+    pub full: Vec<bool>,
     /// The line it was read from, for the reports.
     pub line: usize,
 }
@@ -399,6 +406,23 @@ fn plain_name(s: &str) -> Result<&str, String> {
     } else {
         Err(format!("\"{s}\" is not a plain file name"))
     }
+}
+
+/// A step, written `full` or not: `full` before a step that pushes in the original's view makes it push as hard as
+/// the view's arrows allow (`in_view`); a step whose arrows are the view's own already (a turn, a cross, a trace)
+/// or that gives none (a wait) takes no `full`.
+fn full_step(words: &[&str]) -> Result<(bool, Step), String> {
+    let Some((&"full", rest)) = words.split_first() else {
+        return Ok((false, step(words)?));
+    };
+    let s = step(rest)?;
+    if matches!(
+        s,
+        Step::Turn(_) | Step::Cross(..) | Step::Trace(..) | Step::Wait(_)
+    ) {
+        return Err("\"full\" is for a step that pushes in the original's view".into());
+    }
+    Ok((true, s))
 }
 
 fn step(words: &[&str]) -> Result<Step, String> {
@@ -628,12 +652,14 @@ fn hint(line: &str, number: usize) -> Result<Hint, String> {
             other => return Err(format!("unknown condition \"{other}\"")),
         }
     }
-    let steps: Vec<Step> = tail
+    let (full, steps): (Vec<bool>, Vec<Step>) = tail
         .split(';')
         .map(|s| s.split_whitespace().collect::<Vec<_>>())
         .filter(|s| !s.is_empty())
-        .map(|s| step(&s))
-        .collect::<Result<_, _>>()?;
+        .map(|s| full_step(&s))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .unzip();
     if steps.is_empty() || steps.len() > MAX_STEPS {
         return Err(format!("a hint has 1 to {MAX_STEPS} steps"));
     }
@@ -643,6 +669,7 @@ fn hint(line: &str, number: usize) -> Result<Hint, String> {
         sector,
         kind,
         steps,
+        full,
         line: number,
     })
 }
@@ -1132,9 +1159,14 @@ impl Runner {
                 self.ended = true;
                 return None;
             };
+            let full = self
+                .hints
+                .get(run.hint)
+                .and_then(|h| h.full.get(run.step))
+                .is_some_and(|f| *f);
             let step = adjust(step, run.flowed, self.zone.cap);
             if let Some(i) = drive(&step, run, sim) {
-                let i = in_view(&step, i, run, sim);
+                let i = in_view(&step, i, full, run, sim);
                 // HINTS_TRACE: the ball every ten ticks while a hint drives, to write hints by
                 if std::env::var_os("HINTS_TRACE").is_some() && sim.tick.is_multiple_of(10) {
                     let (p, v) = (sim.ball.position, sim.ball.velocity);
@@ -1670,11 +1702,32 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
 /// leans and run-ups). There the original's push is given on average: each tick the arrow set nearest it plus what
 /// the ticks before left over. The original's view is unchanged. A step whose arrows are already the view's own (a
 /// view turn, a cross tried on copies of the run, a trace) is left as it is.
-fn in_view(step: &Step, bits: u8, run: &mut Running, sim: &Sim) -> u8 {
+///
+/// A step written `full` is given as hard as the view's arrows allow instead: its direction as the view's own arrow
+/// set, with no averaging. On a 45-degree map that is two arrows (1.41 times the original's push along an axis) for
+/// a push along an axis of the world and one (as on the original) along a diagonal, where nothing gives more: a ram,
+/// a kick or a climb that needs the original's diagonal push (1.41) is written along an axis with `full`. On the
+/// original's view it changes nothing.
+fn in_view(step: &Step, bits: u8, full: bool, run: &mut Running, sim: &Sim) -> u8 {
     if matches!(step, Step::Turn(_) | Step::Cross(..) | Step::Track(_)) {
         return bits;
     }
-    straight_push(bits, Facing::of(&sim.camera), &mut run.carry)
+    let facing = Facing::of(&sim.camera);
+    if full {
+        run.carry = Vec3::ZERO;
+        return full_push(bits, facing);
+    }
+    straight_push(bits, facing, &mut run.carry)
+}
+
+/// The arrows of the view at `facing` along the push of `bits` in its straight view, as hard as they give it
+/// (`in_view`, a `full` step).
+fn full_push(bits: u8, facing: Facing) -> u8 {
+    if facing.base == 0.0 {
+        return bits;
+    }
+    let lift = bits & input::LIFT;
+    arrows(world_push(bits & !input::LIFT, facing.straight()), facing) | lift
 }
 
 /// The arrows of the view at `facing` that give the push of `bits` in its straight view (`Facing::straight`), on
@@ -2114,5 +2167,39 @@ mod tests {
             straight_push(input::UP | input::LEFT, Facing::quarter(1), &mut carry),
             input::UP | input::LEFT
         );
+    }
+
+    #[test]
+    fn a_full_step_pushes_as_hard_as_the_view_allows() {
+        let diag = Facing {
+            quarter: 0,
+            base: std::f32::consts::FRAC_PI_4,
+        };
+        // along an axis of the world: two arrows, 1.41 times the original's push; along a diagonal: one, as there
+        for (bits, hard) in [
+            (input::UP, std::f32::consts::SQRT_2),
+            (input::LEFT, std::f32::consts::SQRT_2),
+            (input::UP | input::RIGHT, 1.0),
+            (input::DOWN | input::LEFT | input::LIFT, 1.0),
+        ] {
+            let want = world_push(bits, diag.straight());
+            let got = full_push(bits, diag);
+            let push = world_push(got, diag);
+            assert!((push.length() - hard).abs() < 1e-3, "{bits} {push}");
+            assert!(push.normalize().dot(want.normalize()) > 0.999);
+            assert_eq!(got & input::LIFT, bits & input::LIFT);
+        }
+        // the original's view gives the arrows as they are
+        assert_eq!(full_push(input::UP, Facing::quarter(2)), input::UP);
+        // written before a step that pushes; refused before one whose arrows are the view's own or none
+        let h = parse(
+            "at 0 0 0 r 1 : full press 1 0 5 0 0 10 60 ; push 1 0 5 ; full round 0 0 4 20 100",
+        )
+        .unwrap();
+        assert_eq!(h[0].full, vec![true, false, true]);
+        assert_eq!(h[0].steps[1], Step::Push(Vec3::X, 5));
+        assert!(parse("at 0 0 0 r 1 : full wait 5").is_err());
+        assert!(parse("at 0 0 0 r 1 : full turn 1").is_err());
+        assert!(parse("at 0 0 0 r 1 : full").is_err());
     }
 }

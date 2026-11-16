@@ -185,6 +185,7 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `ride X Y Z QX QY QZ D T` | keep the ball over the loose body or module part nearest X Y Z until it is within D of QX QY QZ (T ticks at most) |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 | `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
+| `full STEP` | the step (one that pushes: not `turn`, `cross`, `trace` or `wait`) pushed as hard as the arrows of the view as it is allow, instead of the original's push on average: on a 45-degree map two arrows along an axis of the world (1.41 times), one along a diagonal (see "Modified originals"); on the original levels the same as without |
 | `trace FILE FROM TO [GAIN]` | the same stretch of a recorded run followed closed-loop: the replay is run once as the hints load, for the ball's place and speed at each tick; then each tick the player's arrows are the feed-forward plus a pull (times GAIN, 1 by default, 0 for none) toward the recorded place and speed at the matching point (matched by progress along the run, kept near one tick a tick so the run's waits stay waits), turned into the arrow set nearest it in the view now (the part missed carried to the next tick). Over 4 units off the run, it steers to the run's way 30 ticks ahead until it is on it again, and after 10 s lost gives the ball back to the autopilot. Unlike `replay`, it holds when the ball arrives a little different (a chain of sectors: `sync` first, then `trace`) |
 
 Directions are world directions (X east, Z north as the level is built), so a hint does not depend on where the
@@ -295,7 +296,11 @@ run-ups and rams, a `replay` stretch) were tuned in the original's view, so on s
 push on average instead: each tick the arrow set nearest it plus what the ticks before left over (a diagonal push of
 the original, 1.41, is more than one arrow along that diagonal gives: one arrow there). A `cross` (tried on copies
 of the run in the view as it is) and a `trace` (its own carry) are left as they are; on the original levels nothing
-changes. A player's replay recorded on the original level (followed with
+changes. Where the original's push is too little in such a view, a step is written `full` (the one rule for it, opt-in,
+so the runs tuned without it stay as they were): it is given as the view's own arrows, as hard as they push, two
+arrows along an axis of the world (1.41 times the original's axis push, as much as its diagonal one) and one along a
+diagonal (no set gives more there). A ram, a kick or a climb the original made along a diagonal (1.41) is written
+along an axis with `full` to have that push. A player's replay recorded on the original level (followed with
 `--follow` and `--then`, or a hint's `replay` or `trace` stretch) is seen on the original level, the copy's own file,
 when the map holds its geometry (the same objects at the same places, in any order); only the ball's way and its
 pushes in the world are taken over, and the player's keys are turned into the arrows of the map's view. A remake

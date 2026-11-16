@@ -1848,6 +1848,7 @@ impl Pilot {
                     crate::hints::Step::Become(k),
                     crate::hints::Step::Goto(sim.ball.position, 900),
                 ],
+                full: Vec::new(),
                 line: 0,
             });
         } else {
@@ -1931,6 +1932,7 @@ impl Pilot {
                 crate::hints::Step::Goto(t.pos, 600),
                 crate::hints::Step::Inputs(t.quarter, keys),
             ],
+            full: Vec::new(),
             line: 0,
         };
         // tried on a copy: it must keep the ball and end further along the way
@@ -2016,6 +2018,7 @@ impl Pilot {
                 sector: Some(sim.sector + 1),
                 kind: Some(sim.ball.kind),
                 steps,
+                full: Vec::new(),
                 line: 0,
             };
             // tried on a copy first: some bridges are lowered by a lever, not knocked over, and a charge at them
@@ -2085,6 +2088,7 @@ impl Pilot {
                     crate::hints::Step::Goto(from + lift, 400),
                     crate::hints::Step::Air(dir, 300),
                 ],
+                full: Vec::new(),
                 line: 0,
             };
             let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
@@ -2129,6 +2133,7 @@ impl Pilot {
                 crate::hints::Step::Via(t, 900),
                 crate::hints::Step::Become(k),
             ],
+            full: Vec::new(),
             line: 0,
         })
     }
@@ -2162,6 +2167,7 @@ impl Pilot {
                 crate::hints::Step::Push(-dir, SILL_BACK),
                 crate::hints::Step::Via(past + Vec3::Y * crate::sim::BALL_RADIUS, 240),
             ],
+            full: Vec::new(),
             line: 0,
         })
     }

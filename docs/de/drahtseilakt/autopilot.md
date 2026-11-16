@@ -201,6 +201,7 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `ride X Y Z QX QY QZ D T` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte) |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 | `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
+| `full STEP` | der Schritt (einer, der schiebt: nicht `turn`, `cross`, `trace` oder `wait`) schiebt so stark, wie die Pfeile der Ansicht, wie sie ist, erlauben, statt im Mittel mit dem Schub des Originals: auf einer 45-Grad-Karte zwei Pfeile entlang einer Weltachse (1,41-mal), einer diagonal (siehe „Modifizierte Originale“); auf den Originallevels dasselbe wie ohne |
 | `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
 Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebaut ist), ein Hinweis hängt also nicht
@@ -319,6 +320,11 @@ Ansicht des Originals abgestimmt, darum geben sie auf einer solchen Karte im Mit
 Tick die nächstliegenden Pfeile, plus was die Ticks davor übrig ließen (ein diagonaler Schub des Originals, 1,41, ist
 mehr, als ein Pfeil entlang dieser Diagonale gibt: dort ein Pfeil). `cross` (auf Kopien des Laufs in der Ansicht, wie
 sie ist, erprobt) und `trace` (mit eigenem Übertrag) bleiben, wie sie sind; auf den Originallevels ändert sich nichts.
+Wo der Schub des Originals in einer solchen Ansicht zu wenig ist, wird ein Schritt `full` geschrieben (die eine Regel dafür,
+auf Wunsch, so dass ohne sie abgestimmte Läufe bleiben, wie sie waren): er wird mit den eigenen Pfeilen der Ansicht
+gegeben, so stark, wie sie schieben, zwei Pfeile entlang einer Weltachse (1,41-mal der Achsschub des Originals, so viel
+wie sein diagonaler) und einer diagonal (dort gibt kein Satz mehr). Ein Rammstoß, ein Kick oder ein Aufstieg, den das
+Original diagonal machte (1,41), wird entlang einer Achse mit `full` geschrieben, um diesen Schub zu haben.
 Ein Replay eines Spielers
 auf dem Originallevel (mit `--follow` und `--then` gefolgt oder als Abschnitt `replay` oder `trace` eines Hinweises)
 wird auf dem Originallevel angesehen, der Datei der Kopie selbst, wenn die Karte dessen Geometrie hat (dieselben
