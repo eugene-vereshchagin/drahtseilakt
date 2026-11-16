@@ -31,11 +31,14 @@ mkfifo "$work/frames"
 ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 -s "$draw" -r 60 -i "$work/frames" \
     -vf "scale=$size:flags=lanczos" -c:v libx264 -preset medium -crf "$crf" -pix_fmt yuv420p "$work/picture.mp4" &
 encoder=$!
-if [ -d "$level" ]; then which=--open; else which=--level; fi
+# a folder is an open-format level, a .nmo file a map (a community map or a modified original), else an original level
+case "$level" in *.nmo|*.NMO) which=--map ;; *) if [ -d "$level" ]; then which=--open; else which=--level; fi ;; esac
+# VIDEO_TEXTURES picks the texture pack (own, original, remastered or a pack's key), whatever the settings file says
+textures=${VIDEO_TEXTURES:-}
 DRAHTSEILAKT_SOUND_FILE="$work/sound.wav" "$game" "$which" "$level" --replay "$replay" --size "$draw" \
-    ${models:+--models "$models"} --video "$work/frames"
+    ${models:+--models "$models"} ${textures:+--textures "$textures"} --video "$work/frames"
 wait "$encoder"
 ffmpeg -loglevel error -y -i "$work/picture.mp4" -i "$work/sound.wav" -c:v copy -c:a aac -b:a 192k -shortest "$out"
 
-VIDEO_MODELS=$models sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
+VIDEO_MODELS=$models VIDEO_TEXTURES=$textures sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
 echo "$out"

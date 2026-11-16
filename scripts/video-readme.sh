@@ -32,6 +32,10 @@ if [ "$is_remaster" = yes ]; then
     n=$(basename "$level" | sed 's/^Level_0*//')
     level_line="Ballance level $n (Cyparade / Atari, 2004), remastered by drahtseilakt-toolbox from the player's own copy"
     textures="the toolbox's remaster of Ballance's original textures (Real-ESRGAN, up to 4096 px, relief maps), made from the player's own copy"
+elif [ -f "$level" ]; then
+    set_name=$(basename "$(dirname "$(dirname "$level")")"); n=$(basename "$level" | sed 's/[^0-9]//g; s/^0*//')
+    level_line="Ballance level $n, $set_name (a community remake of the original level), from the player's own files"
+    textures="Drahtseilakt's own (CC0 photo textures and generated ones, see assets/own/CREDITS.md)"
 elif [ -d "$level" ]; then
     title=$(sed -n 's/^title *= *//p' "$level/level.txt" 2>/dev/null | head -n 1)
     level_line="${title:-$(basename "$level")} - a Drahtseilakt level (our own, freely licensed)"
@@ -42,6 +46,10 @@ else
     if [ "$t" = original ]; then textures="Ballance's original textures, from the player's own copy"
     else textures="Drahtseilakt's own (CC0 photo textures and generated ones, see assets/own/CREDITS.md)"; fi
 fi
+case ${VIDEO_TEXTURES:-} in
+    original) textures="Ballance's original textures, from the player's own copy" ;;
+    remastered) textures="the toolbox's remaster of Ballance's original textures, made from the player's own copy" ;;
+esac
 theme=neuro; [ "$extended" = yes ] && theme=$(setting sound-theme); theme=${theme:-neuro}
 case $theme in
     original) sounds="Ballance's original sounds and music, from the player's own copy" ;;
