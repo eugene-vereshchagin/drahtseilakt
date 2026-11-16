@@ -185,6 +185,7 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `ride X Y Z QX QY QZ D T` | keep the ball over the loose body or module part nearest X Y Z until it is within D of QX QY QZ (T ticks at most) |
 | `replay FILE FROM TO` | a player's inputs of ticks FROM..TO of the replay FILE (beside the hint file), turned to the test player's view; begun with the ball held in a transformer, it starts as the ball is let go (FROM: the player's transform tick + 149), in step with the player |
 | `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
+| `full STEP` | the step (one that pushes: not `turn`, `cross`, `trace` or `wait`) pushed as hard as the arrows of the view as it is allow, instead of the original's push on average: on a 45-degree map two arrows along an axis of the world (1.41 times), one along a diagonal (see "Modified originals"); on the original levels the same as without |
 | `trace FILE FROM TO [GAIN]` | the same stretch of a recorded run followed closed-loop: the replay is run once as the hints load, for the ball's place and speed at each tick; then each tick the player's arrows are the feed-forward plus a pull (times GAIN, 1 by default, 0 for none) toward the recorded place and speed at the matching point (matched by progress along the run, kept near one tick a tick so the run's waits stay waits), turned into the arrow set nearest it in the view now (the part missed carried to the next tick). Over 4 units off the run, it steers to the run's way 30 ticks ahead until it is on it again, and after 10 s lost gives the ball back to the autopilot. Unlike `replay`, it holds when the ball arrives a little different (a chain of sectors: `sync` first, then `trace`) |
 
 Directions are world directions (X east, Z north as the level is built), so a hint does not depend on where the
@@ -295,7 +296,11 @@ run-ups and rams, a `replay` stretch) were tuned in the original's view, so on s
 push on average instead: each tick the arrow set nearest it plus what the ticks before left over (a diagonal push of
 the original, 1.41, is more than one arrow along that diagonal gives: one arrow there). A `cross` (tried on copies
 of the run in the view as it is) and a `trace` (its own carry) are left as they are; on the original levels nothing
-changes. A player's replay recorded on the original level (followed with
+changes. Where the original's push is too little in such a view, a step is written `full` (the one rule for it, opt-in,
+so the runs tuned without it stay as they were): it is given as the view's own arrows, as hard as they push, two
+arrows along an axis of the world (1.41 times the original's axis push, as much as its diagonal one) and one along a
+diagonal (no set gives more there). A ram, a kick or a climb the original made along a diagonal (1.41) is written
+along an axis with `full` to have that push. A player's replay recorded on the original level (followed with
 `--follow` and `--then`, or a hint's `replay` or `trace` stretch) is seen on the original level, the copy's own file,
 when the map holds its geometry (the same objects at the same places, in any order); only the ball's way and its
 pushes in the world are taken over, and the player's keys are turned into the arrows of the map's view. A remake
@@ -322,28 +327,26 @@ before it rolls back between them). Level 13
 another way in this view: the plank at z 686 that his ball knocks over in passing rammed down, the ball stopping 2
 units short at the serpentine's crossing z 721 so the crate stays under it and stone 18 rolls over untouched, the
 crate pressed under the crossings z 713 and 705 closed-loop with each crossing awaited, and on the beam a press
-east after his launch keys so the paper ball is in the second fan's slot before the stone) passes sectors 1 and 2
+east after his launch keys so the paper ball is in the second fan's slot before the stone) was found to pass sectors 1 and 2
 from the start when run with the level's plan: `--autopilot --plan hints/Level_13.plan --hints hints/Level_13-45.txt`.
 Without `--plan` the way found is another (2255 points instead of 2530) and the ball stands at the end of sector 1;
 everything the run reads is in `hints/` (no route, replay or learned table comes from the data folder), and it
-plays tick for tick the same from an empty data folder as from one full of earlier runs. In sector 3 (2026-11-16)
-the crates of the channel are taken apart the same way: the first rammed west with the owner's run followed at gain 3
-(his ram is a diagonal push, weaker in this view), the second and third rammed from a run-up (`goto`, `hold`,
-`press` at up to 10; the second's press cut short at 110 ticks), the third on a line a little north of its middle,
-so that it goes south-west into its pocket as in his run; the ride down the channel is split in two `pass` steps
-(one was longer than the 20 s a run may stand without a step on); the four swinging sacks (z -822 to -852) are taken
-in the owner's one pass, his run followed (`trace`) from the stone transformer to the paper one (10 s, as his, where
-waiting for each sack's swing took 35 s), and the paper ball is let off that transformer slowly (faster, it ran off
-the floor's south edge at z -871). Not through yet: all ten stone balls rolling down the channel (on the same
-schedule in every run) must reach the queue before CP3 (-648, -288, -1125), to make the floor the ball rolls over.
-In the owner's run the ball is in the channel at 0:55.5, just ahead of the lead stone, and waits at the channel's
-end, where each stone running into it is turned east into the queue. Here the ball comes into the channel at 0:59.8,
-1.5 s behind the lead stone, and rolls on in the stones' convoy at their pace: the three stones ahead of it and one
-more fall at the sacks, three run off the channel's end before the ball is there (2:18.5, his 1:36.7), and three make
-the queue. Sectors 4 and 5 fail in this view when begun at their checkpoints: in sector 4 the owner's diagonal kick off
-the raft into the first fan (x -134) cannot be given here (an arrow along the view's axis is the most along a world
-diagonal), so the ball falls behind the raft and is shut in at x 51; in sector 5 the `round` up the helix (340,
--614.5) is too weak (the original's push on average) and the ball falls off. Level 13 is not finished yet.
+plays tick for tick the same from an empty data folder as from one full of earlier runs. Checked again on
+2026-11-16 from an empty data folder, it does not get through sector 2 from the start (with the binary and hints of
+that merge too): at its end the paper ball rolls behind stone 18 down the rails instead of on it (the owner's ball is
+on its front) and falls into the gap at z 585 that the owner jumps at 9 to 12; a faster `full` push off, before the
+stone or after it has fallen, did not jump it. Sectors 3, 4 and 5 are through when begun at their checkpoints, with
+`full` steps (above) where the owner's push was diagonal: in sector 3 the crates rammed `full` along the axes (crate
+40 east straight from his run, no run-up), the paper transformer and the way round to the channel's mouth `full`, so
+the ball is in the channel ahead of the lead stone (0:58.2, his 0:58.0); his run followed from z -753 to the stone
+transformer (1:14.45, his 1:14.32), so the four swinging sacks are where his were and no stone falls there; at the
+channel's end his run followed, then the ball held still while the last stone comes: all ten stones in the queue,
+CP3 at 2:44.93 (his 2:44.92). In sector 4 his north-east kick off the raft into the first fan (x -134) is given as
+its two parts, `full` north then `full` east (22 ticks each, then his run on): CP4 at 2:04.48 (his 2:04.18). In
+sector 5 the push onto the helix and the `round` up it are `full`: the level finished from its checkpoint in 1:54.17
+with no ball lost. Run on from sector 3 in one go, sector 4 does not hold yet: the kick takes the
+ball through the first fan, but it lands lower than his after it and is lost at x 50 (the modules' phases differ from
+a start at CP4). Level 13 is not finished from the start yet (sector 2's gap).
 
 ## The speedrun style
 

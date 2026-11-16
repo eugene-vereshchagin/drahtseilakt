@@ -201,6 +201,7 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `ride X Y Z QX QY QZ D T` | die Kugel über dem Körper oder Modulteil nächst X Y Z halten, bis es innerhalb D von QX QY QZ ist (höchstens T Takte) |
 | `replay FILE FROM TO` | die Eingaben eines Spielers in den Takten FROM..TO des Replays FILE (neben der Hinweisdatei), zur Ansicht des Testspielers gedreht; beginnt er, während ein Transformator die Kugel hält, startet er, wenn die Kugel losgelassen wird (FROM: der Verwandlungstakt des Spielers + 149), im Takt mit dem Spieler |
 | `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
+| `full STEP` | der Schritt (einer, der schiebt: nicht `turn`, `cross`, `trace` oder `wait`) schiebt so stark, wie die Pfeile der Ansicht, wie sie ist, erlauben, statt im Mittel mit dem Schub des Originals: auf einer 45-Grad-Karte zwei Pfeile entlang einer Weltachse (1,41-mal), einer diagonal (siehe „Modifizierte Originale“); auf den Originallevels dasselbe wie ohne |
 | `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
 Richtungen sind Weltrichtungen (X nach Osten, Z nach Norden, wie das Level gebaut ist), ein Hinweis hängt also nicht
@@ -319,6 +320,11 @@ Ansicht des Originals abgestimmt, darum geben sie auf einer solchen Karte im Mit
 Tick die nächstliegenden Pfeile, plus was die Ticks davor übrig ließen (ein diagonaler Schub des Originals, 1,41, ist
 mehr, als ein Pfeil entlang dieser Diagonale gibt: dort ein Pfeil). `cross` (auf Kopien des Laufs in der Ansicht, wie
 sie ist, erprobt) und `trace` (mit eigenem Übertrag) bleiben, wie sie sind; auf den Originallevels ändert sich nichts.
+Wo der Schub des Originals in einer solchen Ansicht zu wenig ist, wird ein Schritt `full` geschrieben (die eine Regel dafür,
+auf Wunsch, so dass ohne sie abgestimmte Läufe bleiben, wie sie waren): er wird mit den eigenen Pfeilen der Ansicht
+gegeben, so stark, wie sie schieben, zwei Pfeile entlang einer Weltachse (1,41-mal der Achsschub des Originals, so viel
+wie sein diagonaler) und einer diagonal (dort gibt kein Satz mehr). Ein Rammstoß, ein Kick oder ein Aufstieg, den das
+Original diagonal machte (1,41), wird entlang einer Achse mit `full` geschrieben, um diesen Schub zu haben.
 Ein Replay eines Spielers
 auf dem Originallevel (mit `--follow` und `--then` gefolgt oder als Abschnitt `replay` oder `trace` eines Hinweises)
 wird auf dem Originallevel angesehen, der Datei der Kopie selbst, wenn die Karte dessen Geometrie hat (dieselben
@@ -349,30 +355,27 @@ zerlegt, wo der Lauf des Besitzers in dieser Ansicht anders geht: das Brett bei 
 umwirft, wird umgerammt; die Kugel hält an der Kreuzung der Serpentine bei z 721 2 Einheiten früher, so bleibt die
 Kiste darunter und Stein 18 rollt unberührt darüber; die Kiste wird geregelt unter die Kreuzungen z 713 und 705
 geschoben, jede Kreuzung abgewartet; auf dem Balken nach seinen Starttasten ein Schub nach Osten, damit die
-Papierkugel vor dem Stein im Fach des zweiten Ventilators ist) schafft die Sektoren 1 und 2 vom Start,
+Papierkugel vor dem Stein im Fach des zweiten Ventilators ist) schaffte damals die Sektoren 1 und 2 vom Start,
 wenn er mit dem Plan des Levels läuft: `--autopilot --plan hints/Level_13.plan --hints hints/Level_13-45.txt`. Ohne
 `--plan` ist der gefundene Weg ein anderer (2255 Punkte statt 2530), und die Kugel bleibt am Ende von Sektor 1 stehen;
 alles, was der Lauf liest, liegt in `hints/` (weder Weg noch Wiederholungen noch die gelernte Tabelle kommen aus dem
-Datenordner), und mit leerem Datenordner läuft er Tick für Tick gleich wie mit einem voller früherer Läufe. In Sektor 3
-(2026-11-16) sind die Kisten des Kanals ebenso zerlegt: die erste nach Westen gerammt, dem Lauf des Besitzers mit
-Verstärkung 3 folgend (sein Rammstoß ist diagonal, in dieser Ansicht schwächer), die zweite und dritte aus einem
-Anlauf gerammt (`goto`, `hold`, `press` bis 10; der Stoß der zweiten auf 110 Ticks gekürzt), die dritte auf einer
-Linie etwas nördlich ihrer Mitte, sodass sie wie in seinem Lauf nach Südwesten in ihre Tasche geht; die Fahrt den
-Kanal hinab ist in zwei `pass`-Schritte geteilt (einer war länger als die 20 s, die ein Lauf ohne nächsten Schritt
-stehen darf); die vier schwingenden Säcke (z -822 bis -852) werden in seinem einen Durchgang genommen, sein Lauf vom
-Stein- bis zum Papiertransformator gefolgt (`trace`; 10 s wie bei ihm, wo das Abwarten jedes Sacks 35 s dauerte), und
-die Papierkugel verlässt diesen Transformator langsam (schneller rollte sie bei z -871 über die Südkante des Bodens).
-Noch nicht geschafft: alle zehn Steinkugeln, die den Kanal hinabrollen (in jedem Lauf nach demselben Zeitplan), müssen
-die Schlange vor CP3 (-648, -288, -1125) erreichen, um den Boden zu bilden, über den die Kugel rollt. Im Lauf des
-Besitzers ist die Kugel um 0:55.5 im Kanal, knapp vor dem ersten Stein, und wartet am Ende des Kanals, wo jeder Stein,
-der auf sie trifft, nach Osten in die Schlange gelenkt wird. Hier kommt die Kugel um 0:59.8 in den Kanal, 1.5 s hinter
-dem ersten Stein, und rollt im Zug der Steine in deren Tempo weiter: die drei Steine vor ihr und einer mehr fallen an
-den Säcken, drei rollen vom Ende des Kanals, bevor die Kugel dort ist (2:18.5, bei ihm 1:36.7), und drei kommen in die
-Schlange. Die Sektoren 4 und 5 scheitern in dieser Ansicht, von ihren Kontrollpunkten
-begonnen: in Sektor 4 ist der diagonale Stoß des Besitzers vom Floß in den ersten Ventilator (x -134) hier nicht zu
-geben (entlang einer Diagonale der Welt höchstens ein Pfeil), die Kugel fällt hinter das Floß und sitzt bei x 51 fest;
-in Sektor 5 ist `round` die Spirale (340, -614.5) hinauf zu schwach (der Schub des Originals im Mittel), die Kugel
-fällt ab. Level 13 noch nicht geschafft.
+Datenordner), und mit leerem Datenordner läuft er Tick für Tick gleich wie mit einem voller früherer Läufe. Am 2026-11-16 mit leerem Datenordner erneut geprüft,
+kommt er vom Start nicht durch Sektor 2 (auch mit Programm und Hinweisen jenes Merges): an dessen Ende rollt die
+Papierkugel hinter Stein 18 die Schienen hinab statt auf ihm (die Kugel des Besitzers liegt vorn auf ihm) und fällt in
+die Lücke bei z 585, die der Besitzer mit 9 bis 12 überspringt; ein schnellerer `full`-Schub, vor dem Stein oder nach
+seinem Fall, sprang nicht hinüber. Die Sektoren 3, 4 und 5 gelingen, von ihren Kontrollpunkten begonnen, mit
+`full`-Schritten (oben), wo der Schub des Besitzers diagonal war: in Sektor 3 die Kisten `full` entlang der Achsen
+gerammt (Kiste 40 nach Osten direkt aus seinem Lauf, ohne Anlauf), der Papiertransformator und der Weg herum zur
+Mündung des Kanals `full`, sodass die Kugel vor dem ersten Stein im Kanal ist (0:58.2, bei ihm 0:58.0); sein Lauf von
+z -753 bis zum Steintransformator gefolgt (1:14.45, bei ihm 1:14.32), sodass die vier schwingenden Säcke stehen wie
+bei ihm und dort kein Stein fällt; am Ende des Kanals sein Lauf, dann hält die Kugel still, während der letzte Stein
+kommt: alle zehn Steine in der Schlange, CP3 um 2:44.93 (bei ihm 2:44.92). In Sektor 4 ist sein Kick nach Nordosten
+vom Floß in den ersten Ventilator (x -134) in seinen zwei Teilen gegeben, `full` nach Norden, dann `full` nach Osten
+(je 22 Ticks, danach sein Lauf): CP4 um 2:04.48 (bei ihm 2:04.18). In Sektor 5 sind der Schub auf die Spirale und
+`round` hinauf `full`: das Level vom Kontrollpunkt in 1:54.17 ohne verlorene Kugel geschafft. Von Sektor 3 an in einem Zug hält Sektor 4 noch
+nicht: der Kick bringt die Kugel durch den ersten Ventilator, danach landet sie aber tiefer als seine und geht bei x 50
+verloren (die Phasen der Module sind andere als bei einem Start an CP4). Vom Start ist Level 13 noch nicht geschafft
+(die Lücke in Sektor 2).
 
 ## Der Speedrun-Stil
 
