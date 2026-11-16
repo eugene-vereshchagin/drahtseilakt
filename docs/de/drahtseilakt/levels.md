@@ -103,6 +103,18 @@ Bahn jeder Sicherungsart, für die Tests; durch `hidden = yes` in seiner level.t
 und weiter mit `--open` geöffnet). Ihre Textquellen liegen im Repository, die gebauten Dateien nicht. Ihre Lizenz ist
 die des Spiels (GPL-3.0-only).
 
+**Kein Bild des Originalspiels in einem mitgelieferten Level** (Entscheidung des Eigentümers, 2026-11-16). Manche
+Karten tragen Kopien der Texturen des Originals in sich. `crates/gamedata/tests/shipped_originals.rs` vergleicht jedes
+Bild der mitgelieferten Level (Dateien des offenen Formats und die in `.nmo`-Karten gespeicherten Bilder) mit jedem
+Bild der Kopie des Spielers (`OPENBALLANCE_DATA`, weitere Kopien in `DRAHTSEILAKT_ORIGINAL_COPIES`), Pixel für Pixel
+und über einen Wahrnehmungs-Hash, der Skalierung, Drehung, kleine Farbänderungen und einen nur im Alpha gezeichneten
+Verlauf durchschaut, und schlägt bei einem Treffer fehl. Das Werkzeug `own-pictures` (crates/gamedata) setzt an die
+Stelle jedes Treffers unser eigenes Bild gleichen Namens, gedreht und in der Größe wie in der Karte: in einer
+`.nmo`-Karte werden nur diese Pixel neu geschrieben (`nmo::patch`), in einem Level des offenen Formats seine Datei in
+`textures.original/`, danach macht `remaster-open` der Toolbox das vergrößerte Bild neu. Die `level.txt` einer solchen
+Karte trägt `note = proprietary textures removed` (und `note.<code>` in jeder Sprache der Oberfläche, deutsch
+„proprietäre Texturen entfernt“).
+
 ### Das Schau-Level
 
 `00_Синтетический_уровень` („Synthetischer Level", das erste der mitgelieferten: `order = 0`, `difficulty = 1`)

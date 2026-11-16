@@ -56,6 +56,14 @@ Pro Racing 赛季不属于这一类：它们是新的几何，归入 `community/
 
 随游戏附带两套关卡，都是所有者挑选的社区地图（decisions.md，“我们自己没有关卡”）：**Drahtseilakt 集**（`assets/levels/drahtseilakt/01-…13-…`，已转换为开放格式）和**社区集**（`assets/levels/community/`，地图自己的 `.nmo` 文件），每个都在其 `level.txt` 和 CREDITS.md 中署明来源。此外 `assets/levels/drahtseilakt/` 中还有我们的两个关卡，只用我们自己的部件制作（assets/own，[resources.md](resources.md)），由 `assets/own/make/` 中的脚本生成（`levelkit.py` 用轨道块和部件的替身搭建关卡）：展示关卡 `00_Синтетический_уровень`（见下）和 `Parts_Test`（`make_test_level.py`：几百个单位长的轨道，每个部件都在轨道上或旁边，另有每种防护各一段轨道，供测试使用；它的 level.txt 中的 `hidden = yes` 使它不出现在玩家的列表中，仍可用 `--open` 打开）。它们的文本源文件已提交，生成的文件不在仓库中。它们的许可证与游戏相同（GPL-3.0-only）。
 
+**随游戏附带的关卡中没有原版游戏的任何图片**（所有者的决定，2026-11-16）。有些地图在内部带有原版纹理的副本。
+`crates/gamedata/tests/shipped_originals.rs` 把随附关卡的每张图片（开放格式的文件和 `.nmo` 地图中保存的图片）与玩家
+拷贝中的每张图片（`OPENBALLANCE_DATA`，更多拷贝放在 `DRAHTSEILAKT_ORIGINAL_COPIES`）逐像素比较，并用感知哈希比较
+（能识别缩放、旋转、轻微的颜色变化以及只画在 alpha 中的渐隐），一旦相同就失败。工具 `own-pictures`（crates/gamedata）
+用我们自己的同名图片替换每个匹配，按地图中的方向和尺寸处理：在 `.nmo` 地图中只改写这些像素（`nmo::patch`），在开放格式
+关卡中改写它在 `textures.original/` 中的文件，然后由工具箱的 `remaster-open` 重新生成放大的图片。这样的地图的
+`level.txt` 带有 `note = proprietary textures removed`（以及界面每种语言的 `note.<code>`，中文为“已移除专有纹理”）。
+
 ### 展示关卡
 
 `00_Синтетический_уровень`（“合成关卡”，在随游戏附带的列表中排第一：`order = 0`、`difficulty = 1`）把游戏的每一种元素

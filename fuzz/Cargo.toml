@@ -40,6 +40,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "nmo_patch"
+path = "fuzz_targets/nmo_patch.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "nmo_chunk"
 path = "fuzz_targets/nmo_chunk.rs"
 test = false

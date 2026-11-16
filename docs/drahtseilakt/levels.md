@@ -113,6 +113,16 @@ each safety, for the tests; hidden from the players' list by `hidden = yes` in i
 `--open`). Their text sources are committed, the built files are not. Their licence is the
 game's (GPL-3.0-only).
 
+**No picture of the original game in a shipped level** (owner's decision, 2026-11-16). Some maps carry copies of
+the original's textures inside them. `crates/gamedata/tests/shipped_originals.rs` compares every picture of the
+shipped levels (open-format files and the pictures saved in `.nmo` maps) with every picture of the player's copy
+(`OPENBALLANCE_DATA`, more copies in `DRAHTSEILAKT_ORIGINAL_COPIES`), pixel for pixel and by a perceptual hash that
+sees through rescaling, turning, small colour changes and a fade drawn only in the alpha, and fails on a match. The
+tool `own-pictures` (crates/gamedata) puts our own picture of the same name in place of each match, turned and
+sized as the map's: in a `.nmo` map only those pixels are rewritten (`nmo::patch`), in an open-format level its
+`textures.original/` file, after which the toolbox's `remaster-open` makes the enlarged one again. Such a map's
+`level.txt` carries `note = proprietary textures removed` (and `note.<code>` in each language of the interface).
+
 ### The showcase level
 
 `00_Синтетический_уровень` ("Synthetic level", first in the shipped list: `order = 0`, `difficulty = 1`) holds every

@@ -1,5 +1,8 @@
 # Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
 # if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+# Proprietary textures removed (2026-11-16): the pictures of the original Ballance the map carried (Rail_Environment, Modul16, Wood_Raft)
+# are replaced by our own (assets/own, made by assets/own/make), so nothing of the original game is shipped;
+# THIRD-PARTY.md, "Levels". Everything else is the author's.
 title = Moli Thinking
 title.zh = 茉莉思考
 author = ZYL
@@ -12,3 +15,10 @@ catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomM
 video = https://www.youtube.com/watch?v=PHLZ7g5aGFs (桜埜叶毣)
 video = https://www.youtube.com/watch?v=qsTTOyHRzM0 (LacuS: Custom Level 89)
 sky = Sunset
+note = proprietary textures removed
+note.ru = выкинуты проприетарные текстуры
+note.de = proprietäre Texturen entfernt
+note.zh = 已移除专有纹理
+note.fr = textures propriétaires retirées
+note.es = texturas propietarias eliminadas
+note.it = texture proprietarie rimosse

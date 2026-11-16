@@ -1,5 +1,8 @@
 # Community map, shipped with Drahtseilakt with thanks to its author. The map belongs to its author;
 # if the author objects, the level will be removed. Catalogue: https://github.com/pseudoacetyl/BallanceCustomMaps
+# Proprietary textures removed (2026-11-16): the pictures of the original Ballance the map carried (Floor_Top_Profil, Modul18, Floor_Top_Flat, Modul18_Gitter)
+# are replaced by our own (assets/own, made by assets/own/make), so nothing of the original game is shipped;
+# THIRD-PARTY.md, "Levels". Everything else is the author's.
 title = Scary Maze v1.2
 title.zh = 恐怖迷宫V1.2
 author = Sterd
@@ -13,3 +16,10 @@ catalogue = https://github.com/pseudoacetyl/BallanceCustomMaps/blob/main/CustomM
 video = https://www.youtube.com/watch?v=gJif4Ky08VI (桜埜叶毣)
 video = https://www.youtube.com/watch?v=VDM9vq7OqhM (LacuS: Custom Level 47)
 sky = Night
+note = proprietary textures removed
+note.ru = выкинуты проприетарные текстуры
+note.de = proprietäre Texturen entfernt
+note.zh = 已移除专有纹理
+note.fr = textures propriétaires retirées
+note.es = texturas propietarias eliminadas
+note.it = texture proprietarie rimosse

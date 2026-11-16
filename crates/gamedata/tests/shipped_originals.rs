@@ -1,7 +1,10 @@
 // No shipped level carries a picture of the original game: every picture under assets/levels (the open-format
-// levels' files, the textures saved inside the community maps' .nmo files) and assets/own is compared with every
-// picture of the player's copy (its image files and the textures saved in its .nmo files), pixel for pixel and by
-// a perceptual hash that sees through rescaling, turning and small colour changes (gamedata::provenance).
+// levels' files, the textures saved inside the community maps' .nmo files) is compared with every picture of the
+// player's copy (its image files and the textures saved in its .nmo files), pixel for pixel and by a perceptual hash
+// that sees through rescaling, turning, small colour changes and a fade drawn in the alpha (gamedata::provenance).
+// A match fails the test; `own-pictures` (crates/gamedata/src/bin) puts our own pictures in their place. Our own
+// parts and mods (assets/own, assets/mods) are compared too and their look-alikes reported, not refused: the
+// interface is drawn after the original's on purpose (an atlas of the same layout reads as near).
 // Needs the copy (OPENBALLANCE_DATA; more copies, e.g. one with level 13, in DRAHTSEILAKT_ORIGINAL_COPIES as a
 // path list) and the shipped levels' files, which are not in git; skipped without them.
 
@@ -21,13 +24,9 @@ fn no_shipped_level_carries_a_picture_of_the_original() {
         copies.extend(std::env::split_paths(&more));
     }
     let assets = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-    let shipped_roots: Vec<PathBuf> = ["levels", "own", "mods"]
-        .iter()
-        .map(|d| assets.join(d))
-        .collect();
-    let shipped = provenance::prints_under(&shipped_roots);
+    let levels = provenance::prints_under(&[assets.join("levels")]);
     // the levels' pictures are gitignored: a checkout without them has nothing to check
-    if !shipped.iter().any(|(l, _)| l.contains("/levels/")) {
+    if levels.is_empty() {
         eprintln!(
             "no shipped level pictures under {}; skipped",
             assets.display()
@@ -40,32 +39,36 @@ fn no_shipped_level_carries_a_picture_of_the_original() {
         "only {} pictures in the copy {copies:?}: not a copy of the game",
         originals.len()
     );
-    let found = provenance::matches(&shipped, &originals);
-    for (s, o, m) in &found {
-        eprintln!("{m:?}: {s} = {o}");
+    // the check sees a copy: the original's drawn pictures match themselves exactly
+    assert!(
+        originals
+            .iter()
+            .any(|(_, o)| provenance::compare(o, o) == Some(Match::Exact))
+    );
+    let ours = provenance::prints_under(&[assets.join("own"), assets.join("mods")]);
+    for (s, o, h) in provenance::matches(&ours, &originals) {
+        if h.how.is_copy() {
+            eprintln!("look-alike of our own (reported, not refused): {h:?}: {s} = {o}");
+        }
     }
-    let copies: Vec<_> = found.iter().filter(|(_, _, h)| h.how.is_copy()).collect();
+    let found = provenance::matches(&levels, &originals);
+    for (s, o, h) in &found {
+        eprintln!("{h:?}: {s} = {o}");
+    }
+    let hits: Vec<_> = found.iter().filter(|(_, _, h)| h.how.is_copy()).collect();
     eprintln!(
-        "{} shipped pictures checked against {} of the original's: {} copies, {} flat look-alikes",
-        shipped.len(),
+        "{} pictures of the shipped levels checked against {} of the original's: {} copies, {} flat look-alikes",
+        levels.len(),
         originals.len(),
-        copies.len(),
-        found.len() - copies.len()
+        hits.len(),
+        found.len() - hits.len()
     );
     assert!(
-        copies.is_empty(),
-        "shipped pictures that are the original's:\n{}",
-        copies
-            .iter()
-            .map(|(s, o, m)| format!("  {m:?}: {s} = {o}"))
+        hits.is_empty(),
+        "shipped pictures that are the original's (own-pictures replaces them):\n{}",
+        hits.iter()
+            .map(|(s, o, h)| format!("  {h:?}: {s} = {o}"))
             .collect::<Vec<_>>()
             .join("\n")
-    );
-    // the check sees a copy: the original's own pictures match themselves exactly
-    let (label, first) = &originals[0];
-    assert_eq!(
-        provenance::compare(first, first),
-        Some(Match::Exact),
-        "{label}"
     );
 }
