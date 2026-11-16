@@ -483,6 +483,34 @@ daneben (`hints/Level_03.zones`), ihre ruhigen Zonen gelten nur für den Speedru
 
 Die Läufe von Level 3 und 5 spielen auf den unsichtbaren Karten Tick für Tick gleich.
 
+### Der rohe Speedrun
+
+`--style raw` ist der Speedrun, wie der erste Testspieler fuhr (2026-11-01/02): keine Kosten für Tempo (die Physik ist
+die Grenze), Langsamkeit, Kanten, Mitte oder Pfeilwechsel; keine Zonen (vorsichtig, flow, ruhig — mit
+`AUTOPILOT_RAW_CALM_ZONES=1` bleiben die ruhigen) und keine gelernten Regeln; wo der Spieler an der Kante fuhr, tut er es
+auch; Stillstände des Spielers werden übersprungen. Hinweise (Rätsellösungen) laufen wie im Speedrun;
+`AUTOPILOT_RAW_FLOW_HINTS=1` lässt alle ihre Halte weg, wo eine Kopie des Laufs die Kugel hält, und nimmt ihre Tempi als
+Minimum. Zurück geht es nur bei verlorener Kugel, fremdem Verwandler, nicht erfüllter Prüfung und 20 s ohne
+Fortschritt; nach sechs Fehlschlägen an einer Stelle fahren die weiteren Versuche ruhig vom Speicherstand bis 20
+Wegpunkte dahinter (`AUTOPILOT_RAW_FALLBACK=N`, 0: nie). Ruhiger Stil und `--style speedrun` bleiben unverändert.
+Ergebnisse 2026-11-16 (Speedrun-Rezepte, leere Datenordner), behalten: Level 2 und 3:
+
+| Level | calm | speedrun | raw |
+|---|---|---|---|
+| 1 | 6:23.63 | 4:14.80 | 4:26.17 |
+| 2 | 5:23.90 | 5:14.97 | **4:12.93** (FLOW_HINTS) |
+| 3 | 5:58.97 | 5:26.92 | **5:09.62** |
+| 4 | 9:19.47 | 8:05.68 | 8:08.08 |
+| 5 | 12:39.77 | 11:29.95 | 15:05.47 |
+| 6 | 9:01.60 | 7:06.52 | 7:29.67 |
+| 7 | 12:04.28 | 10:10.02 | 12:03.12 |
+| 8 | 9:59.40 | 9:14.47 | game over (s4) |
+| 9 | 12:35.27 | - | - (s4) |
+| 10 | 15:31.00 | 13:07.92 | 13:38.70 |
+| 11 | 13:43.73 | 11:51.15 | game over (s3) |
+| 12 | 12:35.68 | 10:26.15 | - |
+| 13 | 10:43.83 | = calm | - (s1) |
+
 ## Videos seiner Läufe
 
 `--video FILE` mit `--replay` zeichnet den Lauf ohne Fenster, ein Bild je Takt (60 pro Sekunde) in `--size`, als

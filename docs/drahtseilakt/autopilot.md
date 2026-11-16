@@ -458,6 +458,27 @@ them all is the faster try. Where the raw risk fails at one place again and agai
 ride the calm style from the save to 20 way points past the place (`AUTOPILOT_RAW_FALLBACK=N`, 0:
 never), so the raw ride costs a slow stretch there, not the run.
 
+2026-11-16, the raw style with the speedrun's recipes (the same `--follow`, `--plan` and `--hints`), from empty data
+folders. Kept where faster: level 2 (with `AUTOPILOT_RAW_FLOW_HINTS=1`) and level 3; elsewhere the speedrun stays.
+Pure progress gets ahead early (level 7: 2 s ahead at the third checkpoint) and then loses it where a stretch fails
+again and again and the fallback rides it calmly.
+
+| Level | calm | speedrun | raw | raw: lives at the end, rewinds |
+|---|---|---|---|---|
+| 1 | 6:23.63 | 4:14.80 | 4:26.17 (flow hints: 5:31.02) | 6, 9 |
+| 2 | 5:23.90 | 5:14.97 | **4:12.93** (flow hints; as written: 4:49.33) | 3, 0; no ball lost |
+| 3 | 5:58.97 | 5:26.92 | **5:09.62** | 5, 20 |
+| 4 | 9:19.47 | 8:05.68 | 8:08.08 | 5, 0 |
+| 5 | 12:39.77 | 11:29.95 | 15:05.47 (no calm zone) | 3, 50 |
+| 6 | 9:01.60 | 7:06.52 | 7:29.67 | 4, 5 |
+| 7 | 12:04.28 | 10:10.02 | 12:03.12 | 3, 35 |
+| 8 | 9:59.40 | 9:14.47 | game over in sector 4 | - |
+| 9 | 12:35.27 | - | not finished (sector 4 near (390, -56, 523); keeping the player's still stretches: 18:23.97) | - |
+| 10 | 15:31.00 | 13:07.92 | 13:38.70 | 5, 38 |
+| 11 | 13:43.73 | 11:51.15 | game over in sector 3 | - |
+| 12 | 12:35.68 | 10:26.15 | not run | - |
+| 13 | 10:43.83 | = calm | not finished (sector 1: the paper ball ahead of the stone one needs the calm zone; with it, sector 2 fails) | - |
+
 A level whose speedrun needs hints the calm run must not take has its own hint file, given with `--hints`:
 `hints/Level_03-speedrun.txt` is `Level_03.txt` and one hint more (sector 4: the wood ball sent along the single rail
 south of the checkpoint at once, where by itself it stood 8 s). The level's zones file stays the one beside it
