@@ -1062,9 +1062,10 @@ pub enum Style {
     /// physics is the only limit), for slowness, for an edge, off the middle or for switching arrows: a choice is
     /// worth how far along the way it gets. No careful, flow, calm or plain zone and no learned rule holds it back
     /// (AUTOPILOT_RAW_CALM_ZONES=1 keeps the calm zones), the followed player's still stretches are skipped and
-    /// where the player hugged an edge, so may it. A hint's stops go wherever a copy of the run keeps the ball
-    /// without them, and its speeds are minimums there (AUTOPILOT_RAW_KEEP_STOPS=1 keeps them as written: a wait a
-    /// puzzle needs that the copy does not see). It goes back only from a lost ball, a stray transformer, a hint's
+    /// where the player hugged an edge, so may it. A hint is a puzzle's solution written by hand: its stops and
+    /// speeds go as in the speedrun (as written, flowed in the level's flow zones); AUTOPILOT_RAW_FLOW_HINTS=1 flows
+    /// every stop where a copy of the run keeps the ball and takes a flowed step's speed as a minimum (the copy sees
+    /// the ball, not the puzzle: a pusher's plate pressed too hard, a ball to keep ahead). It goes back only from a lost ball, a stray transformer, a hint's
     /// failed check or a way that has not got on for 20 seconds (a dead end), as every style does.
     Raw,
 }
@@ -2962,7 +2963,10 @@ impl Pilot {
         {
             self.ride = Style::Calm;
         }
+        // (the raw speedrun: no zone in the steering; a flow zone still flows a hint's stops, as in the speedrun)
+        let mut hint_flow = false;
         if self.ride == Style::Raw {
+            hint_flow = self.zone.flow;
             self.zone = crate::zones::Effect::default();
         } else if self.ride == Style::Speedrun {
             self.zone.cap = None;
@@ -2981,9 +2985,10 @@ impl Pilot {
             None
         };
         self.hints.zone = self.limit();
-        // the raw speedrun: every hint's stop goes where a copy keeps the ball, its speeds as minimums
+        self.hints.zone.flow |= hint_flow;
+        // (AUTOPILOT_RAW_FLOW_HINTS: every hint's stop flowed where a copy keeps the ball, its speeds as minimums)
         self.hints.raw =
-            self.ride == Style::Raw && std::env::var_os("AUTOPILOT_RAW_KEEP_STOPS").is_none();
+            self.ride == Style::Raw && std::env::var_os("AUTOPILOT_RAW_FLOW_HINTS").is_some();
         if self.hints.raw {
             self.hints.zone.flow = true;
         }

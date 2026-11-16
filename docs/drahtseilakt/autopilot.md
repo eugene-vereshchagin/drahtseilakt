@@ -426,6 +426,38 @@ For other tries at a level, `AUTOPILOT_SPEEDRUN_PACE=F` scales the pace (0.3 to 
 keeps the player's still stretches, and `AUTOPILOT_SPEEDRUN_SKIP_ONLY=1` rides the calm pace and only skips them.
 The fastest runs are kept in `hints/runs/speedrun/`.
 
+### The raw speedrun
+
+`--style raw` is the speedrun as the first test player rode (2026-11-01/02, before the calm pacing, the edge margins
+and the ride-quality rules), for the owner's remark that the speedrun went best then. It is a style of its own, so
+`--style speedrun` and its recipes stay as they were. What the speedrun still holds back, and what the raw one does
+instead:
+
+| Rule (where) | `speedrun` | `raw` |
+|---|---|---|
+| Cruising speed by floor, cost above it (`Pace.fast`, `Route::cruise`) | 1 a unit over 11 (rail), 9-22 (floor), 16 | none: the physics is the limit |
+| Cost below half the pace (`Pace.slow`, no idling) | 0.15 a unit | none |
+| Edge margin (`Pace.safe`, `Pace.edge`, `rollouts`) | within 0.8 of an edge, 2 a unit | none |
+| Off the middle (`Pace.middle`) | none | none |
+| Arrow switches (`Pace.switch`, no zig-zag) | 0.05 an arrow | none |
+| Following a player: up to 1.5 off a line that hugs an edge toward the middle (`track`, `TRACK_SLACK`) | yes | no: the edge as the player rode it |
+| Flow zones' push for speed in the steering (`FLOW_SLOW`) | yes, in the level's flow zones | no |
+| Careful zones and learned rules (caps, braking, `under_cap`, a hint's speeds capped) | none | none |
+| Calm zones (the calm style there, the player's still stretches kept) | yes | no (`AUTOPILOT_RAW_CALM_ZONES=1`: yes) |
+| Plain zones | (no learned rule anyway) | (no learned rule anyway) |
+| A hint's stops (`goto`, `wait`, `hold`, a slow `pass` or `press`) | as written, but in flow zones | the same (`AUTOPILOT_RAW_FLOW_HINTS=1`: left out everywhere a copy of the run keeps the ball for the rest of the hint and a second) |
+| A hint's speeds (`pass`, `press`, `along`: brake above it) | maxima | the same (`AUTOPILOT_RAW_FLOW_HINTS=1`: minima where the step is flowed, it pushes on above them) |
+| The followed player's still stretches | skipped when the player's keys keep the line | skipped the same way |
+| Going back (`Rewinds`): a lost ball, a stray transformer, a hint's failed check or off course, 20 s without getting on | yes | yes (these are failures, not ride quality) |
+
+No rule of the calm style sends a run back for standing, an edge or a wobble: those only cost in the steering's
+scores, and the raw style sets them to 0. A hint is a puzzle's solution written by hand, and a copy of the run judges
+only the ball, not the puzzle (a pusher's plate pressed too hard, a paper ball to keep ahead of a stone one), so its
+stops and speeds stay as written by default; on a level whose hints are mostly ways along rails and tracks, flowing
+them all is the faster try. Where the raw risk fails at one place again and again (six tries), the tries after that
+ride the calm style from the save to 20 way points past the place (`AUTOPILOT_RAW_FALLBACK=N`, 0:
+never), so the raw ride costs a slow stretch there, not the run.
+
 A level whose speedrun needs hints the calm run must not take has its own hint file, given with `--hints`:
 `hints/Level_03-speedrun.txt` is `Level_03.txt` and one hint more (sector 4: the wood ball sent along the single rail
 south of the checkpoint at once, where by itself it stood 8 s). The level's zones file stays the one beside it
