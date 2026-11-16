@@ -65,6 +65,8 @@ __pycache__/
 /assets/own/3D Entities/MenuLevel/level.bin
 /assets/own/3D Entities/MenuLevel/level.gltf
 /assets/**/*.png
+# the land under a sky, written with its pictures by make_skies.py land
+/assets/own/Textures/Sky/*_Land.txt
 /assets/**/*.jpg
 !/assets/own/Splash/splash.jpg
 /assets/**/*.jpeg
