@@ -36,7 +36,8 @@ The skies a level names `Mountains`, `Forest`, `Sea`, `Storm`, `Sunset`, `Night`
 [Poly Haven](https://polyhaven.com/) (licence: CC0 1.0 Universal, https://polyhaven.com/license; checked on each
 asset's page 2026-11-03): each panorama's sky, tone-mapped with a fixed exposure, over a world below the horizon that
 the script draws itself (sea, forest, mountains, canyons, a misty valley; under `Sunset` and `Clouds` only the haze, the
-game drawing their sea of cloud), lit by the same panorama. `Sunset` is graded towards a golden hour (warmer
+game drawing their sea of cloud), lit by the same panorama (the green land under `Mountains`, `Forest` and `Mist` by `make/skyland.py`, our own
+procedural code, point by point). `Sunset` is graded towards a golden hour (warmer
 towards the sun, its dusty horizon band cleared towards the sky above it).
 The panoramas are not shipped; `python3 -I make/make_skies.py fetch` downloads them once into
 `texture-sources/skies/` and refuses any whose checksum differs.

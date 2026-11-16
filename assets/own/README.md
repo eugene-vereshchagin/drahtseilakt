@@ -17,7 +17,7 @@ those first and these for what they lack. Sounds and music are not here: they ar
   `Textures/Sky/` (skies A, B, C) beside them. Made by `make/make_parts.py` (on `make/ownkit.py`).
 - `Textures/Sky/Sky_<name>_<face>.jpg`: the photographic skies a level names (`Mountains`, `Forest`, `Sea`, `Storm`,
   `Sunset`, `Night`, `Desert`, `Mist`; six faces each, with a top), made by `make/make_skies.py` from CC0 HDR
-  panoramas of Poly Haven (pinned by SHA-256, `CREDITS.md`): the sky from the photograph, the world far below drawn.
+  panoramas of Poly Haven (pinned by SHA-256, `CREDITS.md`): the sky from the photograph, the world far below drawn (the green land point by point by `make/skyland.py`).
 - `make/levelkit.py` builds levels of our own from track pieces and the parts' stand-ins; `make/make_test_level.py`
   the shipped test level `assets/levels/Parts_Test/`. `Track/` holds the track's own textures (slabs, kerbs, shade,
   gutter slopes, sides; made by `make/make_textures.py track`), which levelkit.py copies into each level with the
