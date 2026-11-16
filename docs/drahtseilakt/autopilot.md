@@ -167,7 +167,8 @@ ticks a try (15 at most) with no arrows, `pass` and `press` points moved up to 0
 or slower, pushes up to 3 ticks longer or shorter, a `trace`'s gain up to 15% off (the full width from the fourth
 try). Each try counts against `--rewinds` (0: none), the run kept holds only the try that got through, and after
 N tries again the failure is taken as it comes. The summary lists the tries each such hint took (`retries: line L:
-N tries`). Hints without it run as before.
+N tries`). Written as a step, `retry N` does the same from that step on (the run saved as the next step begins;
+the variation is of the steps after it, the delay before the first of them). Hints without it run as before.
 
 When the ball comes within R of the point (in that sector, as that ball), the steps run in order, once a life;
 then the test player finds its place on the way again (past the transformers, when the hint made the ball over: the plan's
@@ -198,6 +199,7 @@ transformers the hint rolled the ball into, in their order, count as gone throug
 | `sync X Y Z [T]` | keep the ball on the point until the sector's loose objects and modules have entered (a checkpoint's sector begins 48 ticks after it; T at most, 600): the state a `--sector N` run starts from |
 | `until X Y Z N [T]` | keep the ball on the point until the sector's clock (the ticks since its modules entered the physics: at its checkpoint, at a `--sector N` start or again after a lost ball) reaches N (T ticks at most, 1800): a puzzle begun at the same moment of the sector, its moving things where they were, whether the run began at the checkpoint or came on from the sector before |
 | `check X Y Z D [T]` | the hint's success condition: the ball within D of the point now or, giving no arrows, within T ticks; not met, the hint has failed (one marked `retry` is tried again, another just ends there) |
+| `retry N` | from here on the hint is tried again up to N times when it fails, as `retry N` before the `:` does from its start: the run is saved as the next step begins (a stretch before it that always works is not played again) |
 | `full STEP` | the step (one that pushes: not `turn`, `cross`, `trace` or `wait`) pushed as hard as the arrows of the view as it is allow, instead of the original's push on average: on a 45-degree map two arrows along an axis of the world (1.41 times), one along a diagonal (see "Modified originals"); on the original levels the same as without |
 | `trace FILE FROM TO [GAIN]` | the same stretch of a recorded run followed closed-loop: the replay is run once as the hints load, for the ball's place and speed at each tick; then each tick the player's arrows are the feed-forward plus a pull (times GAIN, 1 by default, 0 for none) toward the recorded place and speed at the matching point (matched by progress along the run, kept near one tick a tick so the run's waits stay waits), turned into the arrow set nearest it in the view now (the part missed carried to the next tick). Over 4 units off the run, it steers to the run's way 30 ticks ahead until it is on it again, and after 10 s lost gives the ball back to the autopilot. Unlike `replay`, it holds when the ball arrives a little different (a chain of sectors: `sync` first, then `trace`) |
 

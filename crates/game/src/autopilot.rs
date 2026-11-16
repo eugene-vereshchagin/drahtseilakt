@@ -3918,6 +3918,7 @@ mod tests {
             assert_eq!(p.hints.retry_of(0), 3);
             let _ = drive(&mut p, &mut sim, 150, 0);
             assert_eq!(p.hints.would_fire(&sim), None, "fired once a life");
+            assert_eq!(p.hints.take_mark(), None, "no mark in it");
             if failed {
                 assert_eq!(p.hints.take_failed(), Some(0));
                 assert_eq!(p.hints.running_hint(), None, "a failed hint ends");
@@ -3927,6 +3928,18 @@ mod tests {
             }
             assert_eq!(p.hints.take_failed(), None, "taken once");
         }
+    }
+
+    #[test]
+    fn a_retry_step_marks_where_the_hint_is_tried_again_from() {
+        let (mut p, mut sim) = flat_pilot("at 0 2 0 r 10 : wait 5 ; retry 4 ; wait 50", "");
+        let _ = drive(&mut p, &mut sim, 3, 0);
+        assert_eq!(p.hints.take_mark(), None, "not there yet");
+        let _ = drive(&mut p, &mut sim, 5, 0);
+        assert_eq!(p.hints.take_mark(), Some((0, 4)));
+        // on at once: the step after it runs
+        assert_eq!(p.hints.at(), Some((0, 2)));
+        assert_eq!(p.hints.take_mark(), None, "taken once");
     }
 
     #[test]

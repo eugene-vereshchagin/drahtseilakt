@@ -185,8 +185,9 @@ Takte je Versuch (höchstens 15) ohne Pfeile, `pass`- und `press`-Punkte bis 0.3
 bis 6% schneller oder langsamer, Stöße bis 3 Takte länger oder kürzer, die Verstärkung eines `trace` bis 15% daneben
 (die volle Breite ab dem vierten Versuch). Jeder Versuch zählt gegen `--rewinds` (0: keiner), der behaltene Lauf
 enthält nur den gelungenen Versuch, und nach N erneuten Versuchen wird das Scheitern hingenommen. Die
-Zusammenfassung nennt die Versuche jedes solchen Hinweises (`retries: line L: N tries`). Hinweise ohne die Marke
-laufen wie bisher.
+Zusammenfassung nennt die Versuche jedes solchen Hinweises (`retries: line L: N tries`). Als Schritt geschrieben tut `retry N`
+dasselbe von diesem Schritt an (der Lauf gesichert, wenn der nächste Schritt beginnt; variiert werden die Schritte
+danach, die Verzögerung kommt vor den ersten davon). Hinweise ohne die Marke laufen wie bisher.
 
 Kommt die Kugel dem Punkt näher als R (in diesem Sektor, als diese Kugel), laufen die Schritte der Reihe nach,
 einmal je Leben; danach findet der Testspieler seinen Ort auf dem Weg neu (hinter den Transformatoren, wenn der Hinweis die Kugel verwandelt hat: die Transformatoren
@@ -216,6 +217,7 @@ des Plans, in die der Hinweis die Kugel rollen ließ, gelten der Reihe nach als 
 | `sync X Y Z [T]` | die Kugel auf dem Punkt halten, bis die losen Objekte und Module des Sektors eingesetzt sind (der Sektor eines Checkpoints beginnt 48 Takte danach; höchstens T, 600): der Zustand, mit dem ein Lauf `--sector N` beginnt |
 | `until X Y Z N [T]` | die Kugel auf dem Punkt halten, bis die Uhr des Sektors (die Takte, seit seine Module in die Physik kamen: an seinem Checkpoint, bei einem Start mit `--sector N` oder neu nach einer verlorenen Kugel) N erreicht (höchstens T Takte, 1800): ein Rätsel im selben Augenblick des Sektors begonnen, seine beweglichen Dinge, wo sie waren, ob der Lauf am Checkpoint begann oder aus dem Sektor davor kam |
 | `check X Y Z D [T]` | die Erfolgsbedingung des Hinweises: die Kugel jetzt oder, ohne Pfeile, binnen T Takten höchstens D vom Punkt; nicht erfüllt, ist der Hinweis gescheitert (einer mit `retry` wird erneut versucht, ein anderer endet einfach dort) |
+| `retry N` | von hier an wird der Hinweis bis zu N-mal erneut versucht, wenn er scheitert, wie `retry N` vor dem `:` es von seinem Anfang an tut: der Lauf wird gesichert, wenn der nächste Schritt beginnt (eine Strecke davor, die immer gelingt, wird nicht wiederholt) |
 | `full STEP` | der Schritt (einer, der schiebt: nicht `turn`, `cross`, `trace` oder `wait`) schiebt so stark, wie die Pfeile der Ansicht, wie sie ist, erlauben, statt im Mittel mit dem Schub des Originals: auf einer 45-Grad-Karte zwei Pfeile entlang einer Weltachse (1,41-mal), einer diagonal (siehe „Modifizierte Originale“); auf den Originallevels dasselbe wie ohne |
 | `trace FILE FROM TO [GAIN]` | dieselbe Strecke eines aufgezeichneten Laufs, aber geregelt: das Replay wird beim Laden der Hinweise einmal abgespielt, für Ort und Geschwindigkeit der Kugel in jedem Takt; danach sind in jedem Takt die Pfeile des Spielers die Vorsteuerung plus ein Zug (mal GAIN, 1 ohne Angabe, 0 keiner) zu Ort und Geschwindigkeit an der passenden Stelle (nach Fortschritt entlang des Laufs, nahe einem Takt pro Takt, so dass Wartezeiten Wartezeiten bleiben), in den Pfeilsatz umgesetzt, der dem in der aktuellen Ansicht am nächsten liegt (der Rest geht in den nächsten Takt). Mehr als 4 Einheiten neben dem Lauf lenkt es zum Weg des Laufs 30 Takte voraus, bis die Kugel wieder darauf ist, und gibt sie nach 10 s an den Autopiloten zurück. Anders als `replay` hält es, wenn die Kugel etwas anders ankommt (eine Kette von Sektoren: erst `sync`, dann `trace`) |
 
