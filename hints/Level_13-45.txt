@@ -112,7 +112,7 @@ at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 
 #   longer pass); open.
 # The bay faster (2026-11-16, later): crate 40 `full ram ... 1 0 11 8 110` (at 11), crate 42 rammed straight from
 #   there (`full ram -724.1 -220.4 -308.3 -1 -0.2 11 10 120 0`, no stop before it: from a moving ball the charge needs
-#   120 ticks), each `placed` and retried: the ball is at the hold at 3263 (CP3) to 3278 (from the start) instead of
+#   120 ticks), each `placed` and retried: the ball is at the hold at 3263 (CP3) and 3289 (from the start) instead of
 #   3321-3336, and waits there to 3278 (`until`). Tried and not kept: crate 40 rammed out of his run's motion (traced
 #   on to 2580-2610, then a short run-up or a press: jams or short), shorter charges (95-100: placed in 1/3), a pass
 #   before the ram (slower). From CP3 then all ten stones queue only for some departures (3274 loses stone 19 at the
