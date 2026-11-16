@@ -313,7 +313,9 @@ floor 14
 boardbridge
 floor 14
 sign "P_Modul_37: drawbridge into a lane (level 5)"
-check drawbridge-stone : ball stone 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; turned P_Modul_37_01 P_Modul_37_Bridge 60 ; go 8 -2 0 4 600 ; go 8 -12 0 4 600 ; go 36.95 -12 0 4 900 ; go 36.95 12 0 7 900 ; reach 36.95 12 2 3 ; kept
+# level 5: the lane's floor has a ledge 1 long and 0.5 deep (the deck's thickness) either side of the gap; the fallen
+# deck lies in it flush with the lane (the ball rolls over it at the lane's height)
+check drawbridge-stone : ball stone 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; turned P_Modul_37_01 P_Modul_37_Bridge 60 ; go 8 -2 0 4 600 ; go 8 -12 0 4 600 ; go 36.95 -12 0 4 900 ; go 36.95 -1 0 3 600 ; level 36.95 0 0 0.08 ; go 36.95 12 0 7 900 ; reach 36.95 12 2 3 ; kept
 check drawbridge-wood : ball wood 0 0 0 ; go 21 0 0 6 600 ; wait 120 ; still P_Modul_37_01 P_Modul_37_Bridge 30
 floor 8
 mark spur
@@ -326,9 +328,11 @@ floor 9.5
 corner left
 floor 28.95
 corner left
-floor 8.2
+floor 7.2
+rebate 1 0.5
 gap 7.6 nopilot
-floor 8.2
+rebate 1 0.5
+floor 7.2
 corner right
 floor 14
 sign "P_Modul_01: two pushers, from the low floor (level 1)"
@@ -477,7 +481,8 @@ class Show(C.Community, D.Track):
         points): `ball KIND F S U` (begin there at rest), `go F S U V T` (roll to the point at up to V, at most T
         ticks), `arc F S U R A H N` (N points along a turn of radius R, A degrees to the left, H down, from F S U on
         the heading, rolled through at 4), `wait T`, and what must hold then: `reach F S U R` (the ball within R),
-        `away F S U R` (not within R), `kind KIND`, `turned OBJECT PART DEG` (the module's part turned at least DEG
+        `away F S U R` (not within R), `level F S U T` (the ball, within 2.5 of the point seen from above, rolls on a floor at its height: its bottom
+        within T of it), `kind KIND`, `turned OBJECT PART DEG` (the module's part turned at least DEG
         from its start), `still OBJECT PART DEG` (less), `moved OBJECT PART D`, `lies OBJECT PART F S U R` (the part within R of the point), `lost` (a ball was lost), `kept` (none
         was)."""
         text = " ".join(args)
@@ -494,7 +499,7 @@ class Show(C.Community, D.Track):
                 out.append(f"ball {w[0]} {D.fmt(P(w[1:4]))}")
             elif v in ("go",):
                 out.append(f"go {D.fmt(P(w[0:3]))} {float(w[3]):g} {int(w[4])}")
-            elif v in ("reach", "away"):
+            elif v in ("reach", "away", "level"):
                 out.append(f"{v} {D.fmt(P(w[0:3]))} {float(w[3]):g}")
             elif v == "arc":
                 f0, s0, u0, r, a, h, n = (float(x) for x in w)

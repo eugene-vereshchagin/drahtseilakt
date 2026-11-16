@@ -36,6 +36,9 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
                              ties across between the tubes (a harder ride, for later levels)
     gap L [up H|down H] [runup R]  the cursor jumps L ahead (and H up or down): nothing built; the test player
                              takes it at speed (the careful styles with a run-up of R, 14 if not given)
+    rebate L D               a floor L long, D lower than the cursor (which stays at its height): the ledge a deck
+                             lies in flush with the way, either side of the gap it falls into (the drawbridge's lane,
+                             level 5: 1 long, 0.5 deep, the deck's thickness)
     move F S U               the cursor moves F ahead, S to the left, U up (nothing built)
     turn A                   the heading turns A degrees to the left (negative: right), the cursor stays
     mark NAME / back NAME    remember the cursor / go back to it
@@ -578,6 +581,13 @@ class Track:
             self.lay(pts, heads, "Rails" if cmd.startswith("rails") else "Floor", ties="ties" in opts)
             self.turn_rail = (False, False)
             self.move_along(pts, angle)
+        elif cmd == "rebate":
+            # a ledge: the floor laid D lower, the cursor back up at its end (both steps are the floors' own ends)
+            length, deep = num(args, 0, line), num(args, 1, line)
+            down = np.array([0.0, deep, 0.0])
+            self.pos = self.pos - down
+            self.run_command("floor", [f"{length:g}"], {}, flags, line)
+            self.pos = self.pos + down
         elif cmd == "move":
             to = self.at(num(args, 0, line), num(args, 1, line), num(args, 2, line))
             self.along += float(np.linalg.norm(to - self.pos))

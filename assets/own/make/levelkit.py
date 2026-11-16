@@ -467,10 +467,14 @@ def top_height(width, safety, x, surface="stone"):
     return best if best is not None else 0.0
 
 
-def zipper(inner, outer):
+def zipper(inner, outer, feet=None):
     """Triangles between two closed loops round one middle, each given as (angle, vertex) sorted by angle from 0 on
     (the inner one starting at angle 0): every point of both is used, so an edge of the outer loop is never split by
-    a vertex the other side does not have."""
+    a vertex the other side does not have. `feet` (one an outer vertex: the angle of the point of the edge from it to
+    the next nearest the middle) makes the fan hand over from one outer vertex to the next there: every inner vertex
+    is then joined to an outer one that sees it past the inner loop (a convex outline round a circle), so no triangle
+    reaches over the inner loop. Without it the hand-over is at the next outer vertex's angle, and a long outer edge
+    (a checkpoint's front, as wide as the way) fans from its first corner over the bowl inside it."""
     two = 2 * math.pi
     j0 = min(range(len(outer)), key=lambda j: min(outer[j][0] % two, two - outer[j][0] % two))
     o = outer[j0:] + outer[:j0]
@@ -484,11 +488,16 @@ def zipper(inner, outer):
             a += two
         oa.append((a, v))
     oa.append((oa[0][0] + two, oa[0][1]))
+    if feet is None:
+        hand = [oa[k + 1][0] for k in range(len(o))]
+    else:
+        f = feet[j0:] + feet[:j0]
+        hand = [min(oa[k][0] + (f[k] - oa[k][0]) % two, oa[k + 1][0]) for k in range(len(o))]
     ia = inner + [(inner[0][0] + two, inner[0][1])]
     i = j = 0
     tris = []
     while i < len(inner) or j < len(o):
-        adv_inner = j >= len(o) or (i < len(inner) and ia[i + 1][0] <= oa[j + 1][0])
+        adv_inner = j >= len(o) or (i < len(inner) and ia[i + 1][0] <= hand[j])
         if adv_inner:
             tris.append((ia[i][1], oa[j][1], ia[i + 1][1]))
             i += 1
@@ -1046,7 +1055,14 @@ class LevelBuilder:
         inner = [(a, m.vertex(at(rb, a, deep), up, uv_top(rb * math.cos(a), rb * math.sin(a)))) for a in angles]
         world = [c + f * x + left * z for x, z in outer]
         outer_v = [(math.atan2(z, x) % (2 * math.pi), m.vertex(w, up, uv_top(x, z))) for (x, z), w in zip(outer, world)]
-        for t in zipper(inner, outer_v):
+        # each outline edge's point nearest the middle: where the fan hands over to its next corner
+        feet = []
+        for k, (x0, z0) in enumerate(outer):
+            x1, z1 = outer[(k + 1) % len(outer)]
+            dx, dz = x1 - x0, z1 - z0
+            t = min(max(-(x0 * dx + z0 * dz) / max(dx * dx + dz * dz, 1e-12), 0.0), 1.0)
+            feet.append(math.atan2(z0 + t * dz, x0 + t * dx) % (2 * math.pi))
+        for t in zipper(inner, outer_v, feet):
             m.tri(top, *t)
         # the sides round the outline: down to the track's depth (none where a track runs on), then to the platform's
         run = 0.0

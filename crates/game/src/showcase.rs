@@ -228,6 +228,23 @@ mod tests {
                         ));
                     }
                 }
+                "level" => {
+                    // the ball rolls over a floor at height U (a fallen deck flush with the way): within 2.5 of
+                    // the point seen from above, its bottom within TOL of U
+                    let p = point(args).expect("a point");
+                    let tol: f32 = args[3].parse().expect("a tolerance");
+                    let b = sim.ball.position;
+                    let flat = Vec3::new(b.x - p.x, 0.0, b.z - p.z).length();
+                    let bottom = b.y - crate::sim::BALL_RADIUS;
+                    notes.push(format!(
+                        "level: the ball's bottom at {bottom:.3}, {flat:.1} from {p:.1?}"
+                    ));
+                    if flat > 2.5 || (bottom - p.y).abs() > tol {
+                        fails.push(format!(
+                            "level {p:.1?} within {tol}: the ball's bottom at {bottom:.3}, {flat:.1} away"
+                        ));
+                    }
+                }
                 "kind" => {
                     let want = BallKind::from_name(args[0]).expect("a ball kind");
                     if sim.ball.kind != want {
