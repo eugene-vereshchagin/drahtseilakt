@@ -1,6 +1,6 @@
 # Credits
 
-Other credit files: `assets/own/CREDITS.md` (photo textures), `assets/sounds/system/CREDITS.md` and `assets/sounds/neuro/CREDITS.md` (sounds). The game's Credits screen lists the music, sounds and textures too.
+Other credit files: `assets/own/CREDITS.md` (photo textures), `assets/sounds/system/CREDITS.md` and `assets/sounds/neuro/CREDITS.md` (sounds; the synthesizer that made the generated ones is our own code in `tools/audio-synth/`, GPL-3.0-only). The game's Credits screen lists the music, sounds and textures too.
 
 ## The owner's picks (the Drahtseilakt set)
 

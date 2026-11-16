@@ -33,10 +33,10 @@ CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/.
 | `Sounds/Roll_Paper.ogg` | Roll_Paper | 545532_6233742-hq.mp3 | rsellick | CC0 1.0 | https://freesound.org/people/rsellick/sounds/545532/ |
 | `Sounds/Roll_Wood_Wood.ogg` | Roll_Wood_Wood | 629001_13875907-hq.mp3 | KaleidacousticsAudio | CC0 1.0 | https://freesound.org/people/KaleidacousticsAudio/sounds/629001/ |
 | `Sounds/Roll_Wood_Stone.ogg` | Roll_Wood_Stone | 182345_1864955-hq.mp3 | Claire.H | CC-BY 3.0 | https://freesound.org/people/Claire.H/sounds/182345/ |
-| `Sounds/Roll_Wood_Metal.ogg` | Roll_Wood_Metal | !Roll_Wood_Metal_C.ogg ('hollow tube', modal synthesis) | Drahtseilakt project | GPL-3.0-only | audio-generated/rails.py (replaces freesound 537939 by belanhud, CC0, a clatter like maracas) |
+| `Sounds/Roll_Wood_Metal.ogg` | Roll_Wood_Metal | !Roll_Wood_Metal_C.ogg ('hollow tube', modal synthesis) | Drahtseilakt project | GPL-3.0-only | tools/audio-synth/rails.py (replaces freesound 537939 by belanhud, CC0, a clatter like maracas) |
 | `Sounds/Roll_Stone_Wood.ogg` | Roll_Stone_Wood | 629001_13875907-hq.mp3 | KaleidacousticsAudio | CC0 1.0 | https://freesound.org/people/KaleidacousticsAudio/sounds/629001/ |
 | `Sounds/Roll_Stone_Stone.ogg` | Roll_Stone_Stone | 182345_1864955-hq.mp3 | Claire.H | CC-BY 3.0 | https://freesound.org/people/Claire.H/sounds/182345/ |
-| `Sounds/Roll_Stone_Metal.ogg` | Roll_Stone_Metal | !Roll_Stone_Metal_A.ogg ('growl + ring', modal synthesis) | Drahtseilakt project | GPL-3.0-only | audio-generated/rails.py (replaces freesound 537939 by belanhud, CC0) |
+| `Sounds/Roll_Stone_Metal.ogg` | Roll_Stone_Metal | !Roll_Stone_Metal_A.ogg ('growl + ring', modal synthesis) | Drahtseilakt project | GPL-3.0-only | tools/audio-synth/rails.py (replaces freesound 537939 by belanhud, CC0) |
 | `Sounds/Hit_Wood_Wood.ogg` | Hit_Wood_Wood | impactWood_medium_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
 | `Sounds/Hit_Wood_Stone.ogg` | Hit_Wood_Stone | impactGeneric_light_000.ogg | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds |
 | `Sounds/Hit_Wood_Metal.ogg` | Hit_Wood_Metal | impactMetal_light_000.ogg + iron ring | Kenney (www.kenney.nl) | CC0 1.0 | https://kenney.nl/assets/impact-sounds ; changed: iron ring of five partials added, 0.9 s, low-passed at 5 kHz |

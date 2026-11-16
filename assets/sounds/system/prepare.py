@@ -14,7 +14,8 @@
 # first round's Hit_Wood_Metal.ogg and Hit_Stone_Metal.ogg (the commit before the fixes has them: git show
 # f662ce4:assets/sounds/system/Sounds/<file>), the rail hits being longer and more iron (a modal ring added), and writes
 # the fall sound, synthesized (no source: gentle falling glide and a soft thud); --rails: the folder of the synthesized
-# rail loops (audio-candidates/rails-2026-11-09: !Roll_Wood_Metal_C.ogg and !Roll_Stone_Metal_A.ogg).
+# rail loops (audio-candidates/rails-2026-11-09: !Roll_Wood_Metal_C.ogg and !Roll_Stone_Metal_A.ogg; or a folder
+# freshly made by tools/audio-synth/rails.py, whose files are the same without the "!").
 # A round not given is left as it is. Needs ffmpeg and numpy. Writes into the folders beside this file.
 
 import argparse
@@ -389,7 +390,9 @@ def fixes(base, rails, made):
     made["Misc_Fall"] = {"source": "synthesized", "seconds": round(len(y) / RATE, 2), "lufs": round(lufs(y), 1)}
     if rails:
         for role, src in (("Roll_Wood_Metal", "!Roll_Wood_Metal_C.ogg"), ("Roll_Stone_Metal", "!Roll_Stone_Metal_A.ogg")):
-            y = decode(Path(rails) / src, 0.0, None, 1, 0)
+            # the owner marked his picks with "!"; a fresh tools/audio-synth/rails.py folder has them unmarked
+            path = Path(rails) / src
+            y = decode(path if path.exists() else Path(rails) / src.lstrip("!"), 0.0, None, 1, 0)
             encode(y, HERE / "Sounds" / f"{role}.ogg", 4)
             made[role] = {"source": f"rails-2026-11-09/{src} (synthesized)", "seconds": round(len(y) / RATE, 2),
                           "lufs": round(lufs(y), 1)}
