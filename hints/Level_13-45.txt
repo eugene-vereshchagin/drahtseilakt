@@ -95,3 +95,18 @@ at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 
 #   got through the crates five times, all late at the channel's mouth (sector clock 3677 to 3843, 3.5 to 6 s; the
 #   paper ball then rides behind the stone convoy and the queue at CP3 stays short: stuck at x -679.7). Open: the run on comes to the crates in another state
 #   (the physics' random generator and sleep countdown), not a matter of the ram's line.
+# The bay compared again (2026-11-16, the run on handed over at the sector clock 2430 with --replay A --from, against the
+#   CP3 start): the crates and the ball agree before crate 38's ram (crate 42 alone 0.14 off and 3.3 degrees turned);
+#   the trace's ram leaves crate 38 1.5 further south and 4 degrees turned, and the press at crate 40, begun beside it,
+#   rubs crate 38: the ball meets crate 40 at 1.3 a second instead of 5.4, so it moves 1.4 and jams. Crate 42, turned
+#   3.3 degrees, turns on as it leaves the block it stands on (the block drops) and stops short of its pocket.
+#   Closed-loop instead (the `placed` step judges where a crate came to be; a retry mark before each ram): crate 40
+#   `full ram -724.2 -219.3 -293.3 1 0 9 8 110` gets in from both starts (first try nearly always); crate 42 from a
+#   stop at (-714.5, -308.3) `full ram -724.1 -220.4 -308.3 -1 -0.2 9 10 110 0.5` (a little south of west, half a unit
+#   south of its middle) lands in 26 of 31 tries from the start, 29 of 31 from CP3 (straight west through the middle:
+#   9 and 12 of 31; the original's press: 0). But both rams take longer than the original's presses: the ball is at
+#   the hold (-731.5 -214.5 -260.3) at 3321 (CP3) to 3336 (from the start), against 3278, and comes onto the stones'
+#   channel at z -285 as stone 21 does (3415): it lands on the stone and rolls behind the convoy at 5.7 (the "late"
+#   runs before). It must be at the hold by about 3312. Shorter rams (charge 95 or 90 ticks) leave the crates short;
+#   a faster way to crate 42 or no stop before it did not bring the hold earlier. Not kept (the CP3 start would no
+#   longer pass); open.
