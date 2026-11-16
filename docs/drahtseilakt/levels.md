@@ -256,13 +256,15 @@ room check. Plazas, discs and pits lie 0.03 under the floors that run on from th
 height are a crack to the seam test).
 
 **Skies.** `sky` names the sky box round the level: `A`, `B`, `C` (ours, drawn above a sea of cloud, as the
-original's letters) or one of the photographic skies by name: `Mountains` (a sunset sky over hazy mountains with
-snow on the peaks), `Forest` (summer clouds over a forest canopy with glades and lakes), `Sea` (a calm sea at
+original's letters) or one of the photographic skies by name: `Mountains` (a sunset sky over forested hills and
+mountains with rivers, lakes, rocky ridges and snow on the highest peaks), `Forest` (summer clouds over a forest canopy with glades and lakes), `Sea` (a calm sea at
 sunset, mirroring the clouds), `Storm` (a heavy overcast over a dark sea with whitecaps), `Sunset` (a golden sunset over
 a sea of cloud), `Clouds` (a summer day over a sea of cloud), `Night` (the Milky Way over a dark lake ringed by hills), `Desert` (a late afternoon over red
 canyons), `Mist` (an evening glow over hills with mist in the valleys). Their skies are CC0 photographs from Poly
 Haven; what lies below the horizon is drawn by `assets/own/make/make_skies.py`, seen as from high above, so the
-track hangs far over it (`assets/own/CREDITS.md`). Any other name is a set of files `Textures/Sky/Sky_<name>_<face>`
+track hangs far over it (`assets/own/CREDITS.md`); under `Mountains`, `Forest` and `Mist` the green land is
+drawn point by point at each pixel's own scale (`assets/own/make/skyland.py`: the tree crowns straight down, the
+haze turning a cool blue-white with distance), its lower faces at 2048 pixels. Any other name is a set of files `Textures/Sky/Sky_<name>_<face>`
 (Front, Right, Back, Left, Down, and Top if it has one) a level folder or the textures bring; a name is letters,
 digits, `_` and `-`. `--sky NAME` on the command line plays any level under another sky.
 

@@ -6,8 +6,9 @@ far below the track that this script draws itself.
 The panoramas are photographs taken on the ground, and Ballance's camera looks down a lot: what lies under the horizon
 in a photograph (the grass at the photographer's feet, a road, a tripod) would read as a floor a few metres under the
 track. So only the sky and the horizon are taken from the photograph; everything below is made here, lit by the same
-photograph and seen as from high above: a sea that mirrors the sky with waves, a forest canopy, hazy mountains, a
-canyon, a sea of cloud, a valley full of mist. The aerial haze thickens towards the horizon in the photograph's own
+photograph and seen as from high above: a sea that mirrors the sky with waves, a forest canopy, forested mountains, a
+canyon, a sea of cloud, a valley full of mist (the green lands drawn point by point at each pixel's own scale by
+skyland.py, their five lower faces at LAND_FACE; the rest from maps). The aerial haze thickens towards the horizon in the photograph's own
 horizon colour, so the two meet without a seam.
 
   python3 -I make_skies.py fetch [DIR]   # download the pinned panoramas once into DIR/skies/<id>/ and check them
@@ -33,6 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import free_textures as ft  # noqa: E402  (the sources' folder)
 import ownkit as k  # noqa: E402
+import skyland  # noqa: E402  (the green land below, drawn point by point)
 
 OUT = os.path.join(os.path.dirname(HERE), "Textures", "Sky")
 POLYHAVEN = {"licence": "CC0 1.0 Universal", "licence_url": "https://polyhaven.com/license"}
@@ -65,7 +67,8 @@ MAX_FILE = 48 << 20
 # world drawn below it.
 #   cut: the lowest elevation (degrees) of the photograph kept; reach: how far it is stretched down (a band of distant
 #        land a few degrees deep, seen from higher up, fills more of the view below the horizon)
-#   below: "sea" (water mirroring the sky), "land" (lit relief with the kind's colours), "clouds" (a sea of cloud),
+#   below: "sea" (water mirroring the sky), "land" (lit relief with the kind's colours: `mountains`, `forest` and
+#          `mist` drawn point by point by skyland.py, `canyon` from a map), "clouds" (a sea of cloud),
 #          "haze" (only the haze: a level under this sky has its sea of cloud drawn by the game, clouds.wgsl)
 #   grade: a golden-hour grade, (colour at the horizon, colour from 40 degrees up[, colour at the horizon away from
 #          the sun]) multiplying the photograph and the world below, blended by elevation (and round from the sun)
@@ -73,11 +76,13 @@ MAX_FILE = 48 << 20
 #         degrees up, smoothed round the circle) times gain, `amount` of it at the horizon, none `degrees` up
 #   haze: the aerial haze's thickness (per altitude of the camera over the world below; 0.1 is clear air)
 #   zoom: how much nearer the land seems (its features drawn that much larger); relief: its slopes that much steeper
-#   (more light and shade); vivid: its colours that much more saturated
+#   (more light and shade); vivid: its colours that much more saturated; cool, white: the green land's haze turned
+#   towards a blue-white and its sun towards white (COOL_HAZE, SUN_WHITE)
 SKIES = {
-    # (the owner, 2026-11-03: the land under level 1 too dull and too far: brighter, greener, more relief, nearer)
+    # (the owner, 2026-11-03: the land under level 1 too dull and too far: brighter, greener, more relief, nearer;
+    # 2026-11-16: under the synthetic level "a rotten swamp behind the clouds", blocky and yellow: skyland.py)
     "Mountains": dict(src="table_mountain_1_puresky", ev=0.15, below="land", kind="mountains", haze=0.065, seed=101,
-                      zoom=1.5, relief=1.6, vivid=1.35),
+                      zoom=1.5, relief=1.2, vivid=1.1),
     "Forest": dict(src="kloofendal_48d_partly_cloudy_puresky", ev=-0.2, below="land", kind="forest", haze=0.13,
                    seed=202),
     "Sea": dict(src="kloppenheim_06_puresky", ev=0.0, below="sea", waves=0.10, water=(0.012, 0.030, 0.040),
@@ -98,6 +103,7 @@ SKIES = {
 SKY_LIGHT = os.path.join(HERE, "sky_light.json")
 
 FACE = 1024  # the faces' size as shipped
+LAND_FACE = 2048  # the lower faces' size of a sky with the green land below (sharp up to 4K)
 SS = 2  # drawn at twice that and averaged down
 JPEG_QUALITY = 88
 
@@ -357,6 +363,10 @@ class Light:
 
 # --- the worlds below ------------------------------------------------------------------------------------------------
 
+# The green land's air: how far its haze turns from the photograph's horizon colour to a cool blue-white looking
+# down (COOL, by brightness), and how far the sun's colour on it is taken towards white
+COOL, COOL_HAZE, SUN_WHITE = np.array([0.80, 0.90, 1.10]), 0.6, 0.5
+
 TILE = 12.0  # the land's map covers 12 x 12 camera altitudes (it repeats; far off, the haze hides it)
 MAP = 2048
 
@@ -372,37 +382,9 @@ def smooth(e0, e1, x):
 
 def land_maps(kind, seed):
     """The land's height (in camera altitudes; only its slopes are drawn, as light and shade) and colour (albedo) on
-    its map, and where water lies, by kind."""
+    its map, and where water lies, for the kinds drawn from a map (the canyon; the green kinds are skyland.py's)."""
     n = lambda cells, s, o=6: k.value_noise(MAP, MAP, (cells, cells), seed + s, octaves=o)  # noqa: E731
     none = np.zeros((MAP, MAP), bool)
-    if kind == "mountains":
-        big = n(3, 1)
-        r = ridged(n(8, 2, 7))
-        hgt = 1.2 * (0.45 * big + 0.55 * r ** 1.5) + 0.04 * n(64, 3, 4)
-        h01 = (hgt - hgt.min()) / (hgt.max() - hgt.min())
-        meadow = np.array([0.16, 0.22, 0.09])
-        forest = np.array([0.05, 0.08, 0.04])
-        rock = np.array([0.28, 0.26, 0.23])
-        snow = np.array([0.75, 0.77, 0.80])
-        wood = smooth(0.42, 0.55, n(24, 4, 5)) * smooth(0.65, 0.4, h01)
-        alb = meadow * (1 - wood)[..., None] + forest * wood[..., None]
-        alb = alb + (rock - alb) * smooth(0.42, 0.62, h01)[..., None]
-        alb = alb + (snow - alb) * smooth(0.74, 0.86, h01 + 0.08 * n(32, 5, 4))[..., None]
-        return hgt, alb, h01 < 0.12
-    if kind == "forest":
-        hills = n(5, 1)
-        hgt = 0.35 * hills + 0.05 * n(40, 2, 5)
-        tone = n(28, 3, 6)
-        dark = np.array([0.03, 0.06, 0.025])
-        light = np.array([0.09, 0.13, 0.045])
-        autumn = np.array([0.17, 0.11, 0.035])
-        alb = dark + (light - dark) * smooth(0.3, 0.7, tone)[..., None]
-        alb = alb + (autumn - alb) * (0.7 * smooth(0.66, 0.8, n(14, 4, 5)))[..., None]
-        glade = smooth(0.71, 0.77, n(12, 5, 5))
-        alb = alb + (np.array([0.20, 0.24, 0.10]) - alb) * glade[..., None]
-        h01 = (hills - hills.min()) / (hills.max() - hills.min())
-        river = smooth(0.965, 0.99, ridged(n(4, 6, 6))) > 0.5
-        return hgt, alb, (h01 < 0.06) | river
     if kind == "canyon":
         plateau = n(4, 1, 6)
         cut = ridged(n(5, 2, 7))
@@ -419,18 +401,11 @@ def land_maps(kind, seed):
         alb = alb + ((red + (ochre - red) * band[..., None]) - alb) * wall[..., None]
         alb = alb + (np.array([0.45, 0.30, 0.20]) - alb) * smooth(0.9, 1.0, gorge)[..., None]
         return hgt, alb, none
-    if kind == "mist":
-        hills = n(6, 1, 7)
-        hgt = 0.7 * hills + 0.03 * n(48, 2, 5)
-        tone = n(20, 3, 5)
-        alb = np.array([0.06, 0.10, 0.05]) + np.array([0.06, 0.07, 0.03]) * tone[..., None]
-        return hgt, alb, none
     raise ValueError(kind)
 
 
 def shade(hgt, alb, water, light, kind, seed):
-    """The land's radiance on its map: lit by the sun by its slope and by the sky, lakes and rivers mirroring the sky
-    near the horizon; for mist, the valleys filled with lit fog."""
+    """The land's radiance on its map: lit by the sun by its slope and by the sky, water a dark mirror of the haze."""
     texel = TILE / MAP
     gy, gx = np.gradient(hgt, texel)
     nrm = np.stack([-gx, np.ones_like(hgt), -gy], -1)
@@ -442,14 +417,6 @@ def shade(hgt, alb, water, light, kind, seed):
     rad = alb / np.pi * (light.sun[None, None] * lam[..., None] + sky)
     if water.any():
         rad[water] = light.horizon.mean(0) * 0.16 + light.sky / np.pi * 0.04
-    if kind == "mist":
-        h01 = (hgt - hgt.min()) / (hgt.max() - hgt.min())
-        fog_lit = (light.sky + light.sun * max(light.sun_dir[1], 0.05)) / np.pi * 0.8
-        drift = k.value_noise(MAP, MAP, (8, 8), seed + 9, octaves=6)
-        fog = 0.95 * smooth(0.6, 0.4, h01 + 0.3 * (drift - 0.5)) ** 0.6
-        rad = rad + (fog_lit - rad) * fog[..., None]
-        # the fog's share rides along as a fourth channel: the land's fine detail is not drawn on the fog
-        return np.concatenate([rad, fog[..., None]], -1)
     return rad
 
 
@@ -469,29 +436,12 @@ def cloud_maps(light, seed):
 
 # Fine detail laid over the land at a much smaller scale than its map (tree crowns, rock grain, billows): a map of its
 # own over one camera altitude, multiplying the land's radiance.
-DETAIL = {"forest": (0.016, 0.55), "mist": (0.016, 0.4), "mountains": (0.03, 0.3), "canyon": (0.02, 0.2),
-          "clouds": (0.05, 0.12)}
+DETAIL = {"canyon": (0.02, 0.2), "clouds": (0.05, 0.12)}
 
 
 def detail_map(kind, seed):
     size = 1024
     cells = max(4, int(round(1.0 / DETAIL[kind][0])))
-    if kind in ("forest", "mist"):
-        # tree crowns: round, lit towards the middle, dark between them (the distance to the nearest of points
-        # scattered one a cell)
-        rng = np.random.default_rng(seed + 31)
-        pts = rng.random((cells, cells, 2))
-        y, x = (np.mgrid[0:size, 0:size] + 0.5) * (cells / size)
-        cy, cx = np.floor(y).astype(int), np.floor(x).astype(int)
-        best = np.full((size, size), 9.0)
-        for dy in (-1, 0, 1):
-            for dx in (-1, 0, 1):
-                gy, gx = cy + dy, cx + dx
-                p = pts[gy % cells, gx % cells]
-                dist = np.hypot(gy + p[..., 0] - y, gx + p[..., 1] - x)
-                best = np.minimum(best, dist)
-        c = np.clip(1 - best / 0.75, 0, 1) ** 0.6 * (0.7 + 0.6 * k.value_noise(size, size, (cells, cells), seed + 32, 2))
-        return np.clip(c, 0, 1)[..., None]
     c = k.value_noise(size, size, (cells, cells), seed + 31, octaves=3)
     return c[..., None]
 
@@ -502,7 +452,10 @@ class Below:
     def __init__(self, cfg, light, pano):
         self.cfg, self.light, self.pano = cfg, light, pano
         seed = cfg["seed"]
-        if cfg["below"] == "land":
+        self.terrain = None
+        if cfg["below"] == "land" and cfg["kind"] in skyland.KINDS:
+            self.terrain = skyland.Terrain(cfg["kind"], seed, cfg.get("relief", 1.0))
+        elif cfg["below"] == "land":
             hgt, alb, water = land_maps(cfg["kind"], seed)
             hgt = hgt * cfg.get("relief", 1.0)
             grey = alb.mean(-1, keepdims=True)
@@ -510,11 +463,11 @@ class Below:
             self.ground = Pyramid(shade(hgt, alb, water, light, cfg["kind"], seed))
         elif cfg["below"] == "clouds":
             self.ground = Pyramid(cloud_maps(light, seed))
-        if cfg["below"] in ("land", "clouds"):
+        if cfg["below"] in ("land", "clouds") and self.terrain is None:
             self.kind = cfg.get("kind", "clouds")
             self.detail = Pyramid(detail_map(self.kind, seed))
-        elif cfg["below"] == "haze":
-            pass
+        elif cfg["below"] in ("haze", "land"):
+            pass  # only the haze, or the green land (drawn by self.terrain)
         else:
             self.wave_tile = cfg.get("wave_tile", 1.6)
             c = cfg.get("wave_cells", 6)
@@ -538,7 +491,15 @@ class Below:
         # every azimuth meets; by azimuth there it would draw a wedge pointing at the sun)
         side = ((1 - down) ** 1.5)[..., None]
         haze_col = light.horizon.mean(0) + (light.haze(u) - light.horizon.mean(0)) * side
-        if cfg["below"] == "haze":
+        if self.terrain is not None:
+            # aerial perspective: the air between the camera and the land scatters blue (a cool blue-white, of the
+            # haze's own brightness); none at the horizon itself, where the land meets the photograph's haze
+            cool = cfg.get("cool", COOL_HAZE) * smooth(0.02, 0.3, down)[..., None]
+            blue = (haze_col @ LUM)[..., None] * (COOL / float(COOL @ LUM))
+            haze_col = haze_col + (blue - haze_col) * cool
+        if self.terrain is not None:
+            col = self.land(d, down, px, pz, footprint_angle / zoom, sky_fn)
+        elif cfg["below"] == "haze":
             # the deep air under a sea of cloud: the haze, a little of the sky's shade straight down
             col = haze_col * 0.8 + light.sky / np.pi * 0.25 * np.ones_like(haze_col)
         elif cfg["below"] in ("land", "clouds"):
@@ -575,6 +536,37 @@ class Below:
                 col = col + (foam_col - col) * foam[..., None]
         f = 1 - np.exp(-cfg["haze"] * dist)
         return col * (1 - f[..., None]) + haze_col * f[..., None]
+
+    def land(self, d, down, px, pz, angle, sky_fn):
+        """The green land (skyland.py) where the directions d meet it: lit by the sun and the sky, its water mirroring
+        the sky, fog in its valleys lit by both."""
+        cfg, light = self.cfg, self.light
+        # a sample's footprint on the ground: the geometric mean of its length along the view (angle / down^2) and
+        # across it (angle / down), so the land stays sharp a long way out and no finer octave aliases
+        fp = (angle / down ** 1.5).astype(np.float32)
+        alb, nrm, water, fog = self.terrain.surface(px.astype(np.float32), pz.astype(np.float32), fp)
+        grey = alb.mean(-1, keepdims=True)
+        alb = np.clip(grey + (alb - grey) * cfg.get("vivid", 1.0), 0, 1)
+        # the sun's colour half way to a white of its brightness: a low sun's yellow on every sunlit slope reads as
+        # a dry, sick land from far above, where the air between has already taken some of its red
+        sun = light.sun
+        white = float(sun @ LUM) * np.ones(3)
+        sun = sun + (white - sun) * cfg.get("white", SUN_WHITE)
+        lam = np.clip(nrm @ light.sun_dir, 0, 1)[..., None]
+        sky = light.sky * (0.5 + 0.5 * nrm[..., 1:2])
+        col = alb / np.pi * (sun * lam + sky)
+        if water.max() > 0:
+            refl = d * np.array([1.0, -1.0, 1.0])
+            refl[..., 1] = np.maximum(refl[..., 1], 0.004)
+            refl /= np.linalg.norm(refl, axis=-1, keepdims=True)
+            fres = (0.02 + 0.98 * (1 - down) ** 5)[..., None]
+            deep = skyland.WATER * float(light.sky @ LUM) / np.pi * 8.0
+            wcol = sky_fn(refl) * fres + deep * (1 - fres)
+            col = col + (wcol - col) * water[..., None]
+        if fog.max() > 0:
+            fog_lit = (light.sky + sun * max(light.sun_dir[1], 0.05)) / np.pi * 0.8
+            col = col + (fog_lit - col) * fog[..., None]
+        return col
 
 
 # --- one sky ---------------------------------------------------------------------------------------------------------
@@ -620,7 +612,7 @@ def make_sky(name, root=None):
         src = np.where(el < 0, np.arctan(np.tan(el) / reach), el)
         return panorama(pano, azimuth_u(d), np.maximum(src, cut)).astype(np.float64)
 
-    def radiance(d):
+    def radiance(d, size):
         el = elevation(d)
         out = sky_fn(d)
         low = el < 0.0
@@ -632,7 +624,7 @@ def make_sky(name, root=None):
             if mix.any():
                 idx = np.flatnonzero(low)[mix]
                 dd = d.reshape(-1, 3)[idx]
-                angle = (np.pi / 2) / (FACE * SS)
+                angle = (np.pi / 2) / size
                 g = below.radiance(dd, angle, sky_fn)
                 o = out.reshape(-1, 3)
                 o[idx] = o[idx] * w[mix][:, None] + g * (1 - w[mix][:, None])
@@ -654,15 +646,30 @@ def make_sky(name, root=None):
             out = out * (low_col * (1 - k) + np.array(grade[1]) * k)
         return out * tint
 
-    size = FACE * SS
     os.makedirs(OUT, exist_ok=True)
     made = []
-    for face, corners in FACES.items():
-        img = np.empty((size, size, 3), np.float32)
-        for r0 in range(0, size, 256):
-            rows = np.arange(r0, min(size, r0 + 256))
-            img[r0:r0 + len(rows)] = radiance(face_dirs(corners, rows, size))
-        img = img.reshape(FACE, SS, FACE, SS, 3).mean((1, 3))
+    # a sky with the green land below has its five lower faces at LAND_FACE (the land has detail to fill them; the
+    # photograph's sky would gain nothing, and its top stays at FACE)
+    sizes = {f: (LAND_FACE if below.terrain is not None and f != "Top" else FACE) for f in FACES}
+    bands = [(f, r0) for f in FACES for r0 in range(0, sizes[f] * SS, BAND)]
+    global _RENDER
+    _RENDER = (radiance, sizes)
+    try:
+        import multiprocessing as mp
+        workers = mp.get_context("fork").Pool(min(len(bands), os.cpu_count() or 1))
+    except (ImportError, ValueError, OSError):
+        workers = None  # no fork here: one band after another
+    try:
+        done = list((workers.map if workers else map)(_render_band, bands))
+    finally:
+        if workers:
+            workers.close()
+            workers.join()
+    parts = dict(zip(bands, done))
+    for face in FACES:
+        n = sizes[face]
+        img = np.concatenate([parts[(face, r0)] for r0 in range(0, n * SS, BAND)])
+        img = img.reshape(n, SS, n, SS, 3).mean((1, 3))
         ldr = srgb(aces(img * exposure))
         a = np.clip(ldr * 255 + 0.5, 0, 255).astype(np.uint8)
         path = os.path.join(OUT, f"Sky_{name}_{face}.jpg")
@@ -671,6 +678,18 @@ def make_sky(name, root=None):
     print(name, sum(os.path.getsize(p) for p in made), "bytes")
     save_light(name, light, exposure * tint)
     return made
+
+
+BAND = 256  # rows of a face drawn at once (and the unit of work shared among the processes)
+_RENDER = None  # (radiance, sizes) of the sky being made, for the forked processes
+
+
+def _render_band(job):
+    face, r0 = job
+    radiance, sizes = _RENDER
+    size = sizes[face] * SS
+    rows = np.arange(r0, min(size, r0 + BAND))
+    return radiance(face_dirs(FACES[face], rows, size), size).astype(np.float32)
 
 
 def save_light(name, light, exposure):

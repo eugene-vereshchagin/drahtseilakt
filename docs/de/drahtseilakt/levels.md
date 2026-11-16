@@ -247,14 +247,16 @@ und `plug` sind vom Platzcheck ausgenommen. Plätze, Scheiben und Gruben liegen 
 (zwei ebene Teile auf gleicher Höhe wären ein Riss für den Nahttest).
 
 **Himmel.** `sky` wählt die Himmelsbox um das Level: `A`, `B`, `C` (unsere, über einem Wolkenmeer, wie die Buchstaben
-des Originals) oder einen der fotografischen Himmel mit Namen: `Mountains` (ein Abendhimmel über dunstigen Bergen mit
-Schnee auf den Gipfeln), `Forest` (Sommerwolken über einem Blätterdach mit Lichtungen und Seen), `Sea` (ein ruhiges
+des Originals) oder einen der fotografischen Himmel mit Namen: `Mountains` (ein Abendhimmel über bewaldeten Hügeln und
+Bergen mit Flüssen, Seen, Felsgraten und Schnee auf den höchsten Gipfeln), `Forest` (Sommerwolken über einem Blätterdach mit Lichtungen und Seen), `Sea` (ein ruhiges
 Meer im Sonnenuntergang, das die Wolken spiegelt), `Storm` (schwere Wolken über dunklem Meer mit Schaumkronen),
 `Sunset` (ein goldener Sonnenuntergang über einem Wolkenmeer), `Clouds` (ein Sommertag über einem
 Wolkenmeer), `Night` (die Milchstraße über einem dunklen See zwischen
 Hügeln), `Desert` (später Nachmittag über roten Canyons), `Mist` (Abendlicht über Hügeln mit Nebel in den Tälern).
 Ihr Himmel sind CC0-Fotos von Poly Haven; was unter dem Horizont liegt, zeichnet `assets/own/make/make_skies.py`, wie
-aus großer Höhe gesehen, sodass die Bahn hoch darüber schwebt (`assets/own/CREDITS.md`). Jeder andere Name ist ein
+aus großer Höhe gesehen, sodass die Bahn hoch darüber schwebt (`assets/own/CREDITS.md`); unter `Mountains`, `Forest` und `Mist` wird
+das grüne Land Punkt für Punkt im Maßstab jedes Pixels gezeichnet (`assets/own/make/skyland.py`: senkrecht unten
+die Baumkronen, in der Ferne ein kühler bläulich-weißer Dunst), seine unteren Seiten mit 2048 Pixeln. Jeder andere Name ist ein
 Satz Dateien `Textures/Sky/Sky_<Name>_<Seite>` (Front, Right, Back, Left, Down und Top, falls vorhanden) aus dem
 Levelordner oder den Texturen; ein Name besteht aus Buchstaben, Ziffern, `_` und `-`. `--sky NAME` auf der
 Kommandozeile spielt jedes Level unter einem anderen Himmel.
