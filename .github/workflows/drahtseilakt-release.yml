@@ -1,0 +1,267 @@
+# Drahtseilakt release builds: the game and its toolbox for every target, packed as portable archives (the layout of
+# scripts/make-portable.sh: program, toolbox, assets/, licences, README.txt, portable.txt, data/), with SHA256SUMS.
+#
+#   Targets: Linux x86_64 and aarch64, Windows x86_64 and aarch64, macOS arm64 and x86_64, FreeBSD x86_64 (a VM build,
+#   experimental: it may fail without stopping the rest). Built with DRAHTSEILAKT_RELEASE=1 (no debug-by-default, no
+#   god mode). Input `dev` adds a Linux x86_64 DEBUG build without it (god mode on; "-dev" in its name and README).
+#
+#   Triggers (never a branch push): Actions -> "Drahtseilakt release" -> Run workflow (archives as run artifacts), or a
+#   pushed tag like 1.2.3, which also makes a DRAFT GitHub Release with the archives and SHA256SUMS (nothing is public
+#   until the owner publishes the draft). Dev builds are never put into a release.
+#
+#   Secrets: TOOLBOX_TOKEN (fine-grained token, read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox); the job
+#   fails if it is missing while the toolbox is wanted. Optional: ASSETS_TOKEN (read access to the assets bundle's host).
+#   Variables: ASSETS_BUNDLE_URL and ASSETS_BUNDLE_SHA256: level data, textures and generated parts are not in git
+#   (.gitignore), so a package needs them from a bundle (.tar.gz with assets/ in it); see scripts/ci-assets.sh.
+#
+# Actions are pinned by full commit SHA, the Rust toolchain by its exact version, crates by Cargo.lock (fetched once
+# with --locked, then built --offline). Tests are not run here (drahtseilakt.yml does that).
+
+name: Drahtseilakt release
+
+on:
+  workflow_dispatch:
+    inputs:
+      toolbox:
+        description: 'Also build and pack drahtseilakt-toolbox (needs the TOOLBOX_TOKEN secret)'
+        type: boolean
+        default: true
+      dev:
+        description: 'Also a Linux x86_64 DEBUG dev build (god mode on, "-dev" in its name)'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drahtseilakt-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_TOOLCHAIN: '1.99.1'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.p.outputs.matrix }}
+      version: ${{ steps.p.outputs.version }}
+      toolbox: ${{ steps.p.outputs.toolbox }}
+    steps:
+      - id: p
+        env:
+          EVENT: ${{ github.event_name }}
+          TOOLBOX_INPUT: ${{ inputs.toolbox }}
+          DEV_INPUT: ${{ inputs.dev }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$REF_TYPE" = tag ]; then version=$REF_NAME; else version="git-${SHA:0:7}"; fi
+          # a tag push has no inputs: the toolbox is part of a release
+          toolbox=true; [ "$EVENT" != workflow_dispatch ] || [ "$TOOLBOX_INPUT" = true ] || toolbox=false
+          matrix='[
+            {"name":"linux-x86_64","runner":"ubuntu-22.04","os":"linux","arch":"x86_64","dev":false},
+            {"name":"linux-aarch64","runner":"ubuntu-22.04-arm","os":"linux","arch":"aarch64","dev":false},
+            {"name":"windows-x86_64","runner":"windows-2025","os":"windows","arch":"x86_64","dev":false},
+            {"name":"windows-aarch64","runner":"windows-11-arm","os":"windows","arch":"aarch64","dev":false},
+            {"name":"macos-aarch64","runner":"macos-15","os":"macos","arch":"aarch64","dev":false},
+            {"name":"macos-x86_64","runner":"macos-15-intel","os":"macos","arch":"x86_64","dev":false}]'
+          if [ "$EVENT" = workflow_dispatch ] && [ "$DEV_INPUT" = true ]; then
+            matrix=$(jq -c '. + [{"name":"linux-x86_64-dev","runner":"ubuntu-22.04","os":"linux","arch":"x86_64","dev":true}]' <<<"$matrix")
+          else
+            matrix=$(jq -c . <<<"$matrix")
+          fi
+          { echo "matrix=$matrix"; echo "version=$version"; echo "toolbox=$toolbox"; } >>"$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      TOOLBOX: ${{ needs.plan.outputs.toolbox == 'true' && '1' || '0' }}
+      DEV: ${{ matrix.dev && '1' || '0' }}
+      OS_KIND: ${{ matrix.os }}
+      ARCH: ${{ matrix.arch }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
+      ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
+      ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || secrets.TOOLBOX_TOKEN }}
+    steps:
+      - name: the toolbox needs its token
+        if: env.TOOLBOX == '1'
+        env:
+          TOKEN: ${{ secrets.TOOLBOX_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::The secret TOOLBOX_TOKEN is not set (a fine-grained token, read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox). Set it, or run with the toolbox input off."
+            exit 1
+          fi
+      # the files exactly as committed (Windows runners convert line ends by default)
+      - name: no line-end conversion
+        run: git config --global core.autocrlf false
+      # the toolbox takes the game's crates by path ../ballance/drahtseilakt: both checked out in that layout
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ballance/drahtseilakt
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.TOOLBOX == '1'
+        with:
+          repository: eugene-vereshchagin/drahtseilakt-toolbox
+          token: ${{ secrets.TOOLBOX_TOKEN }}
+          path: drahtseilakt-toolbox
+          persist-credentials: false
+      - name: toolchain
+        working-directory: ballance/drahtseilakt
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup override set "$RUST_TOOLCHAIN"
+          rustc --version && cargo --version
+      - name: system libraries (Linux; gamepads need udev, sound ALSA, the toolbox's window xkb and wayland)
+        if: matrix.os == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libasound2-dev libxkbcommon-dev libwayland-dev
+      - name: fetch crates (pinned by Cargo.lock)
+        run: |
+          (cd ballance/drahtseilakt && cargo fetch --locked)
+          if [ "$TOOLBOX" = 1 ]; then (cd drahtseilakt-toolbox && cargo fetch --locked); fi
+      - name: build the game
+        working-directory: ballance/drahtseilakt
+        env:
+          VXMATH_FONT_DIR: ${{ github.workspace }}/ballance/drahtseilakt/assets/fonts
+        run: |
+          # a release package is built with DRAHTSEILAKT_RELEASE set (no debug by default, no god mode); the dev one without
+          if [ "$DEV" = 1 ]; then unset DRAHTSEILAKT_RELEASE; else export DRAHTSEILAKT_RELEASE=1; fi
+          cargo build --release --locked --offline -p drahtseilakt
+      - name: build the toolbox
+        if: env.TOOLBOX == '1'
+        working-directory: drahtseilakt-toolbox
+        run: cargo build --release --locked --offline
+      - name: assets (the bundle, the manual, checksums)
+        working-directory: ballance/drahtseilakt
+        run: scripts/ci-assets.sh
+      - name: package
+        working-directory: ballance/drahtseilakt
+        env:
+          GAME_BIN: ${{ github.workspace }}/ballance/drahtseilakt/target/release/drahtseilakt${{ matrix.os == 'windows' && '.exe' || '' }}
+          TOOL_BIN: ${{ github.workspace }}/drahtseilakt-toolbox/target/release/drahtseilakt-toolbox${{ matrix.os == 'windows' && '.exe' || '' }}
+          TOOLBOX_DIR: ${{ github.workspace }}/drahtseilakt-toolbox
+        run: scripts/ci-package.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drahtseilakt-${{ matrix.name }}
+          path: |
+            ballance/drahtseilakt/dist/*.tar.gz
+            ballance/drahtseilakt/dist/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  # FreeBSD: built inside a VM. Experimental: the platform stack (sound, input, window) is untested, so a failure here
+  # does not stop the release; the archive is added when it succeeds.
+  freebsd:
+    needs: plan
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 120
+    env:
+      TOOLBOX: ${{ needs.plan.outputs.toolbox == 'true' && '1' || '0' }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: the toolbox needs its token
+        if: env.TOOLBOX == '1'
+        env:
+          TOKEN: ${{ secrets.TOOLBOX_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::The secret TOOLBOX_TOKEN is not set. Set it, or run with the toolbox input off."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ballance/drahtseilakt
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.TOOLBOX == '1'
+        with:
+          repository: eugene-vereshchagin/drahtseilakt-toolbox
+          token: ${{ secrets.TOOLBOX_TOKEN }}
+          path: drahtseilakt-toolbox
+          persist-credentials: false
+      - uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
+        env:
+          ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
+          ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || secrets.TOOLBOX_TOKEN }}
+        with:
+          release: '14.3'
+          usesh: true
+          envs: 'TOOLBOX VERSION ASSETS_BUNDLE_URL ASSETS_BUNDLE_SHA256 ASSETS_TOKEN'
+          prepare: |
+            pkg install -y bash curl unzip git pkgconf rust py311-markdown python3 alsa-lib libudev-devd libxkbcommon wayland
+          run: |
+            set -eu
+            export DEV=0 OS_KIND=freebsd ARCH=x86_64
+            export DRAHTSEILAKT_RELEASE=1 CARGO_INCREMENTAL=0
+            W=$(pwd)
+            export VXMATH_FONT_DIR="$W/ballance/drahtseilakt/assets/fonts"
+            # the VM's own rust (pkg): the pinned toolchain is for the other targets
+            rustc --version
+            (cd ballance/drahtseilakt && cargo fetch --locked && cargo build --release --locked --offline -p drahtseilakt)
+            if [ "$TOOLBOX" = 1 ]; then (cd drahtseilakt-toolbox && cargo fetch --locked && cargo build --release --locked --offline); fi
+            cd ballance/drahtseilakt
+            bash scripts/ci-assets.sh
+            GAME_BIN="$W/ballance/drahtseilakt/target/release/drahtseilakt" \
+            TOOL_BIN="$W/drahtseilakt-toolbox/target/release/drahtseilakt-toolbox" \
+            TOOLBOX_DIR="$W/drahtseilakt-toolbox" bash scripts/ci-package.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drahtseilakt-freebsd-x86_64
+          path: ballance/drahtseilakt/dist/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  # A pushed tag: a DRAFT release with every archive that was built and SHA256SUMS. Never published automatically.
+  release:
+    needs: [plan, build, freebsd]
+    if: ${{ !cancelled() && github.ref_type == 'tag' && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: drahtseilakt-*
+          merge-multiple: true
+          path: dist
+      - name: draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -l
+          sha256sum -- *.tar.gz *.zip > SHA256SUMS
+          cat SHA256SUMS
+          gh release create "$TAG" --draft --verify-tag --title "Drahtseilakt $TAG" \
+            --notes "Portable builds of Drahtseilakt $TAG with the toolbox. Unpack, run, nothing leaves the folder. Check the files against SHA256SUMS. macOS builds are not signed (README.txt in the archive says how to open them). FreeBSD is experimental." \
+            -- *.tar.gz *.zip SHA256SUMS

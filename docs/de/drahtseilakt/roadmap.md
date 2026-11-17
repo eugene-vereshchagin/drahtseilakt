@@ -272,8 +272,8 @@ alles Folgende gilt. Stand 2026-11-16: **erledigt**, **teilweise**, **offen**.
   **teilweise** (einzelne Level aufgenommen, die ganze Reihe und der Upload offen).
 - **Builds für jede Desktop-Plattform**: Linux, Windows und macOS (BSD willkommen), als Installer und als portabler
   Ordner. **Teilweise**: der portable Linux-Build existiert und wird aktuell gehalten; die Builds für Windows und macOS
-  sind in der CI vorbereitet (`.github/workflows/drahtseilakt.yml`) und warten auf den Befehl des Eigentümers;
-  Installer und BSD sind offen.
+  sind in der CI vorbereitet (`.github/workflows/drahtseilakt-release.yml`: portable Archive mit der Toolbox für Linux, Windows, macOS und FreeBSD, Release-Entwurf bei einem Versions-Tag) und warten auf den Befehl des Eigentümers und das Asset-Paket;
+  Installer sind offen.
 - **Die Toolbox wird mit dem Spiel ausgeliefert** (`drahtseilakt-toolbox`, ein eigenes Programm). **Teilweise**: die CI
   kann sie neben dem Spiel bauen; in den Paketen ist sie noch nicht.
 - **Ein öffentliches, sauberes Repository**: die Veröffentlichung ist ein neues Repository ohne Historie und Daten des

@@ -1,0 +1,9 @@
+# Pins for Real-ESRGAN builds that the toolbox's third-party.txt does not list yet, in the same block format (name,
+# url, sha256); scripts/ci-package.sh reads this file after the toolbox's. Same release as there (v0.2.5.0, 20220424).
+# The macOS archive holds a universal binary (x86_64 and arm64) and the same models. No published hash: this one was
+# taken at the first download (2026-11-17), size 51817124 bytes. Licences as for the other builds
+# (scripts/portable/realesrgan-LICENSES.txt).
+name      realesrgan-ncnn-vulkan-macos
+version   v0.2.5.0 (20220424)
+url       https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-macos.zip
+sha256    e0ad05580abfeb25f8d8fb55aaf7bedf552c375b5b4d9bd3c8d59764d2cc333a
