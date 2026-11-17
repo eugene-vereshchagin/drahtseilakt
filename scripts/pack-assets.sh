@@ -6,10 +6,11 @@
 #                                          community .nmo maps, the showcase): what every package needs. CI fetches it
 #                                          (scripts/ci-assets.sh: repository variables ASSETS_BUNDLE_URL and
 #                                          ASSETS_BUNDLE_SHA256, the latter printed here).
-#   OUT/levels/<level>.zip                 one picked map each (assets/levels/drahtseilakt/NN-*, 100-550 MB, mostly
-#                                          4K textures): players download the ones they want and unpack them into
-#                                          the game's assets/levels/drahtseilakt/. GitHub takes no file over 2 GiB,
-#                                          so these never go into a release archive.
+#   OUT/levels/<level>.zip                 one picked map each (assets/levels/drahtseilakt/NN-*), compressed, without
+#                                          the PNG of a texture that has its .dtx beside it (the game draws the .dtx;
+#                                          a level may carry only the compressed one, open-format.md): players
+#                                          download the ones they want and unpack them into the game's
+#                                          assets/levels/drahtseilakt/. GitHub takes no file over 2 GiB.
 #   OUT/SHA256SUMS                         of everything above.
 #
 #   scripts/pack-assets.sh [OUT]      (default: ../drahtseilakt-portable/bundles)
@@ -41,12 +42,19 @@ rm -f "$base"
 gzip -n "${base%.gz}"
 echo "$base ($(du -h "$base" | cut -f1))"
 
-# one zip per picked map, with the folder at its top, and its own checksums inside
+# one zip per picked map, with the folder at its top and its own checksums inside, without the PNGs a .dtx stands for
 for d in $big; do
     z="$out/levels/$d.zip"
     rm -f "$z"
-    (cd "$picks" && grep -F "  $d/" SHA256SUMS | sed "s,  $d/,  ," >"$stage/sums" &&
-        cp "$stage/sums" "$d/SHA256SUMS" && zip -q -r -0 "$z" "$d" && rm "$d/SHA256SUMS")
+    (cd "$picks" && find "$d" -type f ! -name SHA256SUMS | sort | while IFS= read -r f; do
+        case "$f" in */textures/*.png) [ -f "${f%.png}.dtx" ] && continue ;; esac
+        printf '%s\n' "$f"
+    done) >"$stage/files"
+    mkdir -p "$stage/z/$d"
+    (cd "$picks" && while IFS= read -r f; do sha256sum "$f"; done <"$stage/files") |
+        sed "s,  $d/,  ," >"$stage/z/$d/SHA256SUMS"
+    (cd "$picks" && zip -q -9 "$z" -@ <"$stage/files")
+    (cd "$stage/z" && zip -q -9 "$z" "$d/SHA256SUMS")
     echo "$z ($(du -h "$z" | cut -f1))"
 done
 
