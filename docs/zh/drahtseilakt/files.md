@@ -2,7 +2,7 @@
 
 游戏读取两类文件：**随游戏发布的资源**（`assets/`：字体、自带部件、关卡、出厂 mod、音效主题）和**玩家的数据**（设置、回放、最高分、导入和自制的关卡、玩家的包、mod 和音效主题）。下面两种布局用的是同一个程序。
 
-**发布资源**，先找到的生效：`$DRAHTSEILAKT_ASSETS`；程序旁边的 `assets/`；`../Resources/assets`（macOS 的 .app 包）；仅供开发者使用的源码树（`target/release` 往上三级的 `assets/`，或编译时的路径）。启动时游戏会打印一行 `paths: assets ... | data ... (portable|per-user)`，会话日志也会重复这一行。
+**发布资源**，先找到的生效：`$DRAHTSEILAKT_ASSETS`；程序旁边的 `assets/`；`../Resources/assets`（macOS 的 .app 包）；`../share/drahtseilakt/assets`（安装在前缀下：Linux 软件包把程序放在 `/usr/bin`，数据放在 `/usr/share/drahtseilakt/assets`）；仅供开发者使用的源码树（`target/release` 往上三级的 `assets/`，或编译时的路径）；最后是 `$XDG_DATA_DIRS` 每个目录下的 `drahtseilakt/assets`（默认 `/usr/local/share:/usr/share`）。发布包：[release.md](release.md)。启动时游戏会打印一行 `paths: assets ... | data ... (portable|per-user)`，会话日志也会重复这一行。
 
 **便携版**（复制文件夹即可玩，不触碰文件夹之外的任何东西）：`drahtseilakt(.exe)`、`assets/` 和一个空文件 `portable.txt` 放在一起。玩家数据此时位于程序旁的 `data/`。规则只有这个文件：没有 `portable.txt` 就不是便携模式。
 

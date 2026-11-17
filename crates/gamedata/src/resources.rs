@@ -128,10 +128,28 @@ pub fn default_for(copy_has_menu: bool) -> Provider {
     }
 }
 
+/// Where a prefix keeps the assets, below its `bin/` sibling.
+const SHARE_ASSETS: &str = "share/drahtseilakt/assets";
+
+/// `drahtseilakt/assets` in each absolute folder of an `XDG_DATA_DIRS` value (a relative one is ignored, as the XDG
+/// spec says); an unset or empty value means /usr/local/share:/usr/share.
+fn data_dirs_assets(xdg_data_dirs: Option<&std::ffi::OsStr>) -> Vec<PathBuf> {
+    let list = match xdg_data_dirs {
+        Some(v) if !v.is_empty() => v.to_os_string(),
+        _ => "/usr/local/share:/usr/share".into(),
+    };
+    std::env::split_paths(&list)
+        .filter(|d| d.is_absolute())
+        .map(|d| d.join("drahtseilakt/assets"))
+        .collect()
+}
+
 /// The game's own assets folder (fonts, own files), in this order: `DRAHTSEILAKT_ASSETS`; `assets/` beside the
-/// program; `../Resources/assets` (a macOS .app bundle); then, only as a developer's fallback, the source tree (three
-/// folders up from a build's target/release, four from a test's target/release/deps, and last the path the program
-/// was compiled in). One answer for the whole game, found once.
+/// program; `../Resources/assets` (a macOS .app bundle); `../share/drahtseilakt/assets` (installed under a prefix, as
+/// the Linux packages put it: /usr/bin and /usr/share/drahtseilakt/assets); then, only as a developer's fallback, the
+/// source tree (three folders up from a build's target/release, four from a test's target/release/deps, and the path
+/// the program was compiled in); and last the standard data folders, `drahtseilakt/assets` in each of
+/// `$XDG_DATA_DIRS` (default /usr/local/share:/usr/share). One answer for the whole game, found once.
 pub fn assets_root() -> Option<PathBuf> {
     static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
@@ -161,14 +179,22 @@ pub fn assets_root() -> Option<PathBuf> {
             .and_then(Path::parent)
             .and_then(Path::parent)
             .map(|d| d.join("Resources/assets"));
+        let prefix = exe
+            .as_deref()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+            .map(|d| d.join(SHARE_ASSETS));
         let compiled = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
+        let xdg = std::env::var_os("XDG_DATA_DIRS");
         from_env
             .into_iter()
             .chain(beside)
             .chain(bundle)
+            .chain(prefix)
             .chain(tree)
             .chain(deps)
             .chain(compiled)
+            .chain(data_dirs_assets(xdg.as_deref()))
             .find(|p| real(p))
     })
     .clone()
@@ -523,6 +549,24 @@ mod tests {
         assert_eq!(meant_texture("", &none), None);
         // names that are no ASCII do not cut inside a letter
         assert_eq!(meant_texture("水面水面水面", &none), None);
+    }
+
+    /// The standard data folders are looked in for the installed assets; a relative entry is no folder to trust.
+    #[test]
+    fn the_standard_data_folders_are_searched() {
+        use std::ffi::OsStr;
+        assert_eq!(
+            data_dirs_assets(None),
+            [
+                PathBuf::from("/usr/local/share/drahtseilakt/assets"),
+                PathBuf::from("/usr/share/drahtseilakt/assets")
+            ]
+        );
+        assert_eq!(data_dirs_assets(Some(OsStr::new(""))).len(), 2);
+        assert_eq!(
+            data_dirs_assets(Some(OsStr::new("rel/dir:/opt/share"))),
+            [PathBuf::from("/opt/share/drahtseilakt/assets")]
+        );
     }
 
     #[test]

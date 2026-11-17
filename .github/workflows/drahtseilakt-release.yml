@@ -1,18 +1,26 @@
-# Drahtseilakt release builds: the game and its toolbox for every target, packed as portable archives (the layout of
-# scripts/make-portable.sh: program, toolbox, assets/, licences, README.txt, portable.txt, data/), with SHA256SUMS.
+# Drahtseilakt BINARY release: the game (and its toolbox in the portable archives) for every target, with SHA256SUMS.
+# Data and levels are NOT built here: they change rarely and are released apart (docs/drahtseilakt/release.md).
 #
-#   Targets: Linux x86_64 and aarch64, Windows x86_64 and aarch64, macOS arm64 and x86_64, FreeBSD x86_64 (a VM build,
-#   experimental: it may fail without stopping the rest). Built with DRAHTSEILAKT_RELEASE=1 (no debug-by-default, no
-#   god mode). Input `dev` adds a Linux x86_64 DEBUG build without it (god mode on; "-dev" in its name and README).
+#   Per target (docs/drahtseilakt/release.md has the file names):
+#     Linux x86_64, aarch64   portable .tar.gz (program, bundled libs, base data, toolbox), .deb and .rpm of the
+#                             program (Depends: drahtseilakt-data >= scripts/DATA_VERSION)
+#     Windows x86_64, aarch64 portable .zip and an NSIS installer (per user, base data included; built on Ubuntu)
+#     macOS arm64, x86_64     Drahtseilakt.app in a .dmg (unsigned) and a portable .tar.gz
+#     FreeBSD x86_64          portable .tar.gz (a VM build, experimental: it may fail without stopping the rest)
+#   Built with DRAHTSEILAKT_RELEASE=1 (no debug-by-default, no god mode). Input `dev` adds a Linux x86_64 DEBUG build
+#   without it (god mode on): a portable .tar.gz and drahtseilakt-dev .deb ("-dev" in the names; conflicts with
+#   drahtseilakt). Dev builds are never put into a release.
 #
 #   Triggers (never a branch push): Actions -> "Drahtseilakt release" -> Run workflow (archives as run artifacts), or a
-#   pushed tag like 1.2.3, which also makes a DRAFT GitHub Release with the archives and SHA256SUMS (nothing is public
-#   until the owner publishes the draft). Dev builds are never put into a release.
+#   pushed tag like 1.2.3, which also makes a DRAFT GitHub Release with the binary packages and SHA256SUMS (nothing is
+#   public until the owner publishes the draft; the data and levels packages are not in it).
 #
 #   Secrets: TOOLBOX_TOKEN (fine-grained token, read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox); the job
-#   fails if it is missing while the toolbox is wanted. Optional: ASSETS_TOKEN (read access to the assets bundle's host).
+#   fails if it is missing while the toolbox is wanted. Optional: ASSETS_TOKEN (read access to the data release, if it is not in this repository; else the run's own token reads it).
 #   Variables: ASSETS_BUNDLE_URL and ASSETS_BUNDLE_SHA256: level data, textures and generated parts are not in git
-#   (.gitignore), so a package needs them from a bundle (.tar.gz with assets/ in it); see scripts/ci-assets.sh.
+#   (.gitignore), so the portable archives, the installer and the .app take them from the base data tarball in the
+#   data release (data-<scripts/DATA_VERSION>, drahtseilakt-data-<V>.tar.gz); see scripts/ci-assets.sh. The .deb/.rpm of
+#   the program carry no data (they depend on drahtseilakt-data).
 #
 # Actions are pinned by full commit SHA, the Rust toolchain by its exact version, crates by Cargo.lock (fetched once
 # with --locked, then built --offline). Tests are not run here (drahtseilakt.yml does that).
@@ -101,7 +109,8 @@ jobs:
       VERSION: ${{ needs.plan.outputs.version }}
       ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
       ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
-      ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || secrets.TOOLBOX_TOKEN }}
+      ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || github.token }}
+      GAME_BIN: ${{ github.workspace }}/ballance/drahtseilakt/target/release/drahtseilakt${{ matrix.os == 'windows' && '.exe' || '' }}
     steps:
       - name: the toolbox needs its token
         if: env.TOOLBOX == '1'
@@ -152,13 +161,25 @@ jobs:
         if: env.TOOLBOX == '1'
         working-directory: drahtseilakt-toolbox
         run: cargo build --release --locked --offline
-      - name: assets (the bundle, the manual, checksums)
+      # the program alone, no data: it depends on drahtseilakt-data (the data release). .deb and .rpm (the dev flavour: .deb only)
+      - name: Linux packages (.deb, .rpm)
+        if: matrix.os == 'linux'
+        working-directory: ballance/drahtseilakt
+        run: |
+          args=(game --bin "$GAME_BIN" --arch "$ARCH" --version "$VERSION" --out dist)
+          if [ "$DEV" = 1 ]; then args+=(--dev); fi
+          scripts/make-distro-packages.sh "${args[@]}"
+      - name: assets (the base data, the manual, checksums)
         working-directory: ballance/drahtseilakt
         run: scripts/ci-assets.sh
-      - name: package
+      # the .app is unsigned (no Apple developer account); assets/ is copied, so this runs before ci-package.sh moves it
+      - name: macOS app and .dmg
+        if: matrix.os == 'macos'
+        working-directory: ballance/drahtseilakt
+        run: scripts/ci-macos-app.sh
+      - name: portable archive
         working-directory: ballance/drahtseilakt
         env:
-          GAME_BIN: ${{ github.workspace }}/ballance/drahtseilakt/target/release/drahtseilakt${{ matrix.os == 'windows' && '.exe' || '' }}
           TOOL_BIN: ${{ github.workspace }}/drahtseilakt-toolbox/target/release/drahtseilakt-toolbox${{ matrix.os == 'windows' && '.exe' || '' }}
           TOOLBOX_DIR: ${{ github.workspace }}/drahtseilakt-toolbox
         run: scripts/ci-package.sh
@@ -168,6 +189,9 @@ jobs:
           path: |
             ballance/drahtseilakt/dist/*.tar.gz
             ballance/drahtseilakt/dist/*.zip
+            ballance/drahtseilakt/dist/*.deb
+            ballance/drahtseilakt/dist/*.rpm
+            ballance/drahtseilakt/dist/*.dmg
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -207,7 +231,7 @@ jobs:
         env:
           ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
           ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
-          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || secrets.TOOLBOX_TOKEN }}
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || github.token }}
         with:
           release: '14.3'
           usesh: true
@@ -237,9 +261,45 @@ jobs:
           compression-level: 0
           retention-days: 14
 
-  # A pushed tag: a DRAFT release with every archive that was built and SHA256SUMS. Never published automatically.
+  # The Windows installers (NSIS, per user), made on Ubuntu from the portable zips: makensis packs files for any Windows
+  # architecture. The base data is in the zip, so the installer is complete. Unsigned (SmartScreen warns).
+  installer:
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: drahtseilakt-windows-${{ matrix.arch }}
+          path: portable
+      - name: NSIS
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends nsis
+          makensis -VERSION
+      - name: installer
+        run: scripts/ci-windows-installer.sh "portable/drahtseilakt-$VERSION-windows-$ARCH.zip" "$VERSION" "$ARCH" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drahtseilakt-installer-windows-${{ matrix.arch }}
+          path: dist/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  # A pushed tag: a DRAFT release with every binary package that was built and SHA256SUMS. Never published automatically.
   release:
-    needs: [plan, build, freebsd]
+    needs: [plan, build, installer, freebsd]
     if: ${{ !cancelled() && github.ref_type == 'tag' && needs.build.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -260,8 +320,10 @@ jobs:
           set -euo pipefail
           cd dist
           ls -l
-          sha256sum -- *.tar.gz *.zip > SHA256SUMS
+          shopt -s nullglob
+          files=(*.tar.gz *.zip *.deb *.rpm *.dmg *.exe)
+          sha256sum -- "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
           gh release create "$TAG" --draft --verify-tag --title "Drahtseilakt $TAG" \
-            --notes "Portable builds of Drahtseilakt $TAG with the toolbox. Unpack, run, nothing leaves the folder. Check the files against SHA256SUMS. macOS builds are not signed (README.txt in the archive says how to open them). FreeBSD is experimental." \
-            -- *.tar.gz *.zip SHA256SUMS
+            --notes "Drahtseilakt $TAG, the program: Windows installers and portable zips, Linux .deb/.rpm (they need drahtseilakt-data) and portable archives, macOS .dmg (unsigned) and portable archives, FreeBSD (experimental). The portable archives and installers include the base data; the 13 picked maps are in the data release. Check the files against SHA256SUMS." \
+            -- "${files[@]}" SHA256SUMS

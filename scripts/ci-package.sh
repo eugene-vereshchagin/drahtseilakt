@@ -132,7 +132,8 @@ esac
     echo
     echo "The original Ballance levels need a copy of the game: import it from the menu (it is copied into data/)."
     echo "The 13 picked community maps in the open format (100-550 MB each, mostly 4K textures) are separate downloads,"
-    echo "one .zip a map (scripts/pack-assets.sh makes them): unpack each into assets/levels/drahtseilakt/ in this folder."
+    echo "one .zip a map, in the release tagged data-<number> (docs/drahtseilakt/release.md): unpack each into"
+    echo "assets/levels/drahtseilakt/ in this folder."
     echo
     echo "Needs: $sysreq."
     echo "Licence: GPL-3.0 (LICENSE); everything else in it and its licences: THIRD-PARTY.md; credits: CREDITS.md and"

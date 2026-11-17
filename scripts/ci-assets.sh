@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # CI: makes sure assets/ is complete before a package is built. A fresh clone lacks the files git does not hold (level
-# data, textures, our generated parts: .gitignore, "no binaries in git"). They come from an assets bundle, a .tar.gz
-# with an assets/ folder in it, whose address and SHA-256 are the repository variables ASSETS_BUNDLE_URL and
-# ASSETS_BUNDLE_SHA256 (a private release asset's API URL is fine; the secret ASSETS_TOKEN or TOOLBOX_TOKEN is
+# data, textures, our generated parts: .gitignore, "no binaries in git"). They come from the base data tarball
+# (drahtseilakt-data-<V>.tar.gz, made by scripts/pack-assets.sh and uploaded to the GitHub release tagged data-<V>; V is
+# scripts/DATA_VERSION), a .tar.gz with an assets/ folder in it, whose address and SHA-256 are the repository variables ASSETS_BUNDLE_URL and
+# ASSETS_BUNDLE_SHA256 (a private release asset's API URL is fine; the secret ASSETS_TOKEN or the run's token is
 # sent as its bearer token). The manual is generated here (tools/make_manual.py). Then the checks of
 # scripts/make-portable.sh run. Fails with a clear message when anything is missing; never builds an incomplete package.
 set -euo pipefail
@@ -19,7 +20,9 @@ complete() {
 if ! complete; then
     url=${ASSETS_BUNDLE_URL:-} want=${ASSETS_BUNDLE_SHA256:-} token=${ASSETS_TOKEN:-}
     [ -n "$url" ] && [ -n "$want" ] || die "assets/ lacks the level data, textures and generated parts (not in git), and no bundle is set: add the repository variables ASSETS_BUNDLE_URL and ASSETS_BUNDLE_SHA256 (a .tar.gz with assets/ in it)"
-    echo "ci-assets: downloading the assets bundle"
+    dv=$(tr -d ' \n' <scripts/DATA_VERSION)
+    case $url in *"$dv"*) ;; *) echo "::warning::ci-assets: ASSETS_BUNDLE_URL does not mention DATA_VERSION $dv (scripts/DATA_VERSION): packages depend on drahtseilakt-data >= $dv" ;; esac
+    echo "ci-assets: downloading the base data (data-$dv)"
     auth=(); [ -z "$token" ] || auth=(-H "Authorization: Bearer $token")
     mkdir -p "${RUNNER_TEMP:-/tmp}"
     bundle="${RUNNER_TEMP:-/tmp}/assets-bundle.tar.gz"

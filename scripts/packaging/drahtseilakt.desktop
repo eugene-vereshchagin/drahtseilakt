@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Drahtseilakt
+GenericName=Puzzle game
+Comment=A ball-rolling puzzle game, a new engine for Ballance (2004)
+Exec=drahtseilakt
+Icon=drahtseilakt
+Terminal=false
+Categories=Game;LogicGame;
