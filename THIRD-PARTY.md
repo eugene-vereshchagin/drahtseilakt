@@ -454,7 +454,7 @@ Licences, by count: 130× MIT OR Apache-2.0; 62× MIT; 15× Zlib OR Apache-2.0 O
 | zune-core | 0.5.3 | MIT OR Apache-2.0 OR Zlib |
 | zune-jpeg | 0.5.15 | MIT OR Apache-2.0 OR Zlib |
 
-Build-time only (build scripts and their helpers; not in the program, listed so the check sees every crate in Cargo.lock): 17.
+Build-time only (build scripts and their helpers; not in the program, listed so the check sees every crate in Cargo.lock): 18.
 
 | Crate | Version | Licence |
 |---|---|---|
@@ -474,6 +474,7 @@ Build-time only (build scripts and their helpers; not in the program, listed so 
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
 | walkdir | 2.5.0 | Unlicense/MIT |
+| winresource | 0.1.34 | MIT |
 | xml-rs | 0.8.29 | MIT |
 
 <!-- third-party:crates:end -->
