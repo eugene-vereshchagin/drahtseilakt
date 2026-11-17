@@ -23,7 +23,11 @@ if [ ! -f assets/manual/index.html ]; then
 fi
 [ -f assets/manual/index.html ] || die "no manual after tools/make_manual.py"
 
-# the checkout's levels/drahtseilakt/SHA256SUMS lists the picked maps too; they are not here
+# the checkout holds only the text source (level.txt) of a picked map, which would show as a broken level in the game:
+# remove such a folder (the maps come with their own release assets); then the levels' SHA256SUMS drops their entries
+for d in assets/levels/drahtseilakt/[0-9][1-9]-* assets/levels/drahtseilakt/[1-9][0-9]-*; do
+    [ -d "$d" ] && [ ! -f "$d/level.bin" ] && rm -rf "$d"
+done
 sums=assets/levels/drahtseilakt/SHA256SUMS
 if [ -f "$sums" ]; then
     : >"$sums.tmp"
