@@ -3,7 +3,8 @@
 #
 #   Per target (docs/drahtseilakt/release.md has the file names):
 #     Linux x86_64, aarch64   portable .tar.gz (program, bundled libs, base data, toolbox), .deb and .rpm of the
-#                             program (Depends: drahtseilakt-data >= scripts/DATA_VERSION)
+#                             program (Depends: drahtseilakt-data >= scripts/DATA_VERSION); the x86_64 job also builds
+#                             drahtseilakt-data .deb/.rpm (all architectures) from the checkout
 #     Windows x86_64, aarch64 portable .zip and an NSIS installer (per user, base data included; built on Ubuntu)
 #     macOS arm64, x86_64     Drahtseilakt.app in a .dmg (unsigned) and a portable .tar.gz
 #     FreeBSD x86_64          portable .tar.gz (a VM build, experimental: it may fail without stopping the rest)
@@ -13,15 +14,14 @@
 #
 #   Triggers (never a branch push): Actions -> "Drahtseilakt release" -> Run workflow (archives as run artifacts), or a
 #   pushed tag like 1.2.3, which also makes a DRAFT GitHub Release with the binary packages and SHA256SUMS (nothing is
-#   public until the owner publishes the draft; the data and levels packages are not in it).
+#   public until the owner publishes the draft; the levels packages are not in it).
 #
 #   Secrets: TOOLBOX_TOKEN (fine-grained token, read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox); the job
-#   fails if it is missing while the toolbox is wanted. Optional: ASSETS_TOKEN (read access to the data release, if it is not in this repository; else the run's own token reads it).
-#   Variables: ASSETS_BUNDLE_URL and ASSETS_BUNDLE_SHA256: level data, textures and generated parts are not in git
-#   (.gitignore), so the portable archives, the installer and the .app take them from the base data tarball in the
-#   data release (data-<scripts/DATA_VERSION>, drahtseilakt-data-<V>.tar.gz); see scripts/ci-assets.sh. The .deb/.rpm of
-#   the program carry no data (they depend on drahtseilakt-data).
-#
+#   fails if it is missing while the toolbox is wanted.
+#   The base data (our parts, textures, fonts, sounds, the showcase, the community maps) is IN GIT (owner's decision
+#   2026-11-17), so every build takes it from the checkout; only the manual is generated (scripts/ci-assets.sh). The 13
+#   picked maps are not in git (files over 100 MB): they are the release assets of the data-<V> release, made by hand.
+
 # Actions are pinned by full commit SHA, the Rust toolchain by its exact version, crates by Cargo.lock (fetched once
 # with --locked, then built --offline). Tests are not run here (drahtseilakt.yml does that).
 
@@ -166,14 +166,14 @@ jobs:
           args=(game --bin "$GAME_BIN" --arch "$ARCH" --version "$VERSION" --out dist)
           if [ "$DEV" = 1 ]; then args+=(--dev); fi
           scripts/make-distro-packages.sh "${args[@]}"
-      # the token only in this step: the build steps before it run third-party build scripts
-      - name: assets (the base data, the manual, checksums)
+      - name: assets (the base data from the checkout, the manual, checksums)
         working-directory: ballance/drahtseilakt
-        env:
-          ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
-          ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
-          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || github.token }}
         run: scripts/ci-assets.sh
+      # the base data as packages, once (it is the same for every architecture): from the checkout, before ci-package.sh moves assets/
+      - name: Linux data packages (.deb, .rpm)
+        if: matrix.os == 'linux' && matrix.arch == 'x86_64' && !matrix.dev
+        working-directory: ballance/drahtseilakt
+        run: scripts/make-distro-packages.sh data --out dist
       # the .app is unsigned (no Apple developer account); assets/ is copied, so this runs before ci-package.sh moves it
       - name: macOS app and .dmg
         if: matrix.os == 'macos'
@@ -230,14 +230,10 @@ jobs:
           path: drahtseilakt-toolbox
           persist-credentials: false
       - uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
-        env:
-          ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
-          ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
-          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || github.token }}
         with:
           release: '14.3'
           usesh: true
-          envs: 'TOOLBOX VERSION ASSETS_BUNDLE_URL ASSETS_BUNDLE_SHA256 ASSETS_TOKEN'
+          envs: 'TOOLBOX VERSION'
           prepare: |
             pkg install -y bash curl unzip git pkgconf rust py311-markdown python3 alsa-lib libudev-devd libxkbcommon wayland
           run: |
@@ -327,5 +323,5 @@ jobs:
           sha256sum -- "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
           gh release create "$TAG" --draft --verify-tag --title "Drahtseilakt $TAG" \
-            --notes "Drahtseilakt $TAG, the program: Windows installers and portable zips, Linux .deb/.rpm (they need drahtseilakt-data) and portable archives, macOS .dmg (unsigned) and portable archives, FreeBSD (experimental). The portable archives and installers include the base data; the 13 picked maps are in the data release. Check the files against SHA256SUMS." \
+            --notes "Drahtseilakt $TAG, the program: Windows installers and portable zips, Linux .deb/.rpm (the program and drahtseilakt-data) and portable archives, macOS .dmg (unsigned) and portable archives, FreeBSD (experimental). The portable archives and installers include the base data; the 13 picked maps are in the data release (drahtseilakt-levels). Check the files against SHA256SUMS." \
             -- "${files[@]}" SHA256SUMS

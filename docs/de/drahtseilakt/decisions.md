@@ -155,6 +155,17 @@ neues, aus einem bereinigten Stand ohne diese Historie erstellt und vor dem erst
 geprüft. Bis dahin gilt die Regel „Keine Spieldaten im Repository“ für alles, was veröffentlicht werden soll:
 Code, Tests und Dokumentation hängen nicht davon ab, dass Spieldaten im Repository liegen.
 
+## Binärdateien in git: die Basisdaten
+
+*Entscheidung des Besitzers 2026-11-17; ändert „Keine Spieldaten im Repository“ und die Regel vom 2026-11-10, nach der Levels
+und Texturen nicht in git liegen.* In git liegt, was man braucht, um das Spiel zu bauen und zu spielen: die Basisdaten,
+genau der Inhalt des Datenpakets (unsere Teile und Texturen, Schriften, Klänge, Werksmods, der Showcase und `Parts_Test`, die
+13 Community-`.nmo`-Karten; etwa 100 MB in 355 Dateien, die größte 3,6 MB). Ein Klon baut und spielt, CI lädt nichts herunter
+(die alten Variablen `ASSETS_BUNDLE_URL`/`ASSETS_BUNDLE_SHA256` und das Token sind weg). Weiterhin nicht in git: die 13
+ausgewählten Karten (ein `level.bin` dort liegt über GitHubs Grenze von 100 MB je Datei; sie sind Release-Assets), die
+abgeleiteten Dateien `.dtx`/`.source`/`.remaster` und das Handbuch, das CI billig erzeugt. Nie eine Datei des Originals in
+git (per Hash geprüft). Aufbau der Releases: `docs/drahtseilakt/release.md`.
+
 ## Kein Browser-Build
 
 Der Browser-Build (gasm/WebAssembly) kam mit Upstream und ist kein Ziel dieses Projekts. Er ist kein Ziel

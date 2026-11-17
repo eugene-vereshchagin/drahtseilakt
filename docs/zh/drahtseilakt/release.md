@@ -4,15 +4,21 @@
 
 | 内容 | 变化频率 | 构建者 | 发布形式 |
 |---|---|---|---|
-| **二进制包**：程序 | 每个版本 | 工作流 `Drahtseilakt release`（CI） | 标签为 `X.Y.Z` 的发布（草稿） |
-| **基础数据**：不含 13 张精选地图的 `assets/` | 很少 | `scripts/pack-assets.sh`（所有者的机器） | 标签为 `data-<DATA_VERSION>` 的发布 |
-| **关卡**：13 张精选地图 | 很少 | `scripts/pack-assets.sh`（所有者的机器） | 同一个 `data-<DATA_VERSION>` 发布 |
+| **二进制包**：程序，以及作为 `.deb`/`.rpm` 的基础数据 | 每个版本 | 工作流 `Drahtseilakt release`（CI） | 标签为 `X.Y.Z` 的发布（草稿） |
+| **关卡**：13 张精选地图 | 很少 | `scripts/pack-assets.sh`（所有者的机器） | 标签为 `data-<DATA_VERSION>` 的发布 |
 
-数据和关卡不在 git 中（“git 中没有二进制文件”），因此无法在 CI 中构建；它们在所有者的机器上由本地 `assets/` 生成，并手动上传。
+**基础数据在 git 中**（所有者 2026-11-17 的决定，decisions.md「git 中的二进制文件：基础数据」），因此 CI 直接从检出中取用，
+不下载任何东西；数据包 `drahtseilakt-data`（`.deb`/`.rpm`）在发布工作流中由它构建。只有 13 张精选地图不在 git 中
+（那里的 `level.bin` 超过 GitHub 单文件 100 MB 的限制）；它们在所有者的机器上由本地 `assets/` 制作，手动上传。
 
 ## 基础数据
 
-不含精选地图（`assets/levels/drahtseilakt/NN-*`）和仅开发用文件（`mods-dev`、`own/make`）的 `assets/`：我们自己的部件、字体、声音、内置模组、手册、演示关卡（`00-Showcase`、`Parts_Test`），以及与游戏绑定的 13 张社区 `.nmo` 地图（`assets/levels/community`）。约 93 MB。绝不包含任何原版 Ballance 文件。
+不含精选地图（`assets/levels/drahtseilakt/NN-*`，其 `level.txt` 留在 git 中）和仅供开发的文件（`mods-dev`、`own/make`）的
+`assets/`：我们自己的部件和纹理、字体、声音、出厂模组、演示关卡（`00-Showcase`、`Parts_Test`）以及游戏所依赖的 13 张社区
+`.nmo` 地图（`assets/levels/community`）。在 git 中约 100 MB（355 个文件，最大 3.6 MB），打包后 93 MB。绝不包含任何原版
+Ballance 文件（加入时已与原版副本逐一比对哈希）。不放进 git 的是 CI 能轻易生成的内容：玩家手册（`assets/manual`，
+`tools/make_manual.py`，由 `scripts/ci-assets.sh` 运行）。`.gitignore` 忽略精选地图的文件（`level.txt` 除外）以及派生的
+`.dtx`、`level.source`、`*.remaster/`、`textures.original/`。
 
 ## 关卡
 
@@ -25,52 +31,42 @@
 - 程序版本就是标签 `X.Y.Z`。没有标签的工作流运行在包中的版本是 `0~git<sha>`。
 - 数据发布的标签是 `data-<DATA_VERSION>`；工作流的标签过滤器（`[0-9]+.[0-9]+.[0-9]+`）不匹配它，因此不会触发任何运行。
 
-## 制作数据包和关卡包
+## 制作关卡包
 
 ```sh
-scripts/pack-assets.sh          # OUT defaults to ../drahtseilakt-portable/bundles
+scripts/pack-assets.sh          # OUT 默认为 ../drahtseilakt-portable/bundles
 ```
 
-它在 OUT 中生成（`V` = `scripts/DATA_VERSION`）：
+在 OUT 中生成（`V` = `scripts/DATA_VERSION`）：
 
 | 文件 | 用途 |
 |---|---|
-| `drahtseilakt-data-V.tar.gz` | 其他系统；CI 下载它来制作便携压缩包、安装程序和 .app |
-| `drahtseilakt-data_V-1_all.deb`、`drahtseilakt-data-V-1.noarch.rpm` | Linux，基础数据 |
 | `levels/NN-Name.zip`（13 个） | 所有系统：解压到 `assets/levels/drahtseilakt/` |
 | `drahtseilakt-levels_V-1_all.deb`、`drahtseilakt-levels-V-1.noarch.rpm` | Linux，全部 13 张地图（依赖数据包） |
 | `SHA256SUMS` | 以上所有文件 |
 
-`.deb` 和 `.rpm` 由 [nfpm](https://nfpm.goreleaser.com) 2.49.0 生成，两者用同一个工具，所以同一个脚本既能在所有者的机器上运行（无需 `rpmbuild`），也能在 CI 中运行。`scripts/fetch-nfpm.sh` 把它下载到 `third_party/`（已被 gitignore；绝不写入系统路径），并校验脚本中固定的 SHA-256（来自该发布自带的 `checksums.txt`）。`scripts/pack-assets.sh --no-packages` 跳过软件包。
+`--with-data` 还会由本地 `assets/` 生成旧式的 `drahtseilakt-data-V.tar.gz` 和数据包，用于本地检查软件包；它们不上传：
+CI 从 git 构建 `drahtseilakt-data`（`scripts/make-distro-packages.sh data --out DIR`，取自检出；`--tar FILE` 则改用压缩包）。
 
-## 上传数据发布
+`.deb` 和 `.rpm` 由 [nfpm](https://nfpm.goreleaser.com) 2.49.0 生成，一个工具通吃，因此同一脚本既能在所有者的机器上运行
+（无需 `rpmbuild`），也能在 CI 中运行。`scripts/fetch-nfpm.sh` 把它下载到 `third_party/`（已加入 gitignore；绝不装入系统路径），
+并校验脚本中固定的 SHA-256。`scripts/pack-assets.sh --no-packages` 跳过软件包。
 
-由所有者在检出目录中运行；这里没有任何东西会自动运行：
+## 上传关卡发布
+
+由所有者在检出目录中运行；这里没有任何东西会自动执行：
 
 ```sh
 V=$(cat scripts/DATA_VERSION)
 cd ../drahtseilakt-portable/bundles && sha256sum --check --quiet SHA256SUMS
 gh release create "data-$V" --repo eugene-vereshchagin/drahtseilakt --draft --latest=false \
-  --title "Drahtseilakt data $V" \
-  --notes "Base data and the 13 picked maps for Drahtseilakt (data version $V). Programs: the releases X.Y.Z." \
-  "drahtseilakt-data-$V.tar.gz" \
-  "drahtseilakt-data_$V-1_all.deb" "drahtseilakt-data-$V-1.noarch.rpm" \
+  --title "Drahtseilakt levels $V" \
+  --notes "The 13 picked maps for Drahtseilakt (data version $V). Programs and base data: the releases X.Y.Z." \
   "drahtseilakt-levels_$V-1_all.deb" "drahtseilakt-levels-$V-1.noarch.rpm" \
   levels/*.zip SHA256SUMS
 ```
 
-查看草稿，然后发布。接着让 CI 指向新的基础数据（仓库变量，每个数据版本设置一次）。在私有仓库中，发布资源通过其 API 地址下载（若设置了 `ASSETS_TOKEN` 则用它作为 bearer，否则用本次运行自己的令牌）：
-
-```sh
-V=$(cat scripts/DATA_VERSION)
-URL=$(gh api "repos/eugene-vereshchagin/drahtseilakt/releases/tags/data-$V" \
-  --jq ".assets[] | select(.name == \"drahtseilakt-data-$V.tar.gz\") | .url")
-SUM=$(sha256sum "../drahtseilakt-portable/bundles/drahtseilakt-data-$V.tar.gz" | cut -d' ' -f1)
-gh variable set ASSETS_BUNDLE_URL --repo eugene-vereshchagin/drahtseilakt --body "$URL"
-gh variable set ASSETS_BUNDLE_SHA256 --repo eugene-vereshchagin/drahtseilakt --body "$SUM"
-```
-
-（公开发布也可以用普通下载地址 `https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/data-$V/drahtseilakt-data-$V.tar.gz`。）如果地址中不含 `scripts/DATA_VERSION` 的版本，`scripts/ci-assets.sh` 会发出警告。
+查看草稿后再发布。其余无需设置：CI 不需要变量、密钥，也不下载数据。
 
 ## 二进制发布（CI）
 
@@ -82,13 +78,15 @@ Actions -> “Drahtseilakt release” -> Run workflow（文件是运行产物）
 |---|---|
 | Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` （安装程序）、`drahtseilakt-<V>-windows-<arch>.zip`（便携版） |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` （便携版）、`drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
+| Linux（x86_64 任务，一次） | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`、`drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV（输入项 `dev`） | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |
 | macOS arm64, x86_64 | `drahtseilakt-<V>-macos-<arch>.dmg` （未签名的 `.app`）、`drahtseilakt-<V>-macos-<arch>.tar.gz`（便携版） |
 | FreeBSD x86_64（实验性） | `drahtseilakt-<V>-freebsd-x86_64.tar.gz` |
 
-- **便携压缩包**和 **Windows 安装程序**包含基础数据，因此可独立运行；精选地图是数据发布中单独的 `.zip` 文件。便携压缩包还带有工具箱。
-- **Windows 安装程序**（NSIS，在 Ubuntu 上由便携 zip 构建）：默认按用户安装（`%LOCALAPPDATA%\Programs\Drahtseilakt`，无需管理员权限），带开始菜单文件夹，并在“应用”中提供卸载程序。它不安装 `portable.txt`，所以玩家数据存放在用户配置目录，卸载绝不会动它。未签名：SmartScreen 会警告。
-- **Linux 软件包**：程序在 `/usr/bin/drahtseilakt`（系统库：`libasound2`、`libudev1`），数据在游戏查找的位置 `/usr/share/drahtseilakt/assets`（程序先从 `/usr/bin/../share` 查找，再查 `$XDG_DATA_DIRS`：见 `files.md`）。还有 `.desktop` 文件和图标（站点的 favicon，经 `tools/icon.py` 缩放，git 中不新增文件）。`drahtseilakt` 依赖 `drahtseilakt-data (>= DATA_VERSION)`；`drahtseilakt-levels` 是可选的。工具箱不在其中（仅便携版）。`drahtseilakt-dev` 提供并与 `drahtseilakt` 冲突（仅 `.deb`，来自输入项 `dev`）。
+- **便携压缩包**和 **Windows 安装程序**包含基础数据，因此可独立运行；精选地图是数据发布（`data-<DATA_VERSION>`）中单独的 `.zip` 文件。便携压缩包还带有工具箱。
+- **Windows 安装程序**（NSIS，在 Ubuntu 上由便携 zip 构建）：默认按用户安装（`%LOCALAPPDATA%\Programs\Drahtseilakt`，无需管理员权限），带开始菜单文件夹，并在“应用”中提供卸载程序。它不安装 `portable.txt`，所以玩家数据存放在用户配置目录，卸载绝不会动它。安装程序、卸载程序和快捷方式带有我们的图标（`scripts/packaging/icon.ico`，安装在程序旁）。未签名：SmartScreen 会警告。**尚未做到：**`drahtseilakt.exe` 自身内嵌的图标（资源管理器、便携版的任务栏）：这需要一个嵌入资源的构建依赖，离线 crate 缓存中没有；窗口本身有图标（运行时设置）。
+- **便携副本**（程序旁有 `portable.txt`）只在自己的 `assets/` 中查找资源，绝不查找源码树、`/usr/share` 或 `XDG_DATA_DIRS`。
+- **Linux 软件包**：程序在 `/usr/bin/drahtseilakt`（依赖 `libasound2`、`libudev1`；.rpm 依赖的是 soname：`libasound.so.2`、`libudev.so.1`、`libc.so.6(GLIBC_2.35)`，Fedora 和 openSUSE 都提供，不像 `systemd-libs` 这类包名；推荐游戏运行时加载的窗口系统和图形库：`libvulkan1`、`libxkbcommon-x11-0`、`libx11-6`、`libxcursor1`、`libxi6`、`libwayland-client0`），数据在游戏查找的位置 `/usr/share/drahtseilakt/assets`（程序先从 `/usr/bin/../share` 查找，再查 `$XDG_DATA_DIRS`：见 `files.md`）。还有 `.desktop` 文件和图标（`scripts/packaging/icon-512.png`，我们的木球，与网站和窗口用的是同一张图；512 px，另有经 `tools/icon.py` 缩放的 256 px 副本）。`drahtseilakt` 依赖 `drahtseilakt-data (>= DATA_VERSION)`；`drahtseilakt-levels` 是可选的。工具箱不在其中（仅便携版）。`drahtseilakt-dev` 提供并与 `drahtseilakt` 冲突（仅 `.deb`，来自输入项 `dev`）。
 - **macOS**：`.app` 把数据放在 `Contents/Resources/assets`；未签名也未公证，首次启动需要右键 -> 打开。
 
 在 Debian/Ubuntu 上安装： `sudo apt install ./drahtseilakt-data_V-1_all.deb ./drahtseilakt_X.Y.Z-1_amd64.deb`

@@ -1,8 +1,10 @@
 ; Drahtseilakt Windows installer (NSIS 3), made by scripts/ci-windows-installer.sh, which passes VERSION, ARCH, OUTFILE,
-; HAVE_TOOLBOX (0|1) and the generated file lists FILES and UNFILES.
+; HAVE_TOOLBOX (0|1), ICON (the .ico of scripts/packaging) and the generated file lists FILES and UNFILES.
 ; Per-user by default: no administrator rights, %LOCALAPPDATA%\Programs\Drahtseilakt.
 Unicode true
 !include "MUI2.nsh"
+!define MUI_ICON "${ICON}"
+!define MUI_UNICON "${ICON}"
 !include "LogicLib.nsh"
 
 Name "Drahtseilakt"
@@ -29,17 +31,17 @@ Section "Drahtseilakt"
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\Drahtseilakt"
-  CreateShortcut "$SMPROGRAMS\Drahtseilakt\Drahtseilakt.lnk" "$INSTDIR\drahtseilakt.exe"
+  CreateShortcut "$SMPROGRAMS\Drahtseilakt\Drahtseilakt.lnk" "$INSTDIR\drahtseilakt.exe" "" "$INSTDIR\drahtseilakt.ico"
   !if ${HAVE_TOOLBOX} == 1
-    CreateShortcut "$SMPROGRAMS\Drahtseilakt\Drahtseilakt Toolbox.lnk" "$INSTDIR\drahtseilakt-toolbox.exe"
+    CreateShortcut "$SMPROGRAMS\Drahtseilakt\Drahtseilakt Toolbox.lnk" "$INSTDIR\drahtseilakt-toolbox.exe" "" "$INSTDIR\drahtseilakt.ico"
   !endif
-  CreateShortcut "$SMPROGRAMS\Drahtseilakt\Uninstall Drahtseilakt.lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortcut "$SMPROGRAMS\Drahtseilakt\Uninstall Drahtseilakt.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\drahtseilakt.ico"
   WriteRegStr HKCU "Software\Drahtseilakt" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${UNKEY}" "DisplayName" "Drahtseilakt"
   WriteRegStr HKCU "${UNKEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "${UNKEY}" "Publisher" "Veresk"
   WriteRegStr HKCU "${UNKEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\drahtseilakt.exe"
+  WriteRegStr HKCU "${UNKEY}" "DisplayIcon" "$INSTDIR\drahtseilakt.ico"
   WriteRegStr HKCU "${UNKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1

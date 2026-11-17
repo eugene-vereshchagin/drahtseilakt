@@ -5,19 +5,23 @@
 
 | Что | Меняется | Кто собирает | Выпускается как |
 |---|---|---|---|
-| **Бинарные пакеты**: программа | с каждой версией | workflow `Drahtseilakt release` (CI) | релиз с тегом `X.Y.Z` (черновик) |
-| **Базовые данные**: `assets/` без 13 выбранных карт | редко | `scripts/pack-assets.sh` (машина владельца) | релиз с тегом `data-<DATA_VERSION>` |
-| **Уровни**: 13 выбранных карт | редко | `scripts/pack-assets.sh` (машина владельца) | тот же релиз `data-<DATA_VERSION>` |
+| **Бинарные пакеты**: программа и базовые данные в виде `.deb`/`.rpm` | с каждой версией | workflow `Drahtseilakt release` (CI) | релиз с тегом `X.Y.Z` (черновик) |
+| **Уровни**: 13 выбранных карт | редко | `scripts/pack-assets.sh` (машина владельца) | релиз с тегом `data-<DATA_VERSION>` |
 
-Данные и уровни не лежат в git («никаких бинарников в git»), поэтому в CI их не собрать; их делают на машине
-владельца из локального `assets/` и загружают вручную.
+**Базовые данные лежат в git** (решение владельца 2026-11-17, decisions.md «Бинарники в git: базовые данные»), поэтому CI
+берёт их из checkout и ничего не скачивает; пакеты `drahtseilakt-data` (`.deb`/`.rpm`) собираются из них в release-workflow.
+В git нет только 13 выбранных карт (`level.bin` там больше лимита GitHub в 100 МБ на файл): их делают на машине владельца
+из локального `assets/` и загружают вручную.
 
 ## Базовые данные
 
-`assets/` без выбранных карт (`assets/levels/drahtseilakt/NN-*`) и без файлов только для разработки (`mods-dev`,
-`own/make`): свои детали, шрифты, звуки, фабричные моды, руководство, демонстрационный уровень (`00-Showcase`,
-`Parts_Test`) и 13 карт сообщества `.nmo` (`assets/levels/community`), с которыми игра связана жёстко. Около 93 МБ.
-Никаких файлов оригинального Ballance.
+`assets/` без выбранных карт (`assets/levels/drahtseilakt/NN-*`, их `level.txt` остаётся в git) и без файлов только для
+разработки (`mods-dev`, `own/make`): наши детали и текстуры, шрифты, звуки, фабричные моды, демонстрационный уровень
+(`00-Showcase`, `Parts_Test`) и 13 общинных карт `.nmo` (`assets/levels/community`), на которых игра держится. Около 100 МБ
+в git (355 файлов, самый большой 3,6 МБ), 93 МБ в пакете. Ни одного файла оригинального Ballance (при добавлении
+проверено по хэшам относительно копии оригинала). Не в git, потому что CI делает дёшево: руководство игрока
+(`assets/manual`, `tools/make_manual.py`, запускается `scripts/ci-assets.sh`). `.gitignore` игнорирует файлы выбранных карт,
+кроме их `level.txt`, и производные `.dtx`, `level.source`, `*.remaster/`, `textures.original/`.
 
 ## Уровни
 
@@ -35,64 +39,50 @@
 - Релиз данных получает тег `data-<DATA_VERSION>`; фильтр тегов workflow (`[0-9]+.[0-9]+.[0-9]+`) ему не
   соответствует, так что ничего не запускается.
 
-## Как сделать пакеты данных и уровней
+## Как сделать пакеты уровней
 
 ```sh
-scripts/pack-assets.sh          # OUT defaults to ../drahtseilakt-portable/bundles
+scripts/pack-assets.sh          # OUT по умолчанию ../drahtseilakt-portable/bundles
 ```
 
-Он создаёт в OUT (`V` = `scripts/DATA_VERSION`):
+Создаёт в OUT (`V` = `scripts/DATA_VERSION`):
 
 | Файл | Для |
 |---|---|
-| `drahtseilakt-data-V.tar.gz` | остальных систем; CI скачивает его для портативных архивов, установщика, .app |
-| `drahtseilakt-data_V-1_all.deb`, `drahtseilakt-data-V-1.noarch.rpm` | Linux, базовые данные |
 | `levels/NN-Name.zip` (13) | любой системы: распаковать в `assets/levels/drahtseilakt/` |
 | `drahtseilakt-levels_V-1_all.deb`, `drahtseilakt-levels-V-1.noarch.rpm` | Linux, все 13 карт (зависит от пакета данных) |
 | `SHA256SUMS` | всего перечисленного |
 
-`.deb` и `.rpm` делает [nfpm](https://nfpm.goreleaser.com) 2.49.0 — один инструмент для обоих, так что тот же скрипт
-работает на машине владельца (`rpmbuild` не нужен) и в CI. `scripts/fetch-nfpm.sh` скачивает его в
-`third_party/` (в .gitignore; никогда в системные пути) и проверяет SHA-256, закреплённый в скрипте (из
-`checksums.txt` самого релиза). `scripts/pack-assets.sh --no-packages` пропускает пакеты.
+`--with-data` дополнительно делает старый `drahtseilakt-data-V.tar.gz` и пакеты данных из локального `assets/` — для
+локальной проверки пакетов; их не загружают: CI собирает `drahtseilakt-data` из git
+(`scripts/make-distro-packages.sh data --out DIR` из checkout; `--tar FILE` берёт архив).
 
-## Загрузка релиза данных
+`.deb` и `.rpm` делает [nfpm](https://nfpm.goreleaser.com) 2.49.0 — один инструмент для обоих, поэтому тот же скрипт
+работает на машине владельца (`rpmbuild` не нужен) и в CI. `scripts/fetch-nfpm.sh` скачивает его в `third_party/`
+(в gitignore; никогда в системный путь) и проверяет SHA-256, закреплённый в скрипте. `scripts/pack-assets.sh --no-packages`
+пропускает пакеты.
 
-Выполняет владелец из рабочей копии; само ничего не запускается:
+## Загрузка релиза уровней
+
+Выполняет владелец из checkout; само ничего не запускается:
 
 ```sh
 V=$(cat scripts/DATA_VERSION)
 cd ../drahtseilakt-portable/bundles && sha256sum --check --quiet SHA256SUMS
 gh release create "data-$V" --repo eugene-vereshchagin/drahtseilakt --draft --latest=false \
-  --title "Drahtseilakt data $V" \
-  --notes "Base data and the 13 picked maps for Drahtseilakt (data version $V). Programs: the releases X.Y.Z." \
-  "drahtseilakt-data-$V.tar.gz" \
-  "drahtseilakt-data_$V-1_all.deb" "drahtseilakt-data-$V-1.noarch.rpm" \
+  --title "Drahtseilakt levels $V" \
+  --notes "The 13 picked maps for Drahtseilakt (data version $V). Programs and base data: the releases X.Y.Z." \
   "drahtseilakt-levels_$V-1_all.deb" "drahtseilakt-levels-$V-1.noarch.rpm" \
   levels/*.zip SHA256SUMS
 ```
 
-Посмотрите черновик и опубликуйте его. Затем направьте CI на новые базовые данные (переменные репозитория, один раз
-на версию данных). В закрытом репозитории файл релиза скачивается по его API-адресу (как bearer передаётся
-`ASSETS_TOKEN`, если задан, иначе собственный токен запуска):
-
-```sh
-V=$(cat scripts/DATA_VERSION)
-URL=$(gh api "repos/eugene-vereshchagin/drahtseilakt/releases/tags/data-$V" \
-  --jq ".assets[] | select(.name == \"drahtseilakt-data-$V.tar.gz\") | .url")
-SUM=$(sha256sum "../drahtseilakt-portable/bundles/drahtseilakt-data-$V.tar.gz" | cut -d' ' -f1)
-gh variable set ASSETS_BUNDLE_URL --repo eugene-vereshchagin/drahtseilakt --body "$URL"
-gh variable set ASSETS_BUNDLE_SHA256 --repo eugene-vereshchagin/drahtseilakt --body "$SUM"
-```
-
-(Для открытого релиза подойдёт и обычный адрес
-`https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/data-$V/drahtseilakt-data-$V.tar.gz`.)
-`scripts/ci-assets.sh` предупреждает, если в адресе нет версии из `scripts/DATA_VERSION`.
+Посмотрите черновик, затем опубликуйте. Больше ничего настраивать не нужно: CI не требует ни переменных, ни секретов, ни
+скачивания данных.
 
 ## Бинарный релиз (CI)
 
 Actions -> «Drahtseilakt release» -> Run workflow (файлы — артефакты запуска) или push тега `X.Y.Z`: запуск также
-создаёт **черновик** релиза с файлами ниже и `SHA256SUMS` (без данных и уровней). Параметр `dev` добавляет
+создаёт **черновик** релиза с файлами ниже и `SHA256SUMS` (без уровней). Параметр `dev` добавляет
 dev-вариант (в релиз не попадает никогда). Push в ветку ничего не запускает.
 
 Где `<V>` — тег (или `git-<sha>` вне тега), делаются такие файлы:
@@ -101,19 +91,20 @@ dev-вариант (в релиз не попадает никогда). Push в
 |---|---|
 | Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (установщик), `drahtseilakt-<V>-windows-<arch>.zip` (портативная) |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` (портативная), `drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
+| Linux (задание x86_64, один раз) | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`, `drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV (параметр `dev`) | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |
 | macOS arm64, x86_64 | `drahtseilakt-<V>-macos-<arch>.dmg` (`.app` без подписи), `drahtseilakt-<V>-macos-<arch>.tar.gz` (портативная) |
 | FreeBSD x86_64 (экспериментально) | `drahtseilakt-<V>-freebsd-x86_64.tar.gz` |
 
 - **Портативные архивы** и **установщик Windows** включают базовые данные, поэтому работают сами по себе; выбранные
-  карты — отдельные `.zip` из релиза данных. В портативном архиве есть и тулбокс.
+  карты — отдельные `.zip` из релиза данных (`data-<DATA_VERSION>`). В портативном архиве есть и тулбокс.
 - **Установщик Windows** (NSIS, собирается на Ubuntu из портативного zip): по умолчанию для одного пользователя
   (`%LOCALAPPDATA%\Programs\Drahtseilakt`, без администратора), папка в меню «Пуск», деинсталлятор в «Приложениях».
-  `portable.txt` он не ставит, поэтому данные игрока идут в профиль, а удаление их не трогает. Без подписи: SmartScreen предупредит.
-- **Пакеты Linux**: программа в `/usr/bin/drahtseilakt` (системные библиотеки: `libasound2`, `libudev1`), данные там,
+  `portable.txt` он не ставит, поэтому данные игрока идут в профиль, а удаление их не трогает. Установщик, деинсталлятор и ярлыки несут наш значок (`scripts/packaging/icon.ico`, ставится рядом с программой). Без подписи: SmartScreen предупредит. **Пока нет:** значка внутри самого `drahtseilakt.exe` (Проводник, панель задач портативной копии): нужна build-зависимость для встраивания ресурсов, которой нет в офлайн-кэше крейтов; у окна значок есть (задаётся во время работы).
+- **Портативная копия** (`portable.txt` рядом с программой) ищет ассеты только в своём `assets/`: не в дереве исходников, не в `/usr/share`, не в `XDG_DATA_DIRS`.
+- **Пакеты Linux**: программа в `/usr/bin/drahtseilakt` (зависит от `libasound2`, `libudev1`; .rpm — от sonames `libasound.so.2`, `libudev.so.1`, `libc.so.6(GLIBC_2.35)`, которые есть и в Fedora, и в openSUSE, в отличие от имён пакетов вроде `systemd-libs`; рекомендует библиотеки оконной системы и графики, которые игра загружает во время работы: `libvulkan1`, `libxkbcommon-x11-0`, `libx11-6`, `libxcursor1`, `libxi6`, `libwayland-client0`), данные там,
   где их ищет игра, `/usr/share/drahtseilakt/assets` (программа находит их от `/usr/bin/../share`, затем в
-  `$XDG_DATA_DIRS`: `files.md`). Файл `.desktop` и значок (favicon сайта, масштабированный `tools/icon.py`,
-  новый файл в git не нужен). `drahtseilakt` зависит от `drahtseilakt-data (>= DATA_VERSION)`; `drahtseilakt-levels`
+  `$XDG_DATA_DIRS`: `files.md`). Файл `.desktop` и значок (`scripts/packaging/icon-512.png`, наш деревянный шар — та же картинка, что на сайте и в окне; 512 px и копия 256 px через `tools/icon.py`). `drahtseilakt` зависит от `drahtseilakt-data (>= DATA_VERSION)`; `drahtseilakt-levels`
   необязателен. Тулбокса в них нет (только в портативных).
   `drahtseilakt-dev` предоставляет `drahtseilakt` и конфликтует с ним (только `.deb`, из параметра `dev`).
 - **macOS**: `.app` хранит данные в `Contents/Resources/assets`; без подписи и нотаризации, первый запуск —

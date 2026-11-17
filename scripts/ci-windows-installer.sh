@@ -19,6 +19,8 @@ unzip -q "$zip" -d "$work/unz"
 src=$(find "$work/unz" -mindepth 1 -maxdepth 1 -type d | head -n1)
 [ -f "$src/drahtseilakt.exe" ] || die "the archive has no drahtseilakt.exe"
 rm -rf "$src/data" "$src/portable.txt"
+# the icon (installer, uninstaller, shortcuts, "Apps"): the installed folder carries the .ico, the shortcuts point at it
+cp "$here/scripts/packaging/icon.ico" "$src/drahtseilakt.ico"
 mkdir -p "$outdir"; outdir=$(cd "$outdir" && pwd)
 
 # the install and uninstall lists, from the tree (names with a quote or dollar are refused: NSIS would read them)
@@ -38,5 +40,5 @@ done
 haveTool=0; [ -f "$src/drahtseilakt-toolbox.exe" ] && haveTool=1
 exe="drahtseilakt-$version-windows-$arch-setup.exe"
 makensis -V2 -DVERSION="$version" -DARCH="$arch" -DOUTFILE="$outdir/$exe" -DHAVE_TOOLBOX="$haveTool" \
-    -DFILES="$inst" -DUNFILES="$uninst" "$here/scripts/packaging/installer.nsi"
+    -DICON="$here/scripts/packaging/icon.ico" -DFILES="$inst" -DUNFILES="$uninst" "$here/scripts/packaging/installer.nsi"
 ls -l "$outdir/$exe"

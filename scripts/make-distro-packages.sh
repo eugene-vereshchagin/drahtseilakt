@@ -2,14 +2,15 @@
 # Makes the Linux distribution packages (.deb and .rpm, with the pinned nfpm: scripts/fetch-nfpm.sh) in three kinds,
 # split by how often they change (docs/drahtseilakt/release.md):
 #
-#   data    drahtseilakt-data     (all / noarch) the base assets: from the base data tarball that scripts/pack-assets.sh
-#                                 made (ours, fonts, sounds, mods, manual, the showcase, the community .nmo maps)
+#   data    drahtseilakt-data     (all / noarch) the base assets (ours, fonts, sounds, mods, manual, the showcase, the
+#                                 community .nmo maps): from the checkout's assets/ (git holds them; CI), or from a base
+#                                 data tarball with --tar (scripts/pack-assets.sh, the owner's machine)
 #   levels  drahtseilakt-levels   (all / noarch) the 13 picked maps: from the .zip files pack-assets.sh made
 #   game    drahtseilakt          (amd64+arm64 / x86_64+aarch64) the program, desktop file and icon; Depends on
 #                                 drahtseilakt-data (>= DATA_VERSION). With --dev: drahtseilakt-dev (a build without
 #                                 DRAHTSEILAKT_RELEASE, god mode; .deb only; conflicts with drahtseilakt)
 #
-#   scripts/make-distro-packages.sh data   --tar FILE.tar.gz --out DIR [--formats deb,rpm]
+#   scripts/make-distro-packages.sh data   [--tar FILE.tar.gz] --out DIR [--formats deb,rpm]
 #   scripts/make-distro-packages.sh levels --zips DIR        --out DIR [--formats deb,rpm]
 #   scripts/make-distro-packages.sh game   --bin FILE --arch x86_64|aarch64 --version V --out DIR [--dev] [--formats ..]
 #
@@ -50,14 +51,31 @@ root="$stage/root"; share=usr/share/drahtseilakt
 maintainer="Veresk <eugene-vereshchagin@users.noreply.github.com>"
 homepage="https://github.com/eugene-vereshchagin/drahtseilakt"
 pkg_version=$data_version release=1 arch_deb=all arch_rpm=all conflicts="" provides="" replaces=""
-deps_deb="" deps_rpm=""
+deps_deb="" deps_rpm="" recs_deb="" recs_rpm=""
 doc=""   # the package's doc folder name
 
 case $kind in
     data)
         name=drahtseilakt-data doc=$name
-        [ -f "$tar_file" ] || die "--tar FILE: the base data tarball (scripts/pack-assets.sh)"
-        tar -xzf "$tar_file" -C "$root/$share" assets
+        if [ -n "$tar_file" ]; then
+            [ -f "$tar_file" ] || die "--tar FILE: no such base data tarball (scripts/pack-assets.sh)"
+            tar -xzf "$tar_file" -C "$root/$share" assets
+        else
+            # the checkout (git holds the base data); the manual is generated first (scripts/ci-assets.sh)
+            [ -f "$here/assets/manual/index.html" ] || die "no assets/manual: run scripts/ci-assets.sh first (or pass --tar)"
+            tar -C "$here" --exclude=assets/mods-dev --exclude=assets/own/make --exclude=__pycache__ --exclude='*.pyc' \
+                --exclude='assets/levels/drahtseilakt/[0-9][1-9]-*' --exclude='assets/levels/drahtseilakt/[1-9][0-9]-*' \
+                -cf - assets | tar -C "$root/$share" -xf -
+            # the checks of a package are against what it holds: the picked maps' entries go from the levels' sums
+            lsums="$root/$share/assets/levels/drahtseilakt/SHA256SUMS"
+            if [ -f "$lsums" ]; then
+                while IFS= read -r line; do
+                    f=${line#*  }
+                    [ -d "$root/$share/assets/levels/drahtseilakt/${f%%/*}" ] && printf '%s\n' "$line"
+                done <"$lsums" >"$lsums.tmp" || true
+                mv "$lsums.tmp" "$lsums"
+            fi
+        fi
         # development-only things never ship here
         rm -rf "$root/$share/assets/mods-dev" "$root/$share/assets/own/make"
         find "$root/$share/assets" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
@@ -100,9 +118,10 @@ case $kind in
         [ "$dev" = 0 ] || [ "$formats" = deb ] || { say "the dev flavour is a .deb only"; formats=deb; }
         install -D -m 755 "$bin" "$root/usr/bin/drahtseilakt"
         install -D -m 644 "$here/scripts/packaging/drahtseilakt.desktop" "$root/usr/share/applications/drahtseilakt.desktop"
-        # the icon: the site's favicon (tracked), scaled by tools/icon.py (standard library only)
+        # the icon: the game's icon (scripts/packaging/icon-512.png, the site's wooden ball), scaled by tools/icon.py (standard library only)
         mkdir -p "$root/usr/share/icons/hicolor/256x256/apps"
-        python3 -I "$here/tools/icon.py" 256 "$root/usr/share/icons/hicolor/256x256/apps/drahtseilakt.png" "$here/docs/public/favicon.png"
+        python3 -I "$here/tools/icon.py" 256 "$root/usr/share/icons/hicolor/256x256/apps/drahtseilakt.png" "$here/scripts/packaging/icon-512.png"
+        install -D -m 644 "$here/scripts/packaging/icon-512.png" "$root/usr/share/icons/hicolor/512x512/apps/drahtseilakt.png"
         chmod 644 "$root/usr/share/icons/hicolor/256x256/apps/drahtseilakt.png"
         if [ "$dev" = 1 ]; then
             [ -d "$here/assets/mods-dev" ] || die "no assets/mods-dev for the dev flavour"
@@ -110,7 +129,13 @@ case $kind in
         fi
         pkg_version_data=$data_version
         deps_deb="drahtseilakt-data (>= $pkg_version_data), libc6 (>= 2.35), libasound2 | libasound2t64, libudev1"
-        deps_rpm="drahtseilakt-data >= $pkg_version_data, glibc >= 2.35, alsa-lib, systemd-libs"
+        # rpm: package names differ between Fedora and openSUSE (systemd-libs / libudev1, alsa-lib / libasound2), so the
+        # hard dependencies are sonames, which both distributions provide; the 64-bit marker is right for x86_64 and aarch64.
+        # The window-system and graphics libraries the game loads at run time (winit, wgpu) are recommends only: a
+        # Wayland-only or X11-only system lacks some of them.
+        deps_rpm="drahtseilakt-data >= $pkg_version_data, libc.so.6(GLIBC_2.35)(64bit), libasound.so.2()(64bit), libudev.so.1()(64bit)"
+        recs_deb="libvulkan1, libxkbcommon-x11-0, libx11-6, libxcursor1, libxi6, libwayland-client0"
+        recs_rpm="libvulkan.so.1()(64bit), libxkbcommon-x11.so.0()(64bit), libX11.so.6()(64bit), libXcursor.so.1()(64bit), libXi.so.6()(64bit), libwayland-client.so.0()(64bit)"
         desc="Drahtseilakt, a ball-rolling puzzle game\n A new engine for Ballance (2004). The program only: its data is in\n drahtseilakt-data, the picked maps in drahtseilakt-levels."
         [ "$dev" = 0 ] || desc="Drahtseilakt DEVELOPMENT build\n Debug on, extended mode, the god-mode mod. Not for players; conflicts with\n drahtseilakt."
         ;;
@@ -132,7 +157,7 @@ find "$root" -type f ! -path "$root/usr/bin/*" -exec chmod 644 {} +
 
 # the nfpm config, one per format (dependencies are written differently in each)
 for fmt in ${formats//,/ }; do
-    case $fmt in deb) arch=$arch_deb deps=$deps_deb ;; rpm) arch=$arch_rpm deps=$deps_rpm ;; *) die "format deb or rpm" ;; esac
+    case $fmt in deb) arch=$arch_deb deps=$deps_deb recs=$recs_deb ;; rpm) arch=$arch_rpm deps=$deps_rpm recs=$recs_rpm ;; *) die "format deb or rpm" ;; esac
     cfg="$stage/nfpm-$fmt.yaml"
     {
         echo "name: $name"
@@ -148,6 +173,7 @@ for fmt in ${formats//,/ }; do
         echo "homepage: \"$homepage\""
         echo "license: GPL-3.0"
         if [ -n "$deps" ]; then echo "depends:"; IFS=, read -ra ds <<<"$deps"; for d in "${ds[@]}"; do echo "  - \"${d# }\""; done; fi
+        if [ -n "$recs" ]; then echo "recommends:"; IFS=, read -ra rs <<<"$recs"; for r in "${rs[@]}"; do echo "  - \"${r# }\""; done; fi
         if [ -n "$conflicts" ]; then echo "conflicts: [\"$conflicts\"]"; echo "provides: [\"$provides\"]"; echo "replaces: [\"$replaces\"]"; fi
         echo "contents:"
         echo "  - src: $root/"

@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 usage="usage: package-gasm.sh <version> <macos-universal|linux-x86_64|linux-arm64|windows-x86_64> <gasm-run dir> <out dir>"
 VERSION=${1:?$usage}; PLATFORM=${2:?$usage}; RUNDIR=${3:?$usage}; OUT=${4:?$usage}
 WASM=${OPENBALLANCE_WASM:-$ROOT/build-gasm/openballance.wasm}
-ICON=${OPENBALLANCE_ICON:-$ROOT/docs/public/favicon.png}
+ICON=${OPENBALLANCE_ICON:-$ROOT/scripts/packaging/icon-512.png}
 GASM_VERSION=$(cat "$RUNDIR/VERSION" 2>/dev/null || "$ROOT/tools/fetch-gasm-sdk.sh" --version)
 SRC="$ROOT/tools/gasm-bundle"
 EXE=""; [[ "$PLATFORM" == windows-* ]] && EXE=.exe

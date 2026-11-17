@@ -149,55 +149,69 @@ fn data_dirs_assets(xdg_data_dirs: Option<&std::ffi::OsStr>) -> Vec<PathBuf> {
 /// the Linux packages put it: /usr/bin and /usr/share/drahtseilakt/assets); then, only as a developer's fallback, the
 /// source tree (three folders up from a build's target/release, four from a test's target/release/deps, and the path
 /// the program was compiled in); and last the standard data folders, `drahtseilakt/assets` in each of
-/// `$XDG_DATA_DIRS` (default /usr/local/share:/usr/share). One answer for the whole game, found once.
+/// `$XDG_DATA_DIRS` (default /usr/local/share:/usr/share). A portable copy (`portable.txt` beside the program) looks only
+/// in `assets/` beside itself (`assets_candidates`). One answer for the whole game, found once.
 pub fn assets_root() -> Option<PathBuf> {
     static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
         let real = |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir());
-        let from_env = std::env::var_os("DRAHTSEILAKT_ASSETS").map(PathBuf::from);
-        let exe = std::env::current_exe().ok();
-        let beside = exe
-            .as_deref()
-            .and_then(Path::parent)
-            .map(|d| d.join("assets"));
-        let tree = exe
-            .as_deref()
-            .and_then(Path::parent)
-            .and_then(Path::parent)
-            .and_then(Path::parent)
-            .map(|d| d.join("assets"));
-        // a test's program sits one folder deeper, in target/<profile>/deps: only there, never for an installed
-        // program (whose folder four up could be anyone's)
-        let named = |p: Option<&Path>, n: &str| p.and_then(Path::file_name).is_some_and(|f| f == n);
-        let deps = exe
-            .as_deref()
-            .filter(|e| named(e.parent(), "deps") && named(e.ancestors().nth(3), "target"))
-            .and_then(|e| e.ancestors().nth(4))
-            .map(|d| d.join("assets"));
-        let bundle = exe
-            .as_deref()
-            .and_then(Path::parent)
-            .and_then(Path::parent)
-            .map(|d| d.join("Resources/assets"));
-        let prefix = exe
-            .as_deref()
-            .and_then(Path::parent)
-            .and_then(Path::parent)
-            .map(|d| d.join(SHARE_ASSETS));
-        let compiled = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
-        let xdg = std::env::var_os("XDG_DATA_DIRS");
-        from_env
-            .into_iter()
-            .chain(beside)
-            .chain(bundle)
-            .chain(prefix)
-            .chain(tree)
-            .chain(deps)
-            .chain(compiled)
-            .chain(data_dirs_assets(xdg.as_deref()))
-            .find(|p| real(p))
+        assets_candidates(
+            std::env::var_os("DRAHTSEILAKT_ASSETS").map(PathBuf::from),
+            std::env::current_exe().ok().as_deref(),
+            crate::profile::portable_root().is_some(),
+            std::env::var_os("XDG_DATA_DIRS").as_deref(),
+        )
+        .into_iter()
+        .find(|p| real(p))
     })
     .clone()
+}
+
+/// The places `assets_root` looks in, in order (see there). A portable copy (`portable.txt` beside the program) looks
+/// only in its own `assets/`, after the explicit `DRAHTSEILAKT_ASSETS` of whoever started it: it never falls back to a
+/// source tree, an installed copy or the standard data folders, so it plays what it was shipped with or says it
+/// lacks it, and never picks up some other installation's files.
+fn assets_candidates(
+    from_env: Option<PathBuf>,
+    exe: Option<&Path>,
+    portable: bool,
+    xdg_data_dirs: Option<&std::ffi::OsStr>,
+) -> Vec<PathBuf> {
+    let beside = exe.and_then(Path::parent).map(|d| d.join("assets"));
+    if portable {
+        return from_env.into_iter().chain(beside).collect();
+    }
+    let tree = exe
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .map(|d| d.join("assets"));
+    // a test's program sits one folder deeper, in target/<profile>/deps: only there, never for an installed
+    // program (whose folder four up could be anyone's)
+    let named = |p: Option<&Path>, n: &str| p.and_then(Path::file_name).is_some_and(|f| f == n);
+    let deps = exe
+        .filter(|e| named(e.parent(), "deps") && named(e.ancestors().nth(3), "target"))
+        .and_then(|e| e.ancestors().nth(4))
+        .map(|d| d.join("assets"));
+    let bundle = exe
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .map(|d| d.join("Resources/assets"));
+    let prefix = exe
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .map(|d| d.join(SHARE_ASSETS));
+    let compiled = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
+    from_env
+        .into_iter()
+        .chain(beside)
+        .chain(bundle)
+        .chain(prefix)
+        .chain(tree)
+        .chain(deps)
+        .chain(compiled)
+        .chain(data_dirs_assets(xdg_data_dirs))
+        .collect()
 }
 
 /// Our own files, laid out as the original: `own/` in the assets folder.
@@ -510,6 +524,30 @@ pub fn missing(relative: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A portable copy plays only its own assets/: no source tree, prefix, bundle or XDG folder is ever looked in.
+    #[test]
+    fn a_portable_copy_looks_only_beside_itself() {
+        let exe = Path::new("/games/dra/drahtseilakt");
+        let xdg = std::ffi::OsString::from("/usr/share");
+        let got = assets_candidates(None, Some(exe), true, Some(&xdg));
+        assert_eq!(got, vec![PathBuf::from("/games/dra/assets")]);
+        // an explicit DRAHTSEILAKT_ASSETS still comes first
+        let got = assets_candidates(Some("/x".into()), Some(exe), true, Some(&xdg));
+        assert_eq!(
+            got,
+            vec![PathBuf::from("/x"), PathBuf::from("/games/dra/assets")]
+        );
+        // an installed one has the fallbacks
+        let got = assets_candidates(
+            None,
+            Some(Path::new("/usr/bin/drahtseilakt")),
+            false,
+            Some(&xdg),
+        );
+        assert!(got.contains(&PathBuf::from("/usr/share/drahtseilakt/assets")));
+        assert!(got.contains(&PathBuf::from("/usr/bin/assets")));
+    }
 
     /// The names the community's maps carry (the 605-map audit): whole, cut to a DOS name, copied, or none.
     #[test]

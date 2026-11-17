@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scale the site's favicon (docs/public/favicon.png, the Ballance ball) to an app icon.
+"""Scale the game's icon (scripts/packaging/icon-512.png, our wooden ball) to an app icon.
 
 Smooth scaling (area average when shrinking, bilinear when enlarging, on premultiplied alpha), so the
 rendered ball stays round and soft. Standard library only, so it runs on CI runners without Pillow.
@@ -98,7 +98,7 @@ def main():
     if len(sys.argv) < 3:
         raise SystemExit(__doc__)
     size, out = int(sys.argv[1]), sys.argv[2]
-    src = sys.argv[3] if len(sys.argv) > 3 else 'docs/public/favicon.png'
+    src = sys.argv[3] if len(sys.argv) > 3 else 'scripts/packaging/icon-512.png'
     w, h, rows = read_png(src)
     write_png(out, size, size, scale(w, h, rows, size))
 

@@ -5,19 +5,25 @@ ausgeliefert: ein Update des Programms baut nur die Binärpakete neu.
 
 | Was | Ändert sich | Gebaut von | Veröffentlicht als |
 |---|---|---|---|
-| **Binärpakete**: das Programm | mit jeder Version | Workflow `Drahtseilakt release` (CI) | Release mit Tag `X.Y.Z` (Entwurf) |
-| **Basisdaten**: `assets/` ohne die 13 ausgewählten Karten | selten | `scripts/pack-assets.sh` (Rechner des Besitzers) | Release mit Tag `data-<DATA_VERSION>` |
-| **Levels**: die 13 ausgewählten Karten | selten | `scripts/pack-assets.sh` (Rechner des Besitzers) | dasselbe Release `data-<DATA_VERSION>` |
+| **Binärpakete**: das Programm und die Basisdaten als `.deb`/`.rpm` | mit jeder Version | Workflow `Drahtseilakt release` (CI) | Release mit Tag `X.Y.Z` (Entwurf) |
+| **Levels**: die 13 ausgewählten Karten | selten | `scripts/pack-assets.sh` (Rechner des Besitzers) | Release mit Tag `data-<DATA_VERSION>` |
 
-Daten und Levels liegen nicht in git („keine Binärdateien in git“) und lassen sich daher nicht in CI bauen; sie
-werden auf dem Rechner des Besitzers aus dem lokalen `assets/` erzeugt und von Hand hochgeladen.
+**Die Basisdaten liegen in git** (Entscheidung des Besitzers 2026-11-17, decisions.md „Binärdateien in git: die
+Basisdaten“); CI nimmt sie aus dem Checkout und lädt nichts herunter, die Pakete `drahtseilakt-data` (`.deb`/`.rpm`) werden
+im Release-Workflow daraus gebaut. Nur die 13 ausgewählten Karten sind nicht in git (ein `level.bin` dort liegt über
+GitHubs Grenze von 100 MB je Datei); sie entstehen auf dem Rechner des Besitzers aus dem lokalen `assets/` und werden von
+Hand hochgeladen.
 
 ## Basisdaten
 
-`assets/` ohne die ausgewählten Karten (`assets/levels/drahtseilakt/NN-*`) und ohne reine Entwicklungsdateien
-(`mods-dev`, `own/make`): eigene Teile, Schriften, Klänge, Werksmods, das Handbuch, der Showcase-Level
-(`00-Showcase`, `Parts_Test`) und die 13 Community-`.nmo`-Karten (`assets/levels/community`), an die das Spiel fest
-gebunden ist. Etwa 93 MB. Nie eine Datei des originalen Ballance.
+`assets/` ohne die ausgewählten Karten (`assets/levels/drahtseilakt/NN-*`, deren `level.txt` bleibt in git) und ohne
+reine Entwicklungsdateien (`mods-dev`, `own/make`): unsere Teile und Texturen, Schriften, Klänge, Werksmods, der
+Showcase-Level (`00-Showcase`, `Parts_Test`) und die 13 Community-`.nmo`-Karten (`assets/levels/community`), an die das Spiel
+gebunden ist. Etwa 100 MB in git (355 Dateien, die größte 3,6 MB), 93 MB als Paket. Nie eine Datei des originalen Ballance
+(beim Aufnehmen per Hash gegen eine Kopie des Originals geprüft). Nicht in git, weil CI es billig erzeugt: das Handbuch
+(`assets/manual`, `tools/make_manual.py`, von `scripts/ci-assets.sh` ausgeführt). `.gitignore` ignoriert die Dateien der
+ausgewählten Karten außer ihrer `level.txt` sowie die abgeleiteten `.dtx`, `level.source`, `*.remaster/`,
+`textures.original/`.
 
 ## Levels (Karten)
 
@@ -35,64 +41,50 @@ verweigern ein größeres Paket.
 - Ein Daten-Release trägt den Tag `data-<DATA_VERSION>`; der Tag-Filter des Workflows (`[0-9]+.[0-9]+.[0-9]+`) passt
   nicht darauf, es wird also nichts gestartet.
 
-## Daten- und Level-Pakete erzeugen
+## Level-Pakete erzeugen
 
 ```sh
-scripts/pack-assets.sh          # OUT defaults to ../drahtseilakt-portable/bundles
+scripts/pack-assets.sh          # OUT ist standardmäßig ../drahtseilakt-portable/bundles
 ```
 
-Es erzeugt in OUT (`V` = `scripts/DATA_VERSION`):
+Erzeugt in OUT (`V` = `scripts/DATA_VERSION`):
 
 | Datei | Wofür |
 |---|---|
-| `drahtseilakt-data-V.tar.gz` | die übrigen Systeme; CI lädt es für portable Archive, Installer, .app |
-| `drahtseilakt-data_V-1_all.deb`, `drahtseilakt-data-V-1.noarch.rpm` | Linux, Basisdaten |
 | `levels/NN-Name.zip` (13) | jedes System: nach `assets/levels/drahtseilakt/` entpacken |
 | `drahtseilakt-levels_V-1_all.deb`, `drahtseilakt-levels-V-1.noarch.rpm` | Linux, alle 13 Karten (hängt vom Datenpaket ab) |
 | `SHA256SUMS` | alles oben Genannte |
 
-`.deb` und `.rpm` baut [nfpm](https://nfpm.goreleaser.com) 2.49.0, ein Werkzeug für beide; dasselbe Skript läuft so
-auf dem Rechner des Besitzers (kein `rpmbuild` nötig) und in CI. `scripts/fetch-nfpm.sh` lädt es nach
-`third_party/` (gitignoriert; nie in Systempfade) und prüft die im Skript festgeschriebene SHA-256 (aus der
-`checksums.txt` des Releases). `scripts/pack-assets.sh --no-packages` überspringt die Pakete.
+`--with-data` erzeugt zusätzlich das alte `drahtseilakt-data-V.tar.gz` und Datenpakete aus dem lokalen `assets/`, zum
+lokalen Prüfen der Pakete; sie werden nicht hochgeladen: CI baut `drahtseilakt-data` aus git
+(`scripts/make-distro-packages.sh data --out DIR` aus dem Checkout; `--tar FILE` nimmt stattdessen ein Archiv).
 
-## Das Daten-Release hochladen
+`.deb` und `.rpm` erzeugt [nfpm](https://nfpm.goreleaser.com) 2.49.0, ein Werkzeug für beide, sodass dasselbe Skript auf dem
+Rechner des Besitzers (kein `rpmbuild` nötig) und in CI läuft. `scripts/fetch-nfpm.sh` lädt es nach `third_party/` (in
+gitignore; nie in einen Systempfad) und prüft die im Skript festgeschriebene SHA-256. `scripts/pack-assets.sh --no-packages`
+überspringt die Pakete.
 
-Vom Besitzer aus dem Checkout auszuführen; nichts hier läuft von selbst:
+## Das Level-Release hochladen
+
+Vom Besitzer aus dem Checkout ausgeführt; nichts davon läuft von selbst:
 
 ```sh
 V=$(cat scripts/DATA_VERSION)
 cd ../drahtseilakt-portable/bundles && sha256sum --check --quiet SHA256SUMS
 gh release create "data-$V" --repo eugene-vereshchagin/drahtseilakt --draft --latest=false \
-  --title "Drahtseilakt data $V" \
-  --notes "Base data and the 13 picked maps for Drahtseilakt (data version $V). Programs: the releases X.Y.Z." \
-  "drahtseilakt-data-$V.tar.gz" \
-  "drahtseilakt-data_$V-1_all.deb" "drahtseilakt-data-$V-1.noarch.rpm" \
+  --title "Drahtseilakt levels $V" \
+  --notes "The 13 picked maps for Drahtseilakt (data version $V). Programs and base data: the releases X.Y.Z." \
   "drahtseilakt-levels_$V-1_all.deb" "drahtseilakt-levels-$V-1.noarch.rpm" \
   levels/*.zip SHA256SUMS
 ```
 
-Den Entwurf ansehen, dann veröffentlichen. Danach die CI auf die neuen Basisdaten zeigen lassen
-(Repository-Variablen, einmal je Datenversion). In einem privaten Repository wird ein Release-Asset über seine
-API-URL geladen (als Bearer geht `ASSETS_TOKEN`, sonst das eigene Token des Laufs):
-
-```sh
-V=$(cat scripts/DATA_VERSION)
-URL=$(gh api "repos/eugene-vereshchagin/drahtseilakt/releases/tags/data-$V" \
-  --jq ".assets[] | select(.name == \"drahtseilakt-data-$V.tar.gz\") | .url")
-SUM=$(sha256sum "../drahtseilakt-portable/bundles/drahtseilakt-data-$V.tar.gz" | cut -d' ' -f1)
-gh variable set ASSETS_BUNDLE_URL --repo eugene-vereshchagin/drahtseilakt --body "$URL"
-gh variable set ASSETS_BUNDLE_SHA256 --repo eugene-vereshchagin/drahtseilakt --body "$SUM"
-```
-
-(Bei einem öffentlichen Release geht auch die normale Download-URL
-`https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/data-$V/drahtseilakt-data-$V.tar.gz`.)
-`scripts/ci-assets.sh` warnt, wenn die URL die Version aus `scripts/DATA_VERSION` nicht enthält.
+Den Entwurf ansehen, dann veröffentlichen. Sonst ist nichts einzustellen: CI braucht weder Variable noch Secret noch einen
+Download der Daten.
 
 ## Das Binär-Release (CI)
 
 Actions -> „Drahtseilakt release“ -> Run workflow (die Dateien sind Lauf-Artefakte) oder einen Tag `X.Y.Z` pushen:
-Der Lauf erzeugt dann auch ein **Entwurfs**-Release mit den Dateien unten und `SHA256SUMS` (ohne Daten und Levels).
+Der Lauf erzeugt dann auch ein **Entwurfs**-Release mit den Dateien unten und `SHA256SUMS` (ohne die Levels).
 Die Eingabe `dev` fügt die Dev-Variante hinzu (nie in einem Release). Ein Push auf einen Branch startet nichts.
 
 Mit `<V>` = Tag (außerhalb eines Tags `git-<sha>`) entstehen diese Dateien:
@@ -101,20 +93,21 @@ Mit `<V>` = Tag (außerhalb eines Tags `git-<sha>`) entstehen diese Dateien:
 |---|---|
 | Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (Installer), `drahtseilakt-<V>-windows-<arch>.zip` (portabel) |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` (portabel), `drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
+| Linux (x86_64-Job, einmal) | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`, `drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV (Eingabe `dev`) | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |
 | macOS arm64, x86_64 | `drahtseilakt-<V>-macos-<arch>.dmg` (`.app` ohne Signatur), `drahtseilakt-<V>-macos-<arch>.tar.gz` (portabel) |
 | FreeBSD x86_64 (experimentell) | `drahtseilakt-<V>-freebsd-x86_64.tar.gz` |
 
 - **Portable Archive** und der **Windows-Installer** enthalten die Basisdaten und laufen daher eigenständig; die
-  ausgewählten Karten sind die separaten `.zip`-Dateien aus dem Daten-Release. Das portable Archiv enthält auch die Toolbox.
+  ausgewählten Karten sind die separaten `.zip`-Dateien aus dem Daten-Release (`data-<DATA_VERSION>`). Das portable Archiv enthält auch die Toolbox.
 - **Windows-Installer** (NSIS, auf Ubuntu aus dem portablen zip gebaut): standardmäßig pro Benutzer
   (`%LOCALAPPDATA%\Programs\Drahtseilakt`, ohne Administrator), ein Startmenü-Ordner, ein Deinstallationsprogramm unter
   „Apps“. Er installiert keine `portable.txt`; die Spielerdaten liegen daher im Profil, und eine Deinstallation berührt
-  sie nie. Unsigniert: SmartScreen warnt.
-- **Linux-Pakete**: das Programm in `/usr/bin/drahtseilakt` (Systembibliotheken: `libasound2`, `libudev1`), die Daten
+  sie nie. Installer, Deinstaller und Verknüpfungen tragen unser Icon (`scripts/packaging/icon.ico`, neben dem Programm installiert). Unsigniert: SmartScreen warnt. **Noch nicht:** das Icon in `drahtseilakt.exe` selbst (Explorer, Taskleiste einer portablen Kopie): dafür fehlt eine Build-Abhängigkeit zum Einbetten von Ressourcen im Offline-Crate-Cache; das Fenster hat das Icon (zur Laufzeit gesetzt).
+- **Eine portable Kopie** (`portable.txt` neben dem Programm) sucht ihre Assets nur im eigenen `assets/`, nie in einem Quellbaum, `/usr/share` oder `XDG_DATA_DIRS`.
+- **Linux-Pakete**: das Programm in `/usr/bin/drahtseilakt` (hängt von `libasound2`, `libudev1` ab; das .rpm von den Sonames `libasound.so.2`, `libudev.so.1`, `libc.so.6(GLIBC_2.35)`, die Fedora und openSUSE beide liefern, anders als Paketnamen wie `systemd-libs`; empfiehlt die Fenstersystem- und Grafikbibliotheken, die das Spiel zur Laufzeit lädt: `libvulkan1`, `libxkbcommon-x11-0`, `libx11-6`, `libxcursor1`, `libxi6`, `libwayland-client0`), die Daten
   dort, wo das Spiel sie sucht, `/usr/share/drahtseilakt/assets` (das Programm findet sie über `/usr/bin/../share`,
-  dann in `$XDG_DATA_DIRS`: `files.md`). Eine `.desktop`-Datei und das Icon (das Favicon der Site, skaliert von
-  `tools/icon.py`, keine neue Datei in git). `drahtseilakt` hängt von `drahtseilakt-data (>= DATA_VERSION)` ab;
+  dann in `$XDG_DATA_DIRS`: `files.md`). Eine `.desktop`-Datei und das Icon (`scripts/packaging/icon-512.png`, unsere Holzkugel, dasselbe Bild wie auf der Website und im Fenster; 512 px und eine 256-px-Kopie über `tools/icon.py`). `drahtseilakt` hängt von `drahtseilakt-data (>= DATA_VERSION)` ab;
   `drahtseilakt-levels` ist optional. Die Toolbox ist nicht enthalten (nur portabel).
   `drahtseilakt-dev` stellt `drahtseilakt` bereit und kollidiert damit (nur `.deb`, aus der Eingabe `dev`).
 - **macOS**: die `.app` hält die Daten in `Contents/Resources/assets`; nicht signiert oder notarisiert, der erste Start

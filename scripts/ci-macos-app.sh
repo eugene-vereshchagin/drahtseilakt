@@ -20,8 +20,8 @@ install -m 755 "$GAME_BIN" "$app/Contents/MacOS/drahtseilakt"
 # the shipped assets, without development-only things
 tar -C assets --exclude=./mods-dev --exclude=./own/make --exclude=__pycache__ --exclude='*.pyc' -cf - . \
     | (mkdir -p "$app/Contents/Resources/assets" && tar -C "$app/Contents/Resources/assets" -xf -)
-# the icon: the site's favicon scaled to the iconset sizes
-for s in 16 32 64 128 256 512 1024; do python3 -I tools/icon.py "$s" "$w/s$s.png" docs/public/favicon.png; done
+# the icon: the game's icon (scripts/packaging/icon-512.png) scaled to the iconset sizes
+for s in 16 32 64 128 256 512 1024; do python3 -I tools/icon.py "$s" "$w/s$s.png" scripts/packaging/icon-512.png; done
 for pair in 16:icon_16x16 32:icon_16x16@2x 32:icon_32x32 64:icon_32x32@2x 128:icon_128x128 256:icon_128x128@2x \
             256:icon_256x256 512:icon_256x256@2x 512:icon_512x512 1024:icon_512x512@2x; do
     cp "$w/s${pair%%:*}.png" "$w/icon.iconset/${pair#*:}.png"

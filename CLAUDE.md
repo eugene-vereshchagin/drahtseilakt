@@ -49,9 +49,11 @@ The active profile for this project:
   say *why*.
 - Code, tests, fixtures and examples never depend on game data in the repository (see `.gitignore`). Tests
   that need the game read it from `OPENBALLANCE_DATA`; community maps come from `OPENBALLANCE_MAPS`, downloaded
-  mods from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). While the repository is private it
-  may hold game data as a backup, only where the owner says; the public release is a new, clean repository
-  (decisions.md, "The private repository is a backup").
+  mods from `OPENBALLANCE_MODS` (see `docs/drahtseilakt/community-maps.md`). The base data (our own parts, textures,
+  fonts, sounds, the showcase and the community maps: what the data package holds) is in git (owner 2026-11-17,
+  decisions.md "Binaries in git: the base data"); the 13 picked maps and anything of the original never are
+  (`.gitignore`). The repository may hold other game data as a backup only where the owner says; the public release
+  is a new, clean repository (decisions.md, "The private repository is a backup").
 - **Own content by default, the original's on the player's request** (owner's decision 2026-11-02, decisions.md
   "Own content by default"). Nothing of the original is ever shipped. The game comes with its own interface and
   parts, made as close to the original as we can ourselves (own drawings, sounds, freely licensed fonts); in the

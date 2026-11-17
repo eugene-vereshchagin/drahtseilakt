@@ -160,7 +160,8 @@ export default defineConfig({
   },
 
   head: [
-    ["link", { rel: "icon", href: "/favicon.png", type: "image/png" }],
+    ["link", { rel: "icon", href: "/favicon.ico", sizes: "any" }],
+    ["link", { rel: "icon", href: "/favicon-32.png", type: "image/png", sizes: "32x32" }],
     ["meta", { name: "theme-color", content: "#e8835a" }],
     ["meta", { property: "og:title", content: "OpenBallance: Ballance, rolling again" }],
     ["meta", { property: "og:description", content: "A faithful reimplementation of Ballance: the original game scripts on a new Virtools-compatible runtime with a port of its physics engine. Runs on gasm, natively and in the browser." }],
@@ -170,7 +171,7 @@ export default defineConfig({
 
   themeConfig: {
     siteTitle: "OpenBallance",
-    logo: "/favicon.png",
+    logo: "/favicon-32.png",
 
     nav: [
       { text: "User guide", link: "/guide/", activeMatch: "/guide/" },

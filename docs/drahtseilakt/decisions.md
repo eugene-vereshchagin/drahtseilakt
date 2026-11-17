@@ -148,6 +148,17 @@ cleaned tree without this history, checked for game data before the first push. 
 "No game data in the repository" still applies to everything meant to be published: code, tests and docs
 do not depend on game data being in the repository.
 
+## Binaries in git: the base data
+
+*Owner's decision 2026-11-17; amends "No game data in the repository" and the rule of 2026-11-10 that levels and textures
+stay out of git.* What the game needs to build and play is in git: the base data, exactly what the data package holds
+(our parts and textures, fonts, sounds, factory mods, the showcase and `Parts_Test`, the 13 community `.nmo` maps; about
+100 MB in 355 files, the largest 3.6 MB). A clone builds and plays, and CI downloads nothing (the old bundle variables
+`ASSETS_BUNDLE_URL`/`ASSETS_BUNDLE_SHA256` and the token are gone). Still out: the 13 picked maps (a `level.bin` there
+is over GitHub's 100 MB file limit; they are release assets), the derived `.dtx`/`.source`/`.remaster` files, and the
+player's manual, which CI generates cheaply. No file of the original is ever in git (checked by hash). Release layout:
+`docs/drahtseilakt/release.md`.
+
 ## No browser build
 
 The browser (gasm/WebAssembly) build came with upstream and is not a goal of this project. It is no longer a

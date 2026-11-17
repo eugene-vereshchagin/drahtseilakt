@@ -5386,6 +5386,18 @@ fn show_graphics(g: &crate::options::Graphics, features: crate::features::Featur
     scene::set_fov((features.mode && g.fov != crate::options::FOV_ORIGINAL).then_some(g.fov));
 }
 
+/// The window's icon: our wooden ball, the same picture as the packages' icon (scripts/packaging/icon-180.png).
+/// None if it does not decode (a window without an icon is fine). Windows and X11 use it; macOS and Wayland
+/// take the icon from the app bundle or the .desktop file instead.
+fn window_icon() -> Option<winit::window::Icon> {
+    const PNG: &[u8] = include_bytes!("../../../scripts/packaging/icon-180.png");
+    let img = image::load_from_memory_with_format(PNG, image::ImageFormat::Png)
+        .ok()?
+        .into_rgba8();
+    let (w, h) = img.dimensions();
+    winit::window::Icon::from_rgba(img.into_raw(), w, h).ok()
+}
+
 impl App {
     /// The window's title: the game's name while the main menu is up (or no level is loaded), else the level's.
     fn title(&self) -> String {
@@ -5398,6 +5410,7 @@ impl App {
     fn init(&mut self, event_loop: &ActiveEventLoop) -> Result<(), String> {
         let attrs = Window::default_attributes()
             .with_title(self.title())
+            .with_window_icon(window_icon())
             .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
         let window = Arc::new(event_loop.create_window(attrs).map_err(|e| e.to_string())?);
         let Gpu {

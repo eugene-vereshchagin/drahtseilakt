@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# CI: makes sure assets/ is complete before a package is built. A fresh clone lacks the files git does not hold (level
-# data, textures, our generated parts: .gitignore, "no binaries in git"). They come from the base data tarball
-# (drahtseilakt-data-<V>.tar.gz, made by scripts/pack-assets.sh and uploaded to the GitHub release tagged data-<V>; V is
-# scripts/DATA_VERSION), a .tar.gz with an assets/ folder in it, whose address and SHA-256 are the repository variables ASSETS_BUNDLE_URL and
-# ASSETS_BUNDLE_SHA256 (a private release asset's API URL is fine; the secret ASSETS_TOKEN or the run's token is
-# sent as its bearer token, to a github.com or api.github.com address only). The manual is generated here (tools/make_manual.py). Then the checks of
-# scripts/make-portable.sh run. Fails with a clear message when anything is missing; never builds an incomplete package.
+# CI: makes sure assets/ is ready before a package is built. The base data is in git (owner's decision 2026-11-17, docs/drahtseilakt/
+# release.md), so a checkout has it; nothing is downloaded. Not in git, and so made here: the player's manual
+# (tools/make_manual.py, cheap). The 13 picked maps (assets/levels/drahtseilakt/NN-*) are not in a checkout either (release
+# assets): the entries of the levels' SHA256SUMS for a folder that is absent are dropped, so the packages check against
+# themselves. Then the checks of scripts/make-portable.sh run. Fails with a clear message when anything is missing; never
+# builds an incomplete package.
 set -euo pipefail
 die() { echo "ci-assets: $*" >&2; echo "::error::ci-assets: $*"; exit 1; }
 cd "$(dirname "$0")/.."
@@ -13,40 +12,27 @@ cd "$(dirname "$0")/.."
 sha_of() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1
            elif command -v shasum >/dev/null; then shasum -a 256 "$1" | cut -d' ' -f1
            else sha256 -q "$1"; fi; }
-complete() {
-    [ -f "assets/own/3D Entities/MenuLevel/level.bin" ] && ls assets/levels/*/*/level.bin >/dev/null 2>&1
-}
 
-if ! complete; then
-    url=${ASSETS_BUNDLE_URL:-} want=${ASSETS_BUNDLE_SHA256:-} token=${ASSETS_TOKEN:-}
-    [ -n "$url" ] && [ -n "$want" ] || die "assets/ lacks the level data, textures and generated parts (not in git), and no bundle is set: add the repository variables ASSETS_BUNDLE_URL and ASSETS_BUNDLE_SHA256 (a .tar.gz with assets/ in it)"
-    dv=$(tr -d ' \n' <scripts/DATA_VERSION)
-    case $url in *"$dv"*) ;; *) echo "::warning::ci-assets: ASSETS_BUNDLE_URL does not mention DATA_VERSION $dv (scripts/DATA_VERSION): packages depend on drahtseilakt-data >= $dv" ;; esac
-    echo "ci-assets: downloading the base data (data-$dv)"
-    # the token goes only to GitHub (a release asset there); a bundle hosted elsewhere is fetched without it, and only
-    # over https (curl drops the header on a redirect to another host)
-    auth=()
-    case $url in
-        https://api.github.com/*|https://github.com/*) [ -z "$token" ] || auth=(-H "Authorization: Bearer $token") ;;
-        https://*) ;;
-        *) die "ASSETS_BUNDLE_URL must be an https:// address" ;;
-    esac
-    mkdir -p "${RUNNER_TEMP:-/tmp}"
-    bundle="${RUNNER_TEMP:-/tmp}/assets-bundle.tar.gz"
-    curl -fsSL --proto =https "${auth[@]}" -H "Accept: application/octet-stream" -o "$bundle" "$url" || die "the assets bundle did not download from ASSETS_BUNDLE_URL"
-    [ "$(sha_of "$bundle")" = "$want" ] || die "the assets bundle does not match ASSETS_BUNDLE_SHA256"
-    tar -xzf "$bundle"
-    rm -f "$bundle"
-fi
+[ -f "assets/own/3D Entities/MenuLevel/level.bin" ] && ls assets/levels/*/*/level.bin >/dev/null 2>&1 \
+    || die "assets/ lacks the base data: is this a complete checkout of the repository?"
 
 if [ ! -f assets/manual/index.html ]; then
     py=python3; command -v python3 >/dev/null || py=python
     "$py" -I -c 'import markdown' 2>/dev/null || "$py" -m pip install --quiet --disable-pip-version-check "markdown==3.7"
     "$py" -I tools/make_manual.py
 fi
-
 [ -f assets/manual/index.html ] || die "no manual after tools/make_manual.py"
-[ -f "assets/own/3D Entities/MenuLevel/level.bin" ] || die "assets/ lacks the generated parts (assets/own/make); the bundle is incomplete"
+
+# the checkout's levels/drahtseilakt/SHA256SUMS lists the picked maps too; they are not here
+sums=assets/levels/drahtseilakt/SHA256SUMS
+if [ -f "$sums" ]; then
+    : >"$sums.tmp"
+    while IFS= read -r line; do
+        f=${line#*  }
+        [ -d "assets/levels/drahtseilakt/${f%%/*}" ] && printf '%s\n' "$line" >>"$sums.tmp"
+    done <"$sums" || true
+    mv "$sums.tmp" "$sums"
+fi
 for sums in assets/levels/*/SHA256SUMS assets/own/SHA256SUMS assets/fonts/SHA256SUMS; do
     [ -f "$sums" ] || die "missing $sums"
     dir=$(dirname "$sums")
