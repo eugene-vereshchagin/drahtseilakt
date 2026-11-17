@@ -4038,10 +4038,20 @@ fn upload_prepare(renderer: &mut Renderer, game: &Game) {
 
 /// The level's sky by its name (a name that could not name a file is taken as none); closed when it has a top.
 fn sky_model(game: &Game) -> level::Level {
-    let letter = crate::sky::override_name()
+    let chosen = crate::sky::override_name();
+    let mut letter = chosen
+        .clone()
         .or_else(|| game.level.level.sky.clone())
         .filter(|n| crate::sky::valid_name(n))
         .unwrap_or_else(|| "A".into());
+    // a letter our own textures have no face for plays one of our skies of that mood, the same for every sector
+    if chosen.is_none() {
+        let ours = crate::sky::resolve(&letter, game.data.sky_served(&letter));
+        if ours != letter {
+            eprintln!("sky: {letter} has no face in our textures; playing {ours}");
+        }
+        letter = ours;
+    }
     let top = game
         .data
         .file(&format!(

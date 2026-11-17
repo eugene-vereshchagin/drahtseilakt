@@ -268,6 +268,17 @@ haze turning a cool blue-white with distance) as a mesh under the level (below).
 (Front, Right, Back, Left, Down, and Top if it has one) a level folder or the textures bring; a name is letters,
 digits, `_` and `-`. `--sky NAME` on the command line plays any level under another sky.
 
+**The original levels under our textures.** The original's levels name their sky by a letter (A to L). With
+`--textures own` the letters A, B and C are ours; for every other letter our texture set has no face, so the game
+plays one of our skies of the same mood instead of the copy's (`crates/game/src/sky.rs`, `stand_in`): D, I, K (night)
+`Night`, E, F (dusk, overcast) `Storm`, G, L (warm evening) `Sunset`, H (brown and blue) `Desert`, J (pale) `Clouds`.
+Only skies without a land mesh are used (an original level has none of its own, and a land under the track would show
+through it), and the same sky holds for every sector of a level. The `original` and `remastered` texture packs keep
+the copy's skies; a pack of the player's that brings a letter's faces keeps its own. Nothing changes for physics or
+replays. By level: 1 L (`Sunset`), 2 E (`Storm`), 3 A (ours), 4 F (`Storm`), 5 C (ours), 6 H (`Desert`), 7 D (`Night`),
+8 G (`Sunset`), 9 K (`Night`), 10 B (ours), 11 J (`Clouds`), 12 I (`Night`), 13 F (`Storm`). A level's own game folder
+with its own sky face (a stranger's) is never replaced.
+
 **The sea of cloud.** Under `Sunset` and `Clouds` the kit's levels hang over a sea of cumulus that the game draws as a
 volume (`crates/game/src/clouds.wgsl`): billows of tiling noise, lit by the sky's sun (bright where it meets them,
 blue-violet in their shade) and by the sky above, fading far off into the sky's own haze at the horizon; the columns

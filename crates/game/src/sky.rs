@@ -84,6 +84,31 @@ pub fn valid_name(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
+/// Our sky standing in for a letter of the original's that our texture set has no face for, keeping the mood of the
+/// original's: the dusk and night skies of D, I and K become our night over water, E and F the stormy cloud deck,
+/// the warm G and L our sunset, the brown-and-blue H the desert, the pale J the clouds. None for A, B and C (ours) and
+/// any other name. Skies without land only: the original's levels have no land of their own, and a mesh under the
+/// track would show through it.
+pub fn stand_in(letter: &str) -> Option<&'static str> {
+    Some(match letter {
+        "D" | "I" | "K" => "Night",
+        "E" | "F" => "Storm",
+        "G" | "L" => "Sunset",
+        "H" => "Desert",
+        "J" => "Clouds",
+        _ => return None,
+    })
+}
+
+/// The sky a level plays under: its own letter, or, when the chosen texture packs have no face for it (ours has
+/// A, B, C and the named skies only), [`stand_in`] for it. The copy's and the remaster's packs keep the letter.
+pub fn resolve(letter: &str, served: bool) -> String {
+    match stand_in(letter) {
+        Some(ours) if !served => ours.to_owned(),
+        _ => letter.to_owned(),
+    }
+}
+
 /// The texture file of a sky's face, as the game's textures name it (ours may be PNG or JPEG: assets.rs finds them).
 pub fn face_file(name: &str, face: &str) -> String {
     format!("Sky_{name}_{face}.bmp")
@@ -184,6 +209,22 @@ mod tests {
             &"x".repeat(NAME_MAX + 1),
         ] {
             assert!(!valid_name(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn letters_without_a_face_get_one_of_our_skies() {
+        // no land sky: an original level has no land of its own
+        let land = ["Mountains", "Forest", "Mist"];
+        for l in ["D", "E", "F", "G", "H", "I", "J", "K", "L"] {
+            let ours = stand_in(l).unwrap_or_default();
+            assert!(valid_name(ours) && !land.contains(&ours), "{l}");
+            assert_eq!(resolve(l, false), ours);
+            // a pack that serves the letter (the copy's, the remaster's) keeps it
+            assert_eq!(resolve(l, true), l);
+        }
+        for l in ["A", "B", "C", "Sea", "Z"] {
+            assert_eq!(resolve(l, false), l);
         }
     }
 

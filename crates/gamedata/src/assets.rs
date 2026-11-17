@@ -707,6 +707,19 @@ impl Data {
                 {
                     return Some((w, h, px, false));
                 }
+                // a sky our own textures have a face for (`textures own`): ours, not the copy's, which only the
+                // original and remastered packs show
+                if !(own && !self.overlay_is_remaster())
+                    && rel.to_ascii_lowercase().starts_with("textures/sky/")
+                    && chain
+                        .iter()
+                        .find(|p| p.dir.is_none())
+                        .is_some_and(|p| p.key == crate::packs::OWN)
+                    && let Some(ours) = own_file(&rel)
+                    && let Some(px) = self.decode_budgeted(&ours, false)
+                {
+                    return Some((px.0, px.1, px.2, false));
+                }
                 // it may come from a level's game folder (a stranger's): its size checked before it is decoded
                 if !std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() <= IMAGE_MAX) {
                     return None;
@@ -1138,6 +1151,38 @@ impl Data {
             .find_map(|dir| {
                 let rel = format!("{dir}/{file}");
                 self.file(&rel).map(|p| (rel, p))
+            })
+    }
+
+    /// Whether the level's game folder is the toolbox's remaster of an original level (its parts are the copy's, remade).
+    fn overlay_is_remaster(&self) -> bool {
+        self.overlay
+            .as_deref()
+            .is_some_and(|o| o.starts_with(remastered_levels()))
+    }
+
+    /// Whether the chosen texture pack chain draws the sky `letter`: a pack of the player's or our own set has its
+    /// front face, or the chain ends in the copy's (or its remaster's) own skies, which every letter has. False when
+    /// the chain is ours alone and lacks the letter: the game then plays one of our skies instead (sky.rs).
+    pub fn sky_served(&self, letter: &str) -> bool {
+        use crate::packs::{ORIGINAL, OWN, REMASTERED};
+        let face = format!("Sky_{letter}_Front");
+        // a level's own game folder with the face (a stranger's own sky) always wins; the toolbox's remaster of an
+        // original level carries the copy's skies, which are not "its own"
+        if !self.overlay_is_remaster()
+            && self
+                .level_own(&format!("Textures/Sky/{face}.bmp"))
+                .is_some()
+        {
+            return true;
+        }
+        crate::packs::chain(crate::packs::Kind::Textures)
+            .iter()
+            .any(|pack| match (pack.key.as_str(), &pack.dir) {
+                (_, Some(dir)) => crate::packs::picture(dir, &face).is_some(),
+                (OWN, None) => own_file(&format!("Textures/Sky/{face}.bmp")).is_some(),
+                (ORIGINAL | REMASTERED, None) => true,
+                _ => false,
             })
     }
 

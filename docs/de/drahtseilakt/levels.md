@@ -276,6 +276,17 @@ Satz Dateien `Textures/Sky/Sky_<Name>_<Seite>` (Front, Right, Back, Left, Down u
 Levelordner oder den Texturen; ein Name besteht aus Buchstaben, Ziffern, `_` und `-`. `--sky NAME` auf der
 Kommandozeile spielt jedes Level unter einem anderen Himmel.
 
+**Die Original-Level unter unseren Texturen.** Die Level des Originals nennen ihren Himmel mit einem Buchstaben (A bis L).
+Mit `--textures own` sind A, B und C unsere; für jeden anderen Buchstaben hat unser Texturensatz keine Seite, daher spielt
+das Spiel statt des Himmels der Kopie einen unserer Himmel mit gleicher Stimmung (`crates/game/src/sky.rs`, `stand_in`):
+D, I, K (Nacht) `Night`, E, F (Dämmerung, bedeckt) `Storm`, G, L (warmer Abend) `Sunset`, H (braun und blau) `Desert`,
+J (blass) `Clouds`. Es werden nur Himmel ohne Land-Mesh genommen (ein Original-Level hat kein eigenes Land, und es würde
+unter der Bahn durchscheinen); in allen Abschnitten eines Levels bleibt derselbe Himmel. Die Texturpakete `original` und
+`remastered` behalten die Himmel der Kopie; ein Paket des Spielers, das die Seiten eines Buchstabens mitbringt, behält
+seine. Physik und Replays bleiben unberührt. Nach Level: 1 L (`Sunset`), 2 E (`Storm`), 3 A (unser), 4 F (`Storm`), 5 C (unser),
+6 H (`Desert`), 7 D (`Night`), 8 G (`Sunset`), 9 K (`Night`), 10 B (unser), 11 J (`Clouds`), 12 I (`Night`), 13 F (`Storm`).
+Ein Himmel aus dem eigenen Spielordner eines (fremden) Levels wird nie ersetzt.
+
 **Das Wolkenmeer.** Unter `Sunset` und `Clouds` schweben die Level des Baukastens über einem Meer aus Haufenwolken, das das Spiel
 als Volumen zeichnet (`crates/game/src/clouds.wgsl`): Wolkenballen aus kachelndem Rauschen, beleuchtet von der Sonne
 des Himmels (hell, wo sie sie trifft, blauviolett im Schatten) und vom Himmel darüber, in der Ferne im Dunst des
