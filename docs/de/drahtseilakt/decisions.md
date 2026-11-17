@@ -450,7 +450,7 @@ und werden jetzt mit allem entfernt, was nur ihnen diente: ihr Läufe-Test (`own
 bleiben als `testlevels.rs`), `scripts/own-levels.sh`, der Level-stats-Vergleich eines unserer Level mit seinem Ziel
 (`--level-stats --open`, `scripts/level-stats.py --own`, `hints/level-stats-manual-own.csv`) und die Docs, die sie
 beschrieben. Was das Spiel stattdessen ausliefert: den Drahtseilakt-Satz (die Auswahl des Eigentümers im offenen
-Format), den Community-Satz (`.nmo`), das Schaufensterlevel `00_Синтетический_уровень` und das versteckte
+Format), den Community-Satz (`.nmo`), das Schaufensterlevel `00-Showcase` und das versteckte
 `Parts_Test`, beide mit dem Levelbaukasten gemacht, der dafür bleibt. Die Einträge oben, die von „unseren eigenen
 Leveln“ sprechen, bleiben, wie sie geschrieben wurden; dieser Eintrag ersetzt sie. Kriterien für die
 Veröffentlichung: [roadmap.md](roadmap.md), „Kriterien für die Veröffentlichung“.

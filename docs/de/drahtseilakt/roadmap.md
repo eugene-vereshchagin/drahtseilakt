@@ -256,7 +256,7 @@ alles Folgende gilt. Stand 2026-11-16: **erledigt**, **teilweise**, **offen**.
 - **Keine eigenen Level.** Das Spiel liefert die vom Eigentümer ausgewählten Community-Karten aus, ihren Autoren
   zugeschrieben: den Drahtseilakt-Satz (`assets/levels/drahtseilakt/01-…13-…`, ins offene Format konvertiert) und den
   Community-Satz (`assets/levels/community/`, die `.nmo` der Karten), dazu unser synthetisches Schaufensterlevel
-  `00_Синтетический_уровень` und das versteckte Testlevel `Parts_Test`. **Erledigt** (Ordner seit 2026-11-12, levels.md
+  `00-Showcase` und das versteckte Testlevel `Parts_Test`. **Erledigt** (Ordner seit 2026-11-12, levels.md
   „Level, die mit dem Spiel kommen“; die zehn eigenen Level am 2026-11-16 entfernt).
 - **Eigene Teile**: Jedes Teil, das ein Level verwenden kann (die drei Kugeln und ihre Bruchstücke, Transformatoren,
   Ventilatoren, Schieber, Zugbrücken, die Kiste, das Steinkugel-Rätsel, Schaukeln und Seilbrücken, Start und Ziel,

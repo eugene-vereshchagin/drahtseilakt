@@ -107,7 +107,7 @@ the **Drahtseilakt set** (`assets/levels/drahtseilakt/01-…13-…`, converted t
 (`assets/levels/community/`, the maps' own `.nmo` files), each credited in its `level.txt` and in CREDITS.md. Beside
 them `assets/levels/drahtseilakt/` holds two levels of ours, made of our own parts only (assets/own,
 [resources.md](resources.md)) by scripts in `assets/own/make/` (`levelkit.py` builds a level from track pieces and the
-stand-ins of the parts): the showcase level `00_Синтетический_уровень` (below) and `Parts_Test`
+stand-ins of the parts): the showcase level `00-Showcase` (below) and `Parts_Test`
 (`make_test_level.py`, a few hundred units of track with every part on it or beside it and a stretch of track of
 each safety, for the tests; hidden from the players' list by `hidden = yes` in its level.txt and still opened with
 `--open`). Their text sources are committed, the built files are not. Their licence is the
@@ -125,7 +125,7 @@ sized as the map's: in a `.nmo` map only those pixels are rewritten (`nmo::patch
 
 ### The showcase level
 
-`00_Синтетический_уровень` ("Synthetic level", first in the shipped list: `order = 0`, `difficulty = 1`) holds every
+`00-Showcase` ("Synthetic level", first in the shipped list: `order = 0`, `difficulty = 1`) holds every
 element of the game on one way of about 1900 units, each with a sign beside it, to be rolled through in a few minutes
 and checked by eye in each look: does it draw, with the right textures, sound and behave as it should. It is made by
 `assets/own/make/make_synthetic_level.py` (the classic part, as a level description with two commands of its own,

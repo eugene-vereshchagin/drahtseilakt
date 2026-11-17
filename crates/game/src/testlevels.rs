@@ -1,5 +1,5 @@
 // Checks of the levels our level kit made (assets/own/make/levelkit.py): the parts' test level Parts_Test and the
-// showcase level 00_Синтетический_уровень (docs/drahtseilakt/levels.md, "The level kit"). Railings and borders keep the
+// showcase level 00-Showcase (docs/drahtseilakt/levels.md, "The level kit"). Railings and borders keep the
 // ball on, the floors have no seams, no two drawn faces flicker in one plane, no loose body starts inside a floor.
 // (The ten levels of our own these checks were first written for were removed on 2026-11-16, decisions.md.)
 
@@ -466,7 +466,7 @@ mod tests {
     /// test level.
     #[test]
     fn kit_levels_have_no_faces_flickering_in_one_plane() {
-        let showcase = shipped().join("00_Синтетический_уровень");
+        let showcase = shipped().join("00-Showcase");
         let mut checked = 0;
         for dir in [shipped().join("Parts_Test"), showcase] {
             if !dir.join("level.gltf").is_file() || kit_version(&dir) < 2 {

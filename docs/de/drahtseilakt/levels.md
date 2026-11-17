@@ -97,7 +97,7 @@ eigenen Level“): der **Drahtseilakt-Satz** (`assets/levels/drahtseilakt/01-…
 der **Community-Satz** (`assets/levels/community/`, die `.nmo`-Dateien der Karten), jeder in seiner `level.txt` und in
 CREDITS.md genannt. Neben ihnen enthält `assets/levels/drahtseilakt/` zwei Level von uns, nur aus unseren eigenen Teilen
 gemacht (assets/own, [resources.md](resources.md)) durch Skripte in `assets/own/make/` (`levelkit.py` baut ein Level
-aus Bahnstücken und den Platzhaltern der Teile): das Schaufensterlevel `00_Синтетический_уровень` (unten) und
+aus Bahnstücken und den Platzhaltern der Teile): das Schaufensterlevel `00-Showcase` (unten) und
 `Parts_Test` (`make_test_level.py`, einige hundert Einheiten Bahn mit jedem Teil darauf oder daneben und einem Stück
 Bahn jeder Sicherungsart, für die Tests; durch `hidden = yes` in seiner level.txt aus der Liste der Spieler genommen
 und weiter mit `--open` geöffnet). Ihre Textquellen liegen im Repository, die gebauten Dateien nicht. Ihre Lizenz ist
@@ -117,7 +117,7 @@ Karte trägt `note = proprietary textures removed` (und `note.<code>` in jeder S
 
 ### Das Schau-Level
 
-`00_Синтетический_уровень` („Synthetischer Level", das erste der mitgelieferten: `order = 0`, `difficulty = 1`)
+`00-Showcase` („Synthetischer Level", das erste der mitgelieferten: `order = 0`, `difficulty = 1`)
 enthält jedes Element des Spiels auf einer Bahn von etwa 1900 Einheiten, jedes mit einem Schild daneben: in ein paar
 Minuten durchrollen und in jedem Look mit dem Auge prüfen, ob alles gezeichnet wird, mit den richtigen Texturen,
 klingt und sich verhält, wie es soll. Gebaut wird es von `assets/own/make/make_synthetic_level.py` (der klassische

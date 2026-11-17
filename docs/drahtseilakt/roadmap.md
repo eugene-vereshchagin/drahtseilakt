@@ -240,7 +240,7 @@ following hold. State as of 2026-11-16: **done**, **partly**, **open**.
 
 - **No levels of our own.** The game ships the community maps the owner picked, credited to their authors: the
   Drahtseilakt set (`assets/levels/drahtseilakt/01-…13-…`, converted to the open format) and the community set
-  (`assets/levels/community/`, the maps' `.nmo`), plus our synthetic showcase level `00_Синтетический_уровень` and the
+  (`assets/levels/community/`, the maps' `.nmo`), plus our synthetic showcase level `00-Showcase` and the
   hidden test level `Parts_Test`. **Done** (folders since 2026-11-12, levels.md "Levels shipped with the game"; the ten
   own levels removed 2026-11-16).
 - **Own parts**: every part a level can use (the three balls and their pieces, transformers, fans, pushers,

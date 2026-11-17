@@ -1,4 +1,4 @@
-// Checks of the showcase level shipped with the game (assets/levels/drahtseilakt/00_Синтетический_уровень, made by
+// Checks of the showcase level shipped with the game (assets/levels/drahtseilakt/00-Showcase, made by
 // assets/own/make/make_synthetic_level.py; docs/drahtseilakt/levels.md, "The showcase level"): it holds every one of
 // our parts, loads with no copy of the original, carries its own behaviour graphs, and each element does its job in
 // the game's physics (the level's checks.txt: short runs with the arrows through each element, a ball of the right
@@ -13,7 +13,7 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
 
-    const NAME: &str = "00_Синтетический_уровень";
+    const NAME: &str = "00-Showcase";
 
     fn root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")

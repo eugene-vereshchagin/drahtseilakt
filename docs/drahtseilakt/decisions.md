@@ -497,7 +497,7 @@ is useless if the manual is a URL to type in by hand.
 them: their runs test (`ownlevels.rs`, its kit checks kept as `testlevels.rs`), `scripts/own-levels.sh`, the
 level-stats comparison of one of our levels with its target (`--level-stats --open`, `scripts/level-stats.py --own`,
 `hints/level-stats-manual-own.csv`) and the docs that described them. What the game ships instead: the Drahtseilakt
-set (the owner's picks in the open format), the community set (`.nmo`), the showcase level `00_Синтетический_уровень`
+set (the owner's picks in the open format), the community set (`.nmo`), the showcase level `00-Showcase`
 and the hidden `Parts_Test`, both made with the level kit, which stays for them. The entries above that speak of "our
 own levels" are kept as they were written; this entry replaces them. Release criteria: [roadmap.md](roadmap.md),
 "Release criteria".

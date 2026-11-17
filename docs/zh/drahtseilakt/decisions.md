@@ -281,7 +281,7 @@ Community picks、My maps），而是按含义，在经典和扩展模式下相�
 
 ## 我们自己没有关卡
 
-*所有者的决定，2026-11-16*（“我们的 10 个关卡现在真的必须移除了”）。2026-11-03 计划的我们自己的十个关卡（“游戏开箱即玩”；当时 levels.md 中有“我们的关卡及其编辑方法”）在 2026-11-11 所有者的社区精选取而代之时被搁置，现在连同只为它们服务的一切一起移除：它们的运行测试（`ownlevels.rs`，其工具包检查保留为 `testlevels.rs`）、`scripts/own-levels.sh`、把我们的某个关卡与其目标对比的关卡统计（`--level-stats --open`、`scripts/level-stats.py --own`、`hints/level-stats-manual-own.csv`）以及描述它们的文档。游戏改为附带：Drahtseilakt 集（所有者挑选的、采用开放格式的关卡）、社区集（`.nmo`）、展示关卡 `00_Синтетический_уровень` 和隐藏的 `Parts_Test`，后两者都由关卡工具包制作，工具包为它们保留。上面提到“我们自己的关卡”的条目保持原样；本条取代它们。发布标准：[roadmap.md](roadmap.md)，“发布标准”。
+*所有者的决定，2026-11-16*（“我们的 10 个关卡现在真的必须移除了”）。2026-11-03 计划的我们自己的十个关卡（“游戏开箱即玩”；当时 levels.md 中有“我们的关卡及其编辑方法”）在 2026-11-11 所有者的社区精选取而代之时被搁置，现在连同只为它们服务的一切一起移除：它们的运行测试（`ownlevels.rs`，其工具包检查保留为 `testlevels.rs`）、`scripts/own-levels.sh`、把我们的某个关卡与其目标对比的关卡统计（`--level-stats --open`、`scripts/level-stats.py --own`、`hints/level-stats-manual-own.csv`）以及描述它们的文档。游戏改为附带：Drahtseilakt 集（所有者挑选的、采用开放格式的关卡）、社区集（`.nmo`）、展示关卡 `00-Showcase` 和隐藏的 `Parts_Test`，后两者都由关卡工具包制作，工具包为它们保留。上面提到“我们自己的关卡”的条目保持原样；本条取代它们。发布标准：[roadmap.md](roadmap.md)，“发布标准”。
 
 ## 报告问题在浏览器中打开 issue 表单
 

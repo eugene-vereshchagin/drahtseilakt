@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the shipped showcase level `assets/levels/drahtseilakt/00_Синтетический_уровень/` ("Synthetic level"): one
+"""Builds the shipped showcase level `assets/levels/drahtseilakt/00-Showcase/` ("Synthetic level"): one
 level with every element the game has, to be rolled through in a few minutes and checked by eye: does everything
 draw, with the right textures, sound and behave as it should. Our own content only (the kit's track, the game's own
 parts, signs drawn here from the game's free fonts); in the Ballance look the game swaps in the copy's textures.
@@ -42,7 +42,7 @@ import synthetic_community as C  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.dirname(os.path.dirname(HERE))
-NAME = "00_Синтетический_уровень"
+NAME = "00-Showcase"
 OUT = os.path.join(ASSETS, "levels", "drahtseilakt", NAME)
 FONT = os.path.join(ASSETS, "fonts", "NotoSans-Bold.ttf")
 

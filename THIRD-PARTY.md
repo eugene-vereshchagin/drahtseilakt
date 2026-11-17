@@ -143,7 +143,7 @@ the licence covers the list, not the maps).
 | 12 | Twilight City (暮光之城) (proprietary textures removed) | Nice_melodies | 2016-08-07 | none recorded; credited, removed on request |
 | 13 | Metropolis Cross (都会十字) | dahkjdas | 2020-12-31 | none recorded; credited, removed on request |
 
-The hidden test levels `Parts_Test` and `00_Синтетический_уровень` are this project's (GPL-3.0-only).
+The hidden test levels `Parts_Test` and `00-Showcase` are this project's (GPL-3.0-only).
 
 ## System libraries in the portable Linux build
 

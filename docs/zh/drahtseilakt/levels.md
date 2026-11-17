@@ -54,7 +54,7 @@ Pro Racing 赛季不属于这一类：它们是新的几何，归入 `community/
 
 ## 随游戏附带的关卡
 
-随游戏附带两套关卡，都是所有者挑选的社区地图（decisions.md，“我们自己没有关卡”）：**Drahtseilakt 集**（`assets/levels/drahtseilakt/01-…13-…`，已转换为开放格式）和**社区集**（`assets/levels/community/`，地图自己的 `.nmo` 文件），每个都在其 `level.txt` 和 CREDITS.md 中署明来源。此外 `assets/levels/drahtseilakt/` 中还有我们的两个关卡，只用我们自己的部件制作（assets/own，[resources.md](resources.md)），由 `assets/own/make/` 中的脚本生成（`levelkit.py` 用轨道块和部件的替身搭建关卡）：展示关卡 `00_Синтетический_уровень`（见下）和 `Parts_Test`（`make_test_level.py`：几百个单位长的轨道，每个部件都在轨道上或旁边，另有每种防护各一段轨道，供测试使用；它的 level.txt 中的 `hidden = yes` 使它不出现在玩家的列表中，仍可用 `--open` 打开）。它们的文本源文件已提交，生成的文件不在仓库中。它们的许可证与游戏相同（GPL-3.0-only）。
+随游戏附带两套关卡，都是所有者挑选的社区地图（decisions.md，“我们自己没有关卡”）：**Drahtseilakt 集**（`assets/levels/drahtseilakt/01-…13-…`，已转换为开放格式）和**社区集**（`assets/levels/community/`，地图自己的 `.nmo` 文件），每个都在其 `level.txt` 和 CREDITS.md 中署明来源。此外 `assets/levels/drahtseilakt/` 中还有我们的两个关卡，只用我们自己的部件制作（assets/own，[resources.md](resources.md)），由 `assets/own/make/` 中的脚本生成（`levelkit.py` 用轨道块和部件的替身搭建关卡）：展示关卡 `00-Showcase`（见下）和 `Parts_Test`（`make_test_level.py`：几百个单位长的轨道，每个部件都在轨道上或旁边，另有每种防护各一段轨道，供测试使用；它的 level.txt 中的 `hidden = yes` 使它不出现在玩家的列表中，仍可用 `--open` 打开）。它们的文本源文件已提交，生成的文件不在仓库中。它们的许可证与游戏相同（GPL-3.0-only）。
 
 **随游戏附带的关卡中没有原版游戏的任何图片**（所有者的决定，2026-11-16）。有些地图在内部带有原版纹理的副本。
 `crates/gamedata/tests/shipped_originals.rs` 把随附关卡的每张图片（开放格式的文件和 `.nmo` 地图中保存的图片）与玩家
@@ -66,7 +66,7 @@ Pro Racing 赛季不属于这一类：它们是新的几何，归入 `community/
 
 ### 展示关卡
 
-`00_Синтетический_уровень`（“合成关卡”，在随游戏附带的列表中排第一：`order = 0`、`difficulty = 1`）把游戏的每一种元素
+`00-Showcase`（“合成关卡”，在随游戏附带的列表中排第一：`order = 0`、`difficulty = 1`）把游戏的每一种元素
 放在一条约 1900 个单位长的路上，每个元素旁边有一块标牌：几分钟滚一遍，在每种外观下用眼睛检查是否都能绘制、纹理正确、
 声音和行为正常。它由 `assets/own/make/make_synthetic_level.py`（经典部分，是一份带有两个自有命令 `sign` 和 `gate`
 的关卡描述）和 `synthetic_community.py`（社区部分）生成，只用我们自己的内容；生成的关卡不在 git 中。
