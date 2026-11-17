@@ -50,7 +50,7 @@ case ${VIDEO_TEXTURES:-} in
     original) textures="Ballance's original textures, from the player's own copy" ;;
     remastered) textures="the toolbox's remaster of Ballance's original textures, made from the player's own copy" ;;
 esac
-theme=neuro; [ "$extended" = yes ] && theme=$(setting sound-theme); theme=${theme:-neuro}
+theme=neuro; [ "$extended" = yes ] && theme=$(setting sound-theme); theme=${theme:-neuro}; theme=${VIDEO_SOUNDS:-$theme}
 case $theme in
     original) sounds="Ballance's original sounds and music, from the player's own copy" ;;
     neuro) sounds="Drahtseilakt's generated theme (synthesized by code, no sample of the original)" ;;

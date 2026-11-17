@@ -102,6 +102,8 @@ usage: drahtseilakt [options]
                       data folder's textures/ (docs/drahtseilakt/packs.md)
   --models PACK       the model pack the parts and balls are drawn with: level (as the level takes them; the
                       default), own, original, or a pack of the data folder's models/ (the physics never changes)
+  --sounds THEME      the sound theme the run plays, instead of the settings': neuro (generated), system,
+                      original (the copy's) or a theme of the sounds folder
   --record FILE       write a replay of the run (also written automatically on finishing a level)
   --replay FILE       play a replay instead of the keyboard
   --headless          no window: run the replay to its end and print what happened
@@ -184,6 +186,8 @@ pub struct Options {
     pub textures: Option<String>,
     /// The model pack the parts are drawn with, instead of the settings'.
     pub models: Option<String>,
+    /// The sound theme the run plays, instead of the settings' (sound_themes.rs).
+    pub sounds: Option<String>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
     /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
@@ -272,6 +276,7 @@ pub(crate) fn default_options() -> Options {
         export: None,
         export_parts: None,
         textures: None,
+        sounds: None,
         models: None,
         replay: None,
         headless: false,
@@ -368,6 +373,13 @@ fn parse_args() -> Result<Options, String> {
                 } else {
                     o.models = Some(v);
                 }
+            }
+            "--sounds" => {
+                let v = value()?;
+                if !gamedata::sound_themes::plain(&v) {
+                    return Err(format!("--sounds: not a sound theme's name: {v}"));
+                }
+                o.sounds = Some(v);
             }
             "--record" => o.record = Some(value()?.into()),
             "--replay" => o.replay = Some(value()?.into()),

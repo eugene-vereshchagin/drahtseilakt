@@ -35,10 +35,12 @@ encoder=$!
 case "$level" in *.nmo|*.NMO) which=--map ;; *) if [ -d "$level" ]; then which=--open; else which=--level; fi ;; esac
 # VIDEO_TEXTURES picks the texture pack (own, original, remastered or a pack's key), whatever the settings file says
 textures=${VIDEO_TEXTURES:-}
+# VIDEO_SOUNDS picks the sound theme (neuro, system, original or a theme's key), whatever the settings file says
+sounds=${VIDEO_SOUNDS:-}
 DRAHTSEILAKT_SOUND_FILE="$work/sound.wav" "$game" "$which" "$level" --replay "$replay" --size "$draw" \
-    ${models:+--models "$models"} ${textures:+--textures "$textures"} --video "$work/frames"
+    ${models:+--models "$models"} ${textures:+--textures "$textures"} ${sounds:+--sounds "$sounds"} --video "$work/frames"
 wait "$encoder"
 ffmpeg -loglevel error -y -i "$work/picture.mp4" -i "$work/sound.wav" -c:v copy -c:a aac -b:a 192k -shortest "$out"
 
-VIDEO_MODELS=$models VIDEO_TEXTURES=$textures sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
+VIDEO_MODELS=$models VIDEO_TEXTURES=$textures VIDEO_SOUNDS=$sounds sh "$here/video-readme.sh" "$level" "$replay" "$out" "$size"
 echo "$out"

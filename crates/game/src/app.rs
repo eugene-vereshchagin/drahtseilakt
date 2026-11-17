@@ -1436,8 +1436,13 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
     }
     // the sound theme: the extended mode's choice (`sound-theme`), the default (generated) theme in the classic mode
     // (the interface no longer implies the original's sounds: the copy's interface is now the default)
-    let theme = setting("sound-theme");
+    let theme = o.sounds.clone().or_else(|| setting("sound-theme"));
     gamedata::sound_themes::start(theme.as_deref());
+    if let Some(k) = &o.sounds
+        && gamedata::sound_themes::chosen() != *k
+    {
+        return Err(format!("--sounds {k}: no such sound theme"));
+    }
     scene::set_show_colliders(o.show_colliders);
     if !o.audit.is_empty() {
         let prepare = |copy: bool| {
