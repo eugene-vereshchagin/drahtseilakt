@@ -4,7 +4,7 @@
 # (drahtseilakt-data-<V>.tar.gz, made by scripts/pack-assets.sh and uploaded to the GitHub release tagged data-<V>; V is
 # scripts/DATA_VERSION), a .tar.gz with an assets/ folder in it, whose address and SHA-256 are the repository variables ASSETS_BUNDLE_URL and
 # ASSETS_BUNDLE_SHA256 (a private release asset's API URL is fine; the secret ASSETS_TOKEN or the run's token is
-# sent as its bearer token). The manual is generated here (tools/make_manual.py). Then the checks of
+# sent as its bearer token, to a github.com or api.github.com address only). The manual is generated here (tools/make_manual.py). Then the checks of
 # scripts/make-portable.sh run. Fails with a clear message when anything is missing; never builds an incomplete package.
 set -euo pipefail
 die() { echo "ci-assets: $*" >&2; echo "::error::ci-assets: $*"; exit 1; }
@@ -23,10 +23,17 @@ if ! complete; then
     dv=$(tr -d ' \n' <scripts/DATA_VERSION)
     case $url in *"$dv"*) ;; *) echo "::warning::ci-assets: ASSETS_BUNDLE_URL does not mention DATA_VERSION $dv (scripts/DATA_VERSION): packages depend on drahtseilakt-data >= $dv" ;; esac
     echo "ci-assets: downloading the base data (data-$dv)"
-    auth=(); [ -z "$token" ] || auth=(-H "Authorization: Bearer $token")
+    # the token goes only to GitHub (a release asset there); a bundle hosted elsewhere is fetched without it, and only
+    # over https (curl drops the header on a redirect to another host)
+    auth=()
+    case $url in
+        https://api.github.com/*|https://github.com/*) [ -z "$token" ] || auth=(-H "Authorization: Bearer $token") ;;
+        https://*) ;;
+        *) die "ASSETS_BUNDLE_URL must be an https:// address" ;;
+    esac
     mkdir -p "${RUNNER_TEMP:-/tmp}"
     bundle="${RUNNER_TEMP:-/tmp}/assets-bundle.tar.gz"
-    curl -fsSL "${auth[@]}" -H "Accept: application/octet-stream" -o "$bundle" "$url" || die "the assets bundle did not download from ASSETS_BUNDLE_URL"
+    curl -fsSL --proto =https "${auth[@]}" -H "Accept: application/octet-stream" -o "$bundle" "$url" || die "the assets bundle did not download from ASSETS_BUNDLE_URL"
     [ "$(sha_of "$bundle")" = "$want" ] || die "the assets bundle does not match ASSETS_BUNDLE_SHA256"
     tar -xzf "$bundle"
     rm -f "$bundle"

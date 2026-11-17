@@ -107,9 +107,6 @@ jobs:
       OS_KIND: ${{ matrix.os }}
       ARCH: ${{ matrix.arch }}
       VERSION: ${{ needs.plan.outputs.version }}
-      ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
-      ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
-      ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || github.token }}
       GAME_BIN: ${{ github.workspace }}/ballance/drahtseilakt/target/release/drahtseilakt${{ matrix.os == 'windows' && '.exe' || '' }}
     steps:
       - name: the toolbox needs its token
@@ -169,8 +166,13 @@ jobs:
           args=(game --bin "$GAME_BIN" --arch "$ARCH" --version "$VERSION" --out dist)
           if [ "$DEV" = 1 ]; then args+=(--dev); fi
           scripts/make-distro-packages.sh "${args[@]}"
+      # the token only in this step: the build steps before it run third-party build scripts
       - name: assets (the base data, the manual, checksums)
         working-directory: ballance/drahtseilakt
+        env:
+          ASSETS_BUNDLE_URL: ${{ vars.ASSETS_BUNDLE_URL }}
+          ASSETS_BUNDLE_SHA256: ${{ vars.ASSETS_BUNDLE_SHA256 }}
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN || github.token }}
         run: scripts/ci-assets.sh
       # the .app is unsigned (no Apple developer account); assets/ is copied, so this runs before ci-package.sh moves it
       - name: macOS app and .dmg
@@ -300,7 +302,7 @@ jobs:
   # A pushed tag: a DRAFT release with every binary package that was built and SHA256SUMS. Never published automatically.
   release:
     needs: [plan, build, installer, freebsd]
-    if: ${{ !cancelled() && github.ref_type == 'tag' && needs.build.result == 'success' }}
+    if: ${{ !cancelled() && github.ref_type == 'tag' && needs.build.result == 'success' && needs.installer.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
