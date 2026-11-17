@@ -1,0 +1,5 @@
+# the land under a level under the sky Mist (make_skies.py land; crates/game/src/terrain.rs)
+extent 10000
+heights -546.62 -40.26
+sun 0.5847 0.0552 0.8094
+light 1.2037

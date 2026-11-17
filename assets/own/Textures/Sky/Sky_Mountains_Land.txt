@@ -1,0 +1,5 @@
+# the land under a level under the sky Mountains (make_skies.py land; crates/game/src/terrain.rs)
+extent 10000
+heights -527.29 439.89
+sun 0.7420 0.2240 0.6319
+light 7.1637

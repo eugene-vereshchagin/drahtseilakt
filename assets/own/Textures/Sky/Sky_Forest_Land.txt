@@ -1,0 +1,5 @@
+# the land under a level under the sky Forest (make_skies.py land; crates/game/src/terrain.rs)
+extent 10000
+heights -529.20 13.07
+sun 0.3771 0.7422 0.5540
+light 3.1329
