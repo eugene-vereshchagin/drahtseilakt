@@ -84,11 +84,13 @@ Actions -> "Drahtseilakt release" -> Run workflow (the files are run artifacts),
 makes a **draft** release with the files below and `SHA256SUMS` (not the levels). The input `dev` adds the dev
 flavour (never in a release). Nothing runs on a push to a branch.
 
+**Release assets have stable names**: when a tag release is made, the version is cut out of the file names (and the data version out of the data packages': `drahtseilakt_amd64.deb`, `drahtseilakt.x86_64.rpm`, `drahtseilakt-data_all.deb`, `drahtseilakt-windows-x86_64-setup.exe`), so `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<name>` always gives the newest release; the version stays in the tag, the title and the packages' metadata. Run artifacts keep the `<V>` names below. Which file for whom: [distribution.md](distribution.md).
+
 With `<V>` the tag (or `git-<sha>` outside a tag), these files are made:
 
 | Target | Files |
 |---|---|
-| Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (installer), `drahtseilakt-<V>-windows-<arch>.zip` (portable) |
+| Windows x86_64, aarch64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (installer), `drahtseilakt-<V>-windows-<arch>.zip` (portable) |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` (portable), `drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
 | Linux (x86_64 job, once) | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`, `drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV (`dev` input) | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |

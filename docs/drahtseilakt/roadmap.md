@@ -256,9 +256,9 @@ following hold. State as of 2026-11-16: **done**, **partly**, **open**.
   upload open).
 - **Builds for every desktop platform**: Linux, Windows and macOS (BSD welcome), as installers and as a portable
   folder. **Partly**: the Linux portable build exists and is kept current; the Windows and macOS builds are prepared in
-  CI (`.github/workflows/drahtseilakt-release.yml`: portable archives with the toolbox for Linux, Windows, macOS and FreeBSD, draft release on a version tag) and wait for the owner's command and the assets bundle; installers are open.
-- **The toolbox ships with the game** (`drahtseilakt-toolbox`, a separate program). **Partly**: CI can build it beside
-  the game; it is not yet in the packages.
+  CI (`.github/workflows/drahtseilakt-release.yml`, state 2026-11-18: Windows installer and portable zip, Linux portable archive and `.deb`/`.rpm`, macOS `.dmg` and portable archive, FreeBSD experimental; draft release on a version tag; what to download: [distribution.md](distribution.md)) and wait for the owner's command to tag and publish.
+- **The toolbox ships with the game** (`drahtseilakt-toolbox`, a separate program). **Partly**: it is in the portable archives and the
+  installers (CI builds it beside the game, its own repository has its own releases); the Linux `.deb`/`.rpm` carry the game only.
 - **A public, clean repository**: the release is a new repository without the private one's history and data
   (decisions.md, "The private repository is a backup"). **Open.**
 - **A licence summary**: the game's licence and every shipped asset's (fonts, maps, sounds) in one place. **Partly**:

@@ -474,3 +474,13 @@ Knopfform: beide öffnen `https://github.com/eugene-vereshchagin/drahtseilakt/is
 weitet den Eintrag oben („Das Handbuch des Spielers kommt als lokales HTML“) um genau eine entfernte Adresse aus: eine
 Konstante im Spiel, die dem Öffner des Systems nur übergeben wird, wenn der Spieler es verlangt. Das Spiel selbst hat
 weiterhin keinen Netzwerkcode und verbindet sich nirgends hin.
+
+## Auslieferung: Binärdateien, Daten und Levels getrennt
+
+*Festgehalten 2026-11-18; die Aufteilung stammt vom 2026-11-17 („Binärdateien in git: die Basisdaten“).* Drei Dinge, die sich
+unterschiedlich schnell ändern, werden getrennt ausgeliefert: das Programm (ein Release je Version `X.Y.Z`, von der CI
+gebaut; die portablen Archive und Installer enthalten die Toolbox und die Basisdaten), die Basisdaten (in git, versioniert
+über `scripts/DATA_VERSION`) und die 13 ausgewählten Karten (ein eigenes Release `data-<DATA_VERSION>`, von Hand gepackt,
+weil ein `level.bin` über der 100-MB-Dateigrenze von GitHub liegt). Ein Programm-Update baut so nur die Binärpakete neu. Die
+Release-Dateien haben stabile Namen ohne Version, sodass `releases/latest/download/<Name>` immer aktuell ist. Welche
+Datei für wen: `docs/de/drahtseilakt/distribution.md`; Bauen und Hochladen: `docs/de/drahtseilakt/release.md`.

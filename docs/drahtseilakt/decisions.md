@@ -520,3 +520,13 @@ the URL"). Options has *Report a problem*, and the manual's troubleshooting page
 `https://github.com/eugene-vereshchagin/drahtseilakt/issues/new` in the system's browser. This widens the entry
 above ("The player's manual ships as local HTML") by exactly one remote address: a constant in the game, handed to the
 system's opener only when the player asks. The game itself still has no network code and connects nowhere.
+
+## Distribution: binaries, data and levels apart
+
+*Recorded 2026-11-18; the layout is that of 2026-11-17 ("Binaries in git: the base data").* Three things that change at
+different speeds are shipped apart: the program (a release per version `X.Y.Z`, built by CI; the portable archives and
+installers carry the toolbox and the base data), the base data (in git, versioned by `scripts/DATA_VERSION`), and the 13
+picked maps (their own release `data-<DATA_VERSION>`, packed by hand, because a `level.bin` is over GitHub's 100 MB file
+limit). A program update then rebuilds only the binary packages. Release files have stable names without the version, so
+`releases/latest/download/<name>` is always current. Which file is for whom: `docs/drahtseilakt/distribution.md`; the
+build and upload steps: `docs/drahtseilakt/release.md`.

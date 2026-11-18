@@ -85,11 +85,13 @@ Actions -> «Drahtseilakt release» -> Run workflow (файлы — артефа
 создаёт **черновик** релиза с файлами ниже и `SHA256SUMS` (без уровней). Параметр `dev` добавляет
 dev-вариант (в релиз не попадает никогда). Push в ветку ничего не запускает.
 
+**У ресурсов релиза стабильные имена**: при выпуске релиза по тегу версия вырезается из имён файлов (и версия данных из имён пакетов данных: `drahtseilakt_amd64.deb`, `drahtseilakt.x86_64.rpm`, `drahtseilakt-data_all.deb`, `drahtseilakt-windows-x86_64-setup.exe`), поэтому `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<имя>` всегда отдаёт самый свежий релиз; версия остаётся в теге, заголовке и метаданных пакетов. Артефакты запусков сохраняют имена с `<V>`, как ниже. Какой файл кому: [distribution.md](distribution.md).
+
 Где `<V>` — тег (или `git-<sha>` вне тега), делаются такие файлы:
 
 | Цель | Файлы |
 |---|---|
-| Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (установщик), `drahtseilakt-<V>-windows-<arch>.zip` (портативная) |
+| Windows x86_64, aarch64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (установщик), `drahtseilakt-<V>-windows-<arch>.zip` (портативная) |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` (портативная), `drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
 | Linux (задание x86_64, один раз) | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`, `drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV (параметр `dev`) | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |

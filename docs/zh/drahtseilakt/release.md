@@ -72,11 +72,13 @@ gh release create "data-$V" --repo eugene-vereshchagin/drahtseilakt --draft --la
 
 Actions -> “Drahtseilakt release” -> Run workflow（文件是运行产物），或推送标签 `X.Y.Z`：该运行还会创建一个包含下列文件和 `SHA256SUMS` 的**草稿**发布（不含数据和关卡）。输入项 `dev` 会加上开发版（绝不进入发布）。推送到分支不会触发任何运行。
 
+**发布附件的文件名是固定的**：按标签发布时，版本号会从文件名中去掉（数据包名中的数据版本也一样：`drahtseilakt_amd64.deb`、`drahtseilakt.x86_64.rpm`、`drahtseilakt-data_all.deb`、`drahtseilakt-windows-x86_64-setup.exe`），因此 `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<文件名>` 总是指向最新发布；版本号保留在标签、标题和包的元数据中。工作流运行产物仍使用下面带 `<V>` 的名称。哪个文件给谁用见 [distribution.md](distribution.md)。
+
 `<V>` 为标签（不在标签上时为 `git-<sha>`），生成这些文件：
 
 | 目标 | 文件 |
 |---|---|
-| Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` （安装程序）、`drahtseilakt-<V>-windows-<arch>.zip`（便携版） |
+| Windows x86_64, aarch64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` （安装程序）、`drahtseilakt-<V>-windows-<arch>.zip`（便携版） |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` （便携版）、`drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
 | Linux（x86_64 任务，一次） | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`、`drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV（输入项 `dev`） | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |

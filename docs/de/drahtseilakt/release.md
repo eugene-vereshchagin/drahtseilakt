@@ -87,11 +87,13 @@ Actions -> „Drahtseilakt release“ -> Run workflow (die Dateien sind Lauf-Art
 Der Lauf erzeugt dann auch ein **Entwurfs**-Release mit den Dateien unten und `SHA256SUMS` (ohne die Levels).
 Die Eingabe `dev` fügt die Dev-Variante hinzu (nie in einem Release). Ein Push auf einen Branch startet nichts.
 
+**Release-Assets haben stabile Namen**: Beim Tag-Release wird die Version aus den Dateinamen geschnitten (bei den Datenpaketen auch die Datenversion: `drahtseilakt_amd64.deb`, `drahtseilakt.x86_64.rpm`, `drahtseilakt-data_all.deb`, `drahtseilakt-windows-x86_64-setup.exe`), sodass `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<Name>` immer das neueste Release liefert; die Version bleibt im Tag, im Titel und in den Paket-Metadaten. Lauf-Artefakte behalten die Namen mit `<V>` wie unten. Welche Datei für wen: [distribution.md](distribution.md).
+
 Mit `<V>` = Tag (außerhalb eines Tags `git-<sha>`) entstehen diese Dateien:
 
 | Ziel | Dateien |
 |---|---|
-| Windows x86_64, arm64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (Installer), `drahtseilakt-<V>-windows-<arch>.zip` (portabel) |
+| Windows x86_64, aarch64 | `drahtseilakt-<V>-windows-<arch>-setup.exe` (Installer), `drahtseilakt-<V>-windows-<arch>.zip` (portabel) |
 | Linux x86_64, aarch64 | `drahtseilakt-<V>-linux-<arch>.tar.gz` (portabel), `drahtseilakt_<V>-1_<amd64\|arm64>.deb`, `drahtseilakt-<V>-1.<x86_64\|aarch64>.rpm` |
 | Linux (x86_64-Job, einmal) | `drahtseilakt-data_<DATA_VERSION>-1_all.deb`, `drahtseilakt-data-<DATA_VERSION>-1.noarch.rpm` |
 | Linux x86_64 DEV (Eingabe `dev`) | `drahtseilakt-<V>-linux-x86_64-dev.tar.gz`, `drahtseilakt-dev_<V>-1_amd64.deb` |

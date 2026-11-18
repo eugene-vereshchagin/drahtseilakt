@@ -295,3 +295,11 @@ Community picks、My maps），而是按含义，在经典和扩展模式下相�
 ## 报告问题在浏览器中打开 issue 表单
 
 *所有者的决定，2026-11-16*（“问题报告必须是一个通向 GitHub issues 的按钮，而不是只显示网址”）。Options 中有 *报告问题*，手册的故障排除页有一个按钮样式的链接：二者都在系统浏览器中打开 `https://github.com/eugene-vereshchagin/drahtseilakt/issues/new`。这把上面的条目（“玩家手册以本地 HTML 提供”，见 menu.md“手册”）恰好放宽了一个远程地址：它是游戏中的一个常量，只在玩家要求时交给系统的打开程序。游戏本身仍然没有网络代码，不连接任何地方。
+
+## 分发：二进制、数据与关卡分开
+
+*记录于 2026-11-18；这一布局来自 2026-11-17（“git 中的二进制文件：基础数据”）。* 变化速度不同的三样东西分开发布：程序（每个版本
+`X.Y.Z` 一次发布，由 CI 构建；便携包和安装程序带有 toolbox 和基础数据）、基础数据（在 git 中，版本由 `scripts/DATA_VERSION` 标识）、
+13 张精选地图（单独的发布 `data-<DATA_VERSION>`，手动打包，因为 `level.bin` 超过 GitHub 单文件 100 MB 的限制）。这样更新程序
+只需重建二进制包。发布文件名固定、不含版本号，所以 `releases/latest/download/<文件名>` 总是最新的。哪个文件给谁用：
+`docs/zh/drahtseilakt/distribution.md`；构建和上传步骤：`docs/zh/drahtseilakt/release.md`。
