@@ -488,7 +488,7 @@ impl Audio {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
                 .saturating_add(1);
             let mut k = n;
-            while k >= 10 && k % 10 == 0 {
+            while k >= 10 && k.is_multiple_of(10) {
                 k /= 10;
             }
             if k == 1 {
@@ -796,6 +796,7 @@ impl Audio {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

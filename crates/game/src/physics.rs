@@ -552,7 +552,6 @@ impl World {
             elasticity: s.m.elasticity,
             lin_damp: s.m.lin_damp,
             rot_damp: s.m.rot_damp,
-            ..BodyDesc::default()
         };
         let id = self
             .physics

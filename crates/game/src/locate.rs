@@ -436,14 +436,19 @@ pub fn frame_edges(path: &std::path::Path) -> Option<Vec<f32>> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
     #[test]
     fn a_picture_is_most_like_itself() {
         let mut a = vec![0u8; (W * H * 4) as usize];
-        for (i, px) in a.chunks_exact_mut(4).enumerate() {
-            let v = if (i as u32 % W) / 8 % 2 == 0 { 200 } else { 30 };
+        for (i, px) in a.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            let v = if ((i as u32 % W) / 8).is_multiple_of(2) {
+                200
+            } else {
+                30
+            };
             px.copy_from_slice(&[v, v, v, 255]);
         }
         let ea = edges(&a, W, H);

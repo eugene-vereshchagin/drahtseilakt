@@ -656,6 +656,7 @@ pub fn run(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use level::{Group, Material, Mesh, Object, Part};

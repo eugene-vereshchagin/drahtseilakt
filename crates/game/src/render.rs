@@ -367,7 +367,7 @@ fn overlay_pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu:
 }
 
 /// What view mods ask of the picture's look (`render.*` actions); the default is ours, untouched.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct RenderLook {
     /// The size the picture is drawn at before it is scaled up to the window (nearest), if lower than the window.
     pub scale: Option<(u32, u32)>,
@@ -383,20 +383,6 @@ pub struct RenderLook {
     pub supports: u8,
     /// The level drawn as its original has it: no rounded looks, the textures before the toolbox grew them.
     pub plain: bool,
-}
-
-impl Default for RenderLook {
-    fn default() -> RenderLook {
-        RenderLook {
-            scale: None,
-            aspect: None,
-            filter: 0,
-            fps_cap: 0,
-            colour_bits: 0,
-            supports: 0,
-            plain: false,
-        }
-    }
 }
 
 impl RenderLook {
@@ -520,9 +506,12 @@ pub struct Renderer {
 /// A range in shared chunk `.0`: its offset and length.
 type Range = (usize, u64, u64);
 
+/// A mesh part: its index range, material slot, texture and the optional second pass.
+type MeshPart = (Range, u32, usize, Option<(Range, PipelineKey)>);
+
 struct MeshPlan {
     vertex: Range,
-    parts: Vec<(Range, u32, usize, Option<(Range, PipelineKey)>)>,
+    parts: Vec<MeshPart>,
 }
 
 /// Meshes packed into chunks of bytes (each to become one buffer), with where each mesh's pieces lie. Made without
@@ -531,6 +520,9 @@ pub struct PackedMeshes {
     chunks: Vec<Vec<u8>>,
     plans: Vec<Option<MeshPlan>>,
 }
+
+/// One particle draw: buffer, vertex count, (blend, depth) key and texture.
+type ParticleDraw = (wgpu::Buffer, u32, (PBlend, bool), Option<&'static str>);
 
 impl PackedMeshes {
     /// The meshes once the chunks are buffers (`buffers[i]` holds chunk `i`).
@@ -575,7 +567,7 @@ fn pack_meshes(meshes: Vec<Option<MeshCpu>>) -> PackedMeshes {
         let last = &mut chunks[c];
         let off = last.len() as u64;
         last.extend_from_slice(data);
-        while last.len() % 4 != 0 {
+        while !last.len().is_multiple_of(4) {
             last.push(0);
         }
         (c, off, data.len() as u64)
@@ -667,10 +659,7 @@ pub struct TexJob {
 impl TexJob {
     /// Writes bands of the texture until `deadline` (at least one); true when all are written.
     fn bands(&mut self, queue: &wgpu::Queue, deadline: std::time::Instant) -> bool {
-        loop {
-            let Some(m) = self.data.mips.get(self.mip) else {
-                break;
-            };
+        while let Some(m) = self.data.mips.get(self.mip) {
             let block = self.block;
             let (w, h) = (
                 m.width.div_ceil(block) * block,
@@ -2412,23 +2401,22 @@ impl Renderer {
         for d in &draws {
             self.pipeline(d.3);
         }
-        let particle_draws: Vec<(wgpu::Buffer, u32, (PBlend, bool), Option<&'static str>)> =
-            particles
-                .iter()
-                .filter(|b| !b.vertices.is_empty())
-                .map(|b| {
-                    let key = (b.blend, b.lines);
-                    self.particle_pipeline(key);
-                    let buf = self
-                        .device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("particles"),
-                            contents: bytemuck::cast_slice(&b.vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-                    (buf, b.vertices.len() as u32, key, b.texture)
-                })
-                .collect();
+        let particle_draws: Vec<ParticleDraw> = particles
+            .iter()
+            .filter(|b| !b.vertices.is_empty())
+            .map(|b| {
+                let key = (b.blend, b.lines);
+                self.particle_pipeline(key);
+                let buf = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("particles"),
+                        contents: bytemuck::cast_slice(&b.vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+                (buf, b.vertices.len() as u32, key, b.texture)
+            })
+            .collect();
 
         let Some(depth) = self.depth_view(width, height) else {
             return;

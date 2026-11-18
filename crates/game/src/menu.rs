@@ -818,10 +818,11 @@ impl Menu {
             text = format!("{text}\n{}", self.help_of("help look beautiful"));
         }
         // a player's own pack or theme: its description when it gives one
-        if values[now] == "player" && self.help_force.get().is_none() {
-            if let Some(d) = self.player_descriptions(line, true).into_iter().next() {
-                return format!("{text}\n{d}");
-            }
+        if values[now] == "player"
+            && self.help_force.get().is_none()
+            && let Some(d) = self.player_descriptions(line, true).into_iter().next()
+        {
+            return format!("{text}\n{d}");
         }
         text
     }
@@ -3516,7 +3517,7 @@ fn wrap_lines(f: &crate::ui::Face, text: &str, w: f32, style: &crate::ui::Style)
                         .char_indices()
                         .filter(|&(i, c)| i > 0 && matches!(c, '-' | '_'))
                         .map(|(i, c)| i + c.len_utf8())
-                        .last()
+                        .next_back()
                         .filter(|&at| at < head.len())
                     {
                         tail.extend(head[at..].chars().rev());
@@ -3698,10 +3699,11 @@ fn fit_label(
         return (f.layout(t, frame, &scaled(k1)), k1);
     }
     // two lines, each at most the frame's width, both within its height
-    if let Some((a, b, k2)) = split {
-        if k2 >= fit_min && k2 > k1 {
-            return (tight_two(f, &a, &b, frame, &scaled(k2)), k2);
-        }
+    if let Some((a, b, k2)) = split
+        && k2 >= fit_min
+        && k2 > k1
+    {
+        return (tight_two(f, &a, &b, frame, &scaled(k2)), k2);
     }
     // one line, as small as allowed, and what still does not fit loses its middle
     let k = k1.max(kmin).min(fits_h);
@@ -3821,9 +3823,7 @@ fn text_right(uv: [f32; 4]) -> f32 {
         0.86
     } else if uv == FIELD_UV {
         0.93
-    } else if uv == LEVEL_UV {
-        0.94
-    } else if uv == YES_NO_UV {
+    } else if uv == LEVEL_UV || uv == YES_NO_UV {
         0.94
     } else {
         0.96
@@ -3857,6 +3857,8 @@ const NOTE_BOTTOM: f32 = 0.838;
 /// A note panel's padding (context pixels): sideways, up and down.
 const NOTE_PAD: [f32; 2] = [12.0, 7.0];
 /// The credits' text: its left and right edges (the bar right of them), its top and bottom.
+// screen fractions measured off the original (0.318 is not 1/PI)
+#[allow(clippy::approx_constant)]
 const CREDITS_X: [f32; 2] = [0.318, 0.672];
 const CREDITS_TOP: f32 = 0.10;
 const CREDITS_BOTTOM: f32 = 0.815;
@@ -4161,7 +4163,7 @@ fn scan_levels(dir: &Path, strict: bool) -> (Vec<Package>, usize) {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -4689,7 +4691,7 @@ mod tests {
             titles: Vec::new(),
             order: None,
             hidden: false,
-            difficulty: if i % 2 == 0 { Some(10) } else { None },
+            difficulty: if i.is_multiple_of(2) { Some(10) } else { None },
             titled: true,
         };
         let community = crate::levels::community();

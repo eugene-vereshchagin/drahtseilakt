@@ -161,7 +161,7 @@ impl Footprint {
                 .map(|p| m.transform_point3(Vec3::from(*p)))
                 .collect();
             for part in &mesh.parts {
-                for t in part.indices.chunks_exact(3) {
+                for t in part.indices.as_chunks::<3>().0 {
                     let (Some(a), Some(b), Some(c)) = (
                         world.get(t[0] as usize),
                         world.get(t[1] as usize),
@@ -615,6 +615,7 @@ fn make_pipeline(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

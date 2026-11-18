@@ -2169,7 +2169,7 @@ impl Pilot {
     }
 
     /// Into the next transformer, near it (its rim holds the ball off): through it, backing off for a run-up.
-    fn into_gate(&self, sim: &Sim) -> Option<crate::hints::Hint> {
+    fn gate_hint(&self, sim: &Sim) -> Option<crate::hints::Hint> {
         let &(_, g, k) = self.gates.get(self.gate)?;
         if sim.ball.kind == k || g.distance(sim.ball.position) >= GATE_STUCK {
             return None;
@@ -3178,7 +3178,7 @@ impl Pilot {
                 self.hints.add(hint);
                 return 0;
             }
-            if let Some(hint) = self.into_gate(sim).or_else(|| self.over_sill(sim)) {
+            if let Some(hint) = self.gate_hint(sim).or_else(|| self.over_sill(sim)) {
                 self.moved = sim.tick;
                 self.hints.add(hint);
                 return 0;
@@ -3204,7 +3204,7 @@ impl Pilot {
                 }
             }
             // stuck by the next transformer (its rim holds the ball off): into it, backing off for a run-up
-            if let Some(hint) = self.into_gate(sim) {
+            if let Some(hint) = self.gate_hint(sim) {
                 self.hints.add(hint);
                 return 0;
             }
@@ -3392,6 +3392,8 @@ impl Pilot {
 /// the ball was lost (fell below `low`, or came down on no floor), and what its line off the middle costs. The
 /// copies are run in threads when AUTOPILOT_PARALLEL is set; the results are in the order of the choices, so the run
 /// is the same.
+// the rollout takes the whole situation by value; a struct for one call site would only rename the arguments
+#[allow(clippy::too_many_arguments)]
 fn rollouts(
     sim: &Sim,
     route: &Route,
@@ -3724,6 +3726,7 @@ impl<T: Clone> Rewinds<T> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

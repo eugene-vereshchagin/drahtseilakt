@@ -1762,6 +1762,7 @@ impl Scripts {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod facade_tests {
     use super::*;
     use crate::sim::BallKind;
@@ -1964,6 +1965,7 @@ mod facade_tests {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod body_tests {
     // Physicalize by script (docs/physics.md 2.1, 2.2, 2.5, 2.8): movable bodies made through the host and the world.
     use super::*;

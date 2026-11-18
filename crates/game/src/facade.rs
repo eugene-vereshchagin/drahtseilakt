@@ -43,7 +43,8 @@ pub const PHYSICALIZE_GAMEBALL: [(&str, u32); 8] = [
 ];
 /// The rows of Balls.nmo's `Physicalize_GameBall`: name, friction, elasticity, mass, collision group, linear damping,
 /// rotational damping, force.
-const GAME_BALLS: [(&str, f32, f32, f32, &str, f32, f32, f32); 3] = [
+type BallRow = (&'static str, f32, f32, f32, &'static str, f32, f32, f32);
+const GAME_BALLS: [BallRow; 3] = [
     ("Ball_Paper", 0.5, 0.4, 0.2, "Ball", 1.5, 0.1, 0.065),
     ("Ball_Stone", 0.5, 0.1, 10.0, "Ball", 0.3, 0.1, 0.92),
     ("Ball_Wood", 0.8, 0.2, 1.9, "Ball", 0.9, 0.1, 0.43),
@@ -191,6 +192,7 @@ pub fn events(prev: Option<&Seen>, now: &Seen) -> Vec<&'static str> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

@@ -139,25 +139,18 @@ fn first_differences(a: &Level, b: &Level, data_a: &Data, data_b: &Data) -> Vec<
             b.materials.len()
         ));
     }
-    let mut pics: std::collections::HashMap<
-        (bool, usize),
-        Option<(u32, u32, u64, Option<[u8; 3]>)>,
-    > = std::collections::HashMap::new();
-    let mut picture = |side: bool,
-                       l: &Level,
-                       t: Option<usize>|
-     -> Option<Option<(u32, u32, u64, Option<[u8; 3]>)>> {
+    /// A picture's width, height, pixel hash and colour key.
+    type PicKey = (u32, u32, u64, Option<[u8; 3]>);
+    let mut pics: std::collections::HashMap<(bool, usize), Option<PicKey>> =
+        std::collections::HashMap::new();
+    let mut picture = |side: bool, l: &Level, t: Option<usize>| -> Option<Option<PicKey>> {
         let t = t?;
-        Some(
-            pics.entry((side, t))
-                .or_insert_with(|| {
-                    let tex = l.textures.get(t)?;
-                    let data = if side { data_b } else { data_a };
-                    let (w, h, rgba) = data.texture(tex)?;
-                    Some((w, h, gamedata::fnv1a(&rgba), tex.color_key))
-                })
-                .clone(),
-        )
+        Some(*pics.entry((side, t)).or_insert_with(|| {
+            let tex = l.textures.get(t)?;
+            let data = if side { data_b } else { data_a };
+            let (w, h, rgba) = data.texture(tex)?;
+            Some((w, h, gamedata::fnv1a(&rgba), tex.color_key))
+        }))
     };
     for (x, y) in a.materials.iter().zip(&b.materials) {
         let fields = |m: &level::Material| {

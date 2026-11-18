@@ -6,6 +6,7 @@
 // collision shapes of the measured sizes, so the same input gives the same way within a tolerance).
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use crate::assets::{Data, Source};
     use crate::sim::{BallKind, Sim, input};

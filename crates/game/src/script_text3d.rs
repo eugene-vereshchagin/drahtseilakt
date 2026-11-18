@@ -217,6 +217,7 @@ pub fn add(sc: Option<&Scripts>, particles: &mut Vec<Batch>, r: &mut crate::rend
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use script::{MAX_TEXT3D, MAX_TEXT3D_CHARS, Text3dSpec};
@@ -305,7 +306,7 @@ mod tests {
             8,
             "the text past the budget is cut to nothing, not dropped"
         );
-        assert!(MAX_QUADS * 6 >= MAX_TEXT3D_CHARS);
+        const { assert!(MAX_QUADS * 6 >= MAX_TEXT3D_CHARS) };
     }
 
     #[test]

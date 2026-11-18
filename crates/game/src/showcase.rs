@@ -6,6 +6,7 @@
 // where it has not been built the checks say so and pass.
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use crate::assets::{Data, Source};
     use crate::sim::{BallKind, Sim};
@@ -201,7 +202,7 @@ mod tests {
                         }
                         let k = keys_toward(&sim, from, goal, speed);
                         sim.step(k);
-                        if trace && sim.tick % 30 == 0 {
+                        if trace && sim.tick.is_multiple_of(30) {
                             println!("  {} {goal:.1?}: ball {:.1?}", sim.tick, sim.ball.position);
                         }
                     }
@@ -211,7 +212,7 @@ mod tests {
                     for _ in 0..t {
                         let k = keys_toward(&sim, sim.ball.position, sim.ball.position, 1.0);
                         sim.step(k);
-                        if trace && sim.tick % 30 == 0 {
+                        if trace && sim.tick.is_multiple_of(30) {
                             println!("  {} wait: ball {:.1?}", sim.tick, sim.ball.position);
                         }
                     }

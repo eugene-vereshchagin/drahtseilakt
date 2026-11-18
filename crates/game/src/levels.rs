@@ -582,8 +582,30 @@ fn copy(
     Ok(())
 }
 
+/// The levels shipped with the game (`assets/levels/drahtseilakt/`, the open format, our own content): what the game plays
+/// without any copy of the original (decisions.md, "The game plays out of the box"). The hidden ones (level.txt's
+/// `hidden = yes`: the test level `Parts_Test`) are left out; they still load by their path (`--open`).
+pub fn shipped() -> Vec<gamedata::package::Package> {
+    gamedata::resources::shipped_drahtseilakt_root()
+        .map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
+        .into_iter()
+        .filter(|p| !p.hidden)
+        .collect()
+}
+
+/// The community maps shipped with the game (`assets/levels/community/NN-name/`, the original files and textures: one map's `.nmo` and its level.txt,
+/// naming the author), in the order their level.txt gives. They are the maps of strangers, shown with thanks and
+/// credited in CREDITS.md; the folder is not one of the open-format levels (`shipped` does not list it).
+pub fn community() -> Vec<gamedata::package::Package> {
+    gamedata::resources::shipped_community_root()
+        .map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
+        .into_iter()
+        .filter(|p| !p.hidden)
+        .collect()
+}
+
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use gamedata::profile::resolve;
@@ -714,26 +736,4 @@ mod tests {
         assert_eq!(again, 0, "the same file is not copied again");
         let _ = std::fs::remove_dir_all(&root);
     }
-}
-
-/// The levels shipped with the game (`assets/levels/drahtseilakt/`, the open format, our own content): what the game plays
-/// without any copy of the original (decisions.md, "The game plays out of the box"). The hidden ones (level.txt's
-/// `hidden = yes`: the test level `Parts_Test`) are left out; they still load by their path (`--open`).
-pub fn shipped() -> Vec<gamedata::package::Package> {
-    gamedata::resources::shipped_drahtseilakt_root()
-        .map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
-        .into_iter()
-        .filter(|p| !p.hidden)
-        .collect()
-}
-
-/// The community maps shipped with the game (`assets/levels/community/NN-name/`, the original files and textures: one map's `.nmo` and its level.txt,
-/// naming the author), in the order their level.txt gives. They are the maps of strangers, shown with thanks and
-/// credited in CREDITS.md; the folder is not one of the open-format levels (`shipped` does not list it).
-pub fn community() -> Vec<gamedata::package::Package> {
-    gamedata::resources::shipped_community_root()
-        .map_or_else(Vec::new, |r| gamedata::package::scan(&r).0)
-        .into_iter()
-        .filter(|p| !p.hidden)
-        .collect()
 }

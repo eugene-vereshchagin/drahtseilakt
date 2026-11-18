@@ -3247,6 +3247,7 @@ pub(crate) fn static_objects(level: &Level, made: &[usize]) -> Vec<(usize, Stati
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 pub(crate) mod tests {
     use super::*;
     use level::{Group, Level, Material, Mesh, Object, Part};
@@ -4578,7 +4579,8 @@ pub(crate) mod tests {
             .expect("level 8")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let cases: [(usize, f32, &[(u64, f32)]); 2] = [
+        type Samples<'a> = &'a [(u64, f32)];
+        let cases: [(usize, f32, Samples); 2] = [
             (
                 2,
                 572.15,

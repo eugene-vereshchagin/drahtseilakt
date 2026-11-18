@@ -569,6 +569,7 @@ pub fn interface(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -619,13 +620,13 @@ mod tests {
             angle: 0.0,
         };
         let screen = crate::ui::Screen { w: 640.0, h: 480.0 };
-        assert!(frame_quads(&[hidden.clone()], screen).is_empty());
+        assert!(frame_quads(std::slice::from_ref(&hidden), screen).is_empty());
         let edit = script::Ent2d {
             rotation: Some(std::f32::consts::FRAC_PI_2),
             shown: Some(true),
             ..Default::default()
         };
-        let out = edited_frames(&[hidden.clone()], &[("h".into(), edit)]);
+        let out = edited_frames(std::slice::from_ref(&hidden), &[("h".into(), edit)]);
         assert!(out[0].shown);
         assert!((out[0].angle - 90.0).abs() < 1e-4, "radians become degrees");
         let q = frame_quads(&out, screen);

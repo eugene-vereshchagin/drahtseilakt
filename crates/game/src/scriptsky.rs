@@ -12,6 +12,8 @@ const MAX_SIDES: usize = 16;
 pub fn build(spec: &SkySpec) -> Option<Mesh> {
     let n = spec.sides.len().clamp(4, MAX_SIDES);
     let r = spec.radius;
+    // NaN-preserving: a NaN radius is refused, which `r <= 1e-3` would let through
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(r > 1e-3) {
         return None;
     }

@@ -4,6 +4,7 @@
 // (The ten levels of our own these checks were first written for were removed on 2026-11-16, decisions.md.)
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use crate::assets::{Data, Source};
     use crate::sim::{BallKind, Sim};

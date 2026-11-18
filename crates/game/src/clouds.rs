@@ -721,7 +721,18 @@ pub fn ring_at(
     Some((bytes, mean))
 }
 
+/// The shader's depth binding as the scene's depth texture is: multisampled with anti-aliasing (its sample 0 is read).
+fn depth_binding(text: String, samples: u32) -> String {
+    let text = format!("const NS: i32 = {};\n{text}", samples.max(1));
+    if samples > 1 {
+        text.replace("texture_depth_2d", "texture_depth_multisampled_2d")
+    } else {
+        text
+    }
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -761,7 +772,10 @@ mod tests {
         let n = noise3d(8);
         assert_eq!(n.len(), 8 * 8 * 8 * 4);
         let w = weather_map(16);
-        assert!(w.chunks_exact(4).any(|p| p[0] > 128) && w.chunks_exact(4).any(|p| p[0] < 128));
+        assert!(
+            w.as_chunks::<4>().0.iter().any(|p| p[0] > 128)
+                && w.as_chunks::<4>().0.iter().any(|p| p[0] < 128)
+        );
     }
 
     /// The sky's faces are met where sky.rs puts them: the front's middle straight ahead, the right face's left edge
@@ -786,7 +800,7 @@ mod tests {
         // four faces, each one colour above its middle row and black below
         let face = |c: [u8; 3]| {
             let mut px = vec![0u8; 16 * 16 * 4];
-            for (i, p) in px.chunks_exact_mut(4).enumerate() {
+            for (i, p) in px.as_chunks_mut::<4>().0.iter_mut().enumerate() {
                 if i / 16 < 8 {
                     p[..3].copy_from_slice(&c);
                 }
@@ -807,15 +821,5 @@ mod tests {
         let right = RING * 3 / 4 * 4;
         assert_eq!(&ring[right..right + 3], &[0, 255, 0]);
         assert!(horizon_ring(&faces[..2]).is_none());
-    }
-}
-
-/// The shader's depth binding as the scene's depth texture is: multisampled with anti-aliasing (its sample 0 is read).
-fn depth_binding(text: String, samples: u32) -> String {
-    let text = format!("const NS: i32 = {};\n{text}", samples.max(1));
-    if samples > 1 {
-        text.replace("texture_depth_2d", "texture_depth_multisampled_2d")
-    } else {
-        text
     }
 }

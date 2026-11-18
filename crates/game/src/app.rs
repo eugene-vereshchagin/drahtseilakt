@@ -67,6 +67,9 @@ impl Default for Timing {
     }
 }
 
+/// The camera as eased by a mod: yaw, distance and field of view, and the free camera's eye and target.
+type Eased = ([f32; 3], Option<(glam::Vec3, glam::Vec3)>);
+
 struct Game {
     /// No level is loaded: the menu at the start (see `Game::placeholder`).
     placeholder: bool,
@@ -590,7 +593,7 @@ impl Game {
             if b.on_ground { "ground" } else { "air" },
             input,
             b.kind,
-            self.sim.world().movement_state(0).map_or(-1, |m| m),
+            self.sim.world().movement_state(0).unwrap_or(-1),
         );
         for c in self.sim.world().ball_contacts() {
             let _ = writeln!(
@@ -4698,6 +4701,8 @@ impl Load {
 
 /// The loading thread: reads and builds the level, then reads the textures its models draw with and packs their
 /// meshes, handing them over as they are ready (the channel holds a few, so the pictures never all wait in memory).
+// the loading thread takes its whole kit by value; a struct for one call site would only rename the arguments
+#[allow(clippy::too_many_arguments)]
 fn load_worker(
     o: Options,
     data: Data,
@@ -4938,7 +4943,7 @@ struct App {
     /// `camera.smooth`): yaw, distance, field of view, and the free camera's eye and target.
     playtimes: crate::playtime::PlayTimes,
     playtime_saved: Instant,
-    eased: Option<([f32; 3], Option<(glam::Vec3, glam::Vec3)>)>,
+    eased: Option<Eased>,
     mouse: (f32, f32),
     fps: f32,
     /// The best run as a ghost (a mod's `ghost`), and whether it was looked for in this run.
@@ -8210,17 +8215,17 @@ impl App {
         // the words wait for their picture (its pipeline is made on a thread at the start)
         gpu.renderer
             .draw_screen(&view, (rw, rh), &quads, shot.as_ref(), &art_quads);
-        if look.post() {
-            if let Some(retro) = &gpu.renderer.retro {
-                let place = look.placed(gpu.config.width, gpu.config.height);
-                retro.present(
-                    &gpu.renderer.device,
-                    &gpu.renderer.queue,
-                    &window_view,
-                    place,
-                    look.colour_bits == 16,
-                );
-            }
+        if look.post()
+            && let Some(retro) = &gpu.renderer.retro
+        {
+            let place = look.placed(gpu.config.width, gpu.config.height);
+            retro.present(
+                &gpu.renderer.device,
+                &gpu.renderer.queue,
+                &window_view,
+                place,
+                look.colour_bits == 16,
+            );
         }
         let overlaid = overlay_started.elapsed();
         let present_started = Instant::now();

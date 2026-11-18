@@ -338,7 +338,7 @@ impl System {
 
     /// R(x): a value in [-x, x], as the block draws its variances.
     fn r(&mut self, x: f32) -> f32 {
-        (self.rand() - 0x3fff) as f32 * 6.103_890_3e-5 * x
+        (self.rand() - 0x3fff) as f32 * 6.103_89e-5 * x
     }
 
     fn var(&mut self, bit: u32, x: f32) -> f32 {
@@ -398,8 +398,8 @@ impl System {
         let end = s.size1 + self.var(VAR_SIZE1, s.size1_var);
         let mut dcolor = [0.0; 4];
         if s.evolutions & EVOL_COLOR != 0 {
-            for c in 0..4 {
-                dcolor[c] = (s.color1[c] - s.color0[c]) / life;
+            for (c, d) in dcolor.iter_mut().enumerate() {
+                *d = (s.color1[c] - s.color0[c]) / life;
             }
         }
         let dsize = if s.evolutions & EVOL_SIZE != 0 {

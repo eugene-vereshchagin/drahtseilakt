@@ -2,7 +2,13 @@
 // GPL-3.0. A new or updated dependency fails this test until `python3 -I tools/third_party.py` has been run (which
 // reads the licence from the crate) and the licence is one the GPL allows. Data-free: reads only the repository.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;

@@ -799,7 +799,12 @@ impl Mods {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
 
@@ -1124,7 +1129,10 @@ mod tests {
         let (sim, _) = m.running(true);
         let line = sim.replay_lines()[0].clone();
         let r = crate::replay::ModRef::parse(&line).unwrap();
-        assert_eq!(m.for_replay(&[r.clone()]).unwrap().runs[0].opts, vec![60.0]);
+        assert_eq!(
+            m.for_replay(std::slice::from_ref(&r)).unwrap().runs[0].opts,
+            vec![60.0]
+        );
         let mut bad = r.clone();
         bad.opts[0].1 = "999".into();
         assert!(m.for_replay(&[bad]).is_err(), "an option out of range");
@@ -1136,7 +1144,7 @@ mod tests {
             vec![found("sticky", &(STICKY.to_owned() + "# changed\n"))],
             |_| None,
         );
-        assert!(other.for_replay(&[r.clone()]).is_err());
+        assert!(other.for_replay(std::slice::from_ref(&r)).is_err());
         assert!(Mods::default().for_replay(&[r]).is_err());
     }
 }

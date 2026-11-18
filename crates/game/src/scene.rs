@@ -791,23 +791,23 @@ pub fn ball_looks(
     let Some((mesh, _)) = snap.kind.and_then(|k| balls.of(k)) else {
         return;
     };
-    if deform > 0.0 && snap.kind == Some(BallKind::Wood) {
-        if let Some(i) = inst.iter_mut().rev().find(|i| {
+    if deform > 0.0
+        && snap.kind == Some(BallKind::Wood)
+        && let Some(i) = inst.iter_mut().rev().find(|i| {
             i.mesh == mesh
                 && i.model == BALLS_MODEL
                 && (i.matrix.w_axis.truncate() - snap.ball).length() < 1e-3
-        }) {
-            let w =
-                |k: f32| (t * (1.3 + k) + k * 5.1).sin() * (t * (0.7 + 0.4 * k) + k * 2.3).cos();
-            let s = Vec3::new(
-                1.0 + 0.25 * deform * w(0.0),
-                1.0 + 0.25 * deform * w(1.0),
-                1.0 + 0.25 * deform * w(2.0),
-            );
-            i.matrix = Mat4::from_translation(snap.ball)
-                * Mat4::from_scale(s)
-                * Mat4::from_quat(snap.rotation);
-        }
+        })
+    {
+        let w = |k: f32| (t * (1.3 + k) + k * 5.1).sin() * (t * (0.7 + 0.4 * k) + k * 2.3).cos();
+        let s = Vec3::new(
+            1.0 + 0.25 * deform * w(0.0),
+            1.0 + 0.25 * deform * w(1.0),
+            1.0 + 0.25 * deform * w(2.0),
+        );
+        i.matrix = Mat4::from_translation(snap.ball)
+            * Mat4::from_scale(s)
+            * Mat4::from_quat(snap.rotation);
     }
     for n in 0..decoys.min(8) {
         let k = f32::from(n);
