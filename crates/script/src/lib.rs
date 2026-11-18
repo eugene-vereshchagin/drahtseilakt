@@ -670,7 +670,9 @@ impl Graph {
                         let value = match (&p.value, p.guid == types::MESSAGE) {
                             // a message saved as an index into the file's message manager
                             (behavior::Saved::Bytes(b), true) if b.len() == 4 => {
-                                let i = u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize;
+                                let i = b
+                                    .first_chunk::<4>()
+                                    .map_or(usize::MAX, |c| u32::from_le_bytes(*c) as usize);
                                 doc.messages.get(i).map_or(Value::Str(String::new()), |n| {
                                     Value::Str(String::from_utf8_lossy(n).into_owned())
                                 })
@@ -1256,6 +1258,43 @@ fn cell_value(c: &nmo::scene::Cell) -> Value {
     }
 }
 
+/// Whether the directed graph on `0..n` has a cycle (iterative, three colours: linear in nodes and edges).
+fn has_cycle(n: usize, edges: &dyn Fn(Id) -> Vec<Id>) -> bool {
+    // 0 unseen, 1 on the path, 2 done
+    let mut state = vec![0u8; n];
+    for start in 0..n {
+        if state.get(start).copied() != Some(0) {
+            continue;
+        }
+        let mut path: Vec<(Id, Vec<Id>)> = vec![(start, edges(start))];
+        if let Some(x) = state.get_mut(start) {
+            *x = 1;
+        }
+        while let Some((node, todo)) = path.last_mut() {
+            let node = *node;
+            match todo.pop() {
+                Some(next) => match state.get(next).copied() {
+                    Some(1) => return true,
+                    Some(0) => {
+                        if let Some(x) = state.get_mut(next) {
+                            *x = 1;
+                        }
+                        path.push((next, edges(next)));
+                    }
+                    _ => {}
+                },
+                None => {
+                    if let Some(x) = state.get_mut(node) {
+                        *x = 2;
+                    }
+                    path.pop();
+                }
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1299,41 +1338,4 @@ mod tests {
                 && !Value::Str("a".into()).same(&Value::Str("b".into()))
         );
     }
-}
-
-/// Whether the directed graph on `0..n` has a cycle (iterative, three colours: linear in nodes and edges).
-fn has_cycle(n: usize, edges: &dyn Fn(Id) -> Vec<Id>) -> bool {
-    // 0 unseen, 1 on the path, 2 done
-    let mut state = vec![0u8; n];
-    for start in 0..n {
-        if state.get(start).copied() != Some(0) {
-            continue;
-        }
-        let mut path: Vec<(Id, Vec<Id>)> = vec![(start, edges(start))];
-        if let Some(x) = state.get_mut(start) {
-            *x = 1;
-        }
-        while let Some((node, todo)) = path.last_mut() {
-            let node = *node;
-            match todo.pop() {
-                Some(next) => match state.get(next).copied() {
-                    Some(1) => return true,
-                    Some(0) => {
-                        if let Some(x) = state.get_mut(next) {
-                            *x = 1;
-                        }
-                        path.push((next, edges(next)));
-                    }
-                    _ => {}
-                },
-                None => {
-                    if let Some(x) = state.get_mut(node) {
-                        *x = 2;
-                    }
-                    path.pop();
-                }
-            }
-        }
-    }
-    false
 }

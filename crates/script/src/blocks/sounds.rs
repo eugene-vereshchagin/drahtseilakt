@@ -65,7 +65,7 @@ pub(crate) fn wave_player(
     let file = file_of(rt, obj);
     if input(rt, b, 0) {
         let fade_in = float_pin(rt, b, "Fade In", k, 0.0, host);
-        let looping = pin(rt, b, "Loop", k + 2, host).as_bool();
+        let looping = pin(rt, b, "Loop", k.saturating_add(2), host).as_bool();
         host.sound(obj, &file, SoundCmd::Play { looping, fade_in });
         out(rt, b, 0);
         return if looping { Flow::Done } else { Flow::Continue };
@@ -81,7 +81,7 @@ pub(crate) fn wave_player(
         return Flow::Done;
     }
     if input(rt, b, 1) {
-        let fade_out = float_pin(rt, b, "Fade Out", k + 1, 0.0, host);
+        let fade_out = float_pin(rt, b, "Fade Out", k.saturating_add(1), 0.0, host);
         host.sound(obj, &file, SoundCmd::Stop { fade_out });
         // the fade is not modelled: the sound ends at once, in the run's clock as in the audio
         out(rt, b, 1);
@@ -240,7 +240,8 @@ pub(crate) fn proximity_volume(
         m2[3][2] - m1[3][2],
     ];
     let local = [0, 1, 2].map(|c| {
-        let axis = [m1[0][c], m1[1][c], m1[2][c]];
+        let at = |row: &[f32; 4]| row.get(c).copied().unwrap_or(0.0);
+        let axis = [at(&m1[0]), at(&m1[1]), at(&m1[2])];
         let s2 = axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2];
         if s2 > 1e-12 {
             (axis[0] * d[0] + axis[1] * d[1] + axis[2] * d[2]) / s2
@@ -252,6 +253,8 @@ pub(crate) fn proximity_volume(
     let near = float_pin(rt, b, "Near", 2, 0.0, host);
     let far = float_pin(rt, b, "Far", 3, 0.0, host);
     let (near2, far2) = (near * near, far * far);
+    // NaN-preserving: a NaN distance counts as out of range, which `d2 >= far2` would not
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     let g = if !(d2 < far2) {
         0.0
     } else if d2 <= near2 {

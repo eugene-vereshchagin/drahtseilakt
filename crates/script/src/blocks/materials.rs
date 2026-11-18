@@ -279,17 +279,18 @@ pub(crate) fn set_current_slot(
 /// the last span ends on the end slot.
 fn movie_slot(start: i32, end: i32, elapsed: f32, duration: f32) -> i32 {
     let (start, end) = (i64::from(start), i64::from(end));
-    let count = (end - start).abs() + 1;
+    // i32 differences cannot overflow i64
+    let count = end.saturating_sub(start).saturating_abs().saturating_add(1);
     let progress = if duration > 0.0 && !elapsed.is_nan() {
         (elapsed / duration).clamp(0.0, 1.0)
     } else {
         1.0
     };
-    let step = ((count as f32 * progress).floor() as i64).min(count - 1);
+    let step = ((count as f32 * progress).floor() as i64).min(count.saturating_sub(1));
     let slot = if end >= start {
-        start + step
+        start.saturating_add(step)
     } else {
-        start - step
+        start.saturating_sub(step)
     };
     slot.clamp(start.min(end), start.max(end)) as i32
 }
@@ -355,10 +356,8 @@ pub(crate) fn movie_player(
     if duration > 0.0 {
         let slot = movie_slot(start, end, elapsed, duration);
         let shown = pout_value(rt, b, 0).map_or(start, |v| v.as_int());
-        if slot != shown {
-            if let Some(t) = tex {
-                host.texture_set(t, TexChange::Slot(slot));
-            }
+        if let (true, Some(t)) = (slot != shown, tex) {
+            host.texture_set(t, TexChange::Slot(slot));
         }
         set_pout(rt, b, "Current Slot", 0, Value::Int(slot));
     }
@@ -404,7 +403,7 @@ pub(crate) fn get_texture_info(
 const PIXELS_PER_UNIT: u64 = 64;
 
 fn pay_pixels(rt: &mut Runtime, pixels: u64) {
-    let _ = rt.pay(pixels / PIXELS_PER_UNIT + 1);
+    let _ = rt.pay((pixels / PIXELS_PER_UNIT).saturating_add(1));
 }
 
 /// Blend Textures: the target texture takes Texture 1 * (1 - Blend Factor) + Texture 2 * Blend Factor (the factor is

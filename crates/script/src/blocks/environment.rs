@@ -94,9 +94,17 @@ pub(crate) fn tt_sky(rt: &mut Runtime, _id: Id, b: &Block, _p: Guid, host: &mut 
             _ => None,
         }
     };
-    let walls = (0..sides).map(|k| mat(rt, 7 + k, host)).collect();
-    let top_mat = if top { mat(rt, 7 + sides, host) } else { None };
-    let bottom_at = 7 + sides + usize::from(top);
+    let walls = (0..sides)
+        .map(|k| mat(rt, 7usize.saturating_add(k), host))
+        .collect();
+    let top_mat = if top {
+        mat(rt, 7usize.saturating_add(sides), host)
+    } else {
+        None
+    };
+    let bottom_at = 7usize
+        .saturating_add(sides)
+        .saturating_add(usize::from(top));
     let bottom = if bottom {
         mat(rt, bottom_at, host)
     } else {
@@ -141,7 +149,7 @@ pub(crate) fn ent2d_slot(rt: &mut Runtime, t: Id) -> Option<&mut Ent2d> {
         Some(i) => i,
         None if rt.ents2d.len() < MAX_ENTS_2D => {
             rt.ents2d.push((t, Ent2d::default()));
-            rt.ents2d.len() - 1
+            rt.ents2d.len().saturating_sub(1)
         }
         None => return None,
     };

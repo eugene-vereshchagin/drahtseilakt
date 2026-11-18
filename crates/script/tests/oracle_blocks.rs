@@ -1925,7 +1925,7 @@ fn calculator_hand_values_and_caps() {
     // the maps' expressions
     assert_eq!(calc("(a^2+a)*2", 3.0, 0.0), bits(24.0));
     assert_eq!(calc("sin(a*b)/2+0.5", 0.0, 5.0), bits(0.5));
-    let n = (-2.0f64 * 0.25f64.ln()).sqrt() * (2.0 * f64::from(3.141_592_7_f32) * 0.0).cos();
+    let n = (-2.0f64 * 0.25f64.ln()).sqrt() * (2.0 * f64::from(std::f32::consts::PI) * 0.0).cos();
     assert_eq!(
         calc("sqrt(-2*ln(a))*cos(2*pi*b)", 0.25, 0.0),
         bits(n as f32)

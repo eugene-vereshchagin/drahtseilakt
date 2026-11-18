@@ -200,15 +200,13 @@ impl Host for Rec {
         self.texts3d.push((key, on));
     }
     fn text_box(&mut self, key: usize, spec: Option<crate::TextSpec>) {
-        if let Some(s) = &spec {
-            if self
-                .boxes
-                .last()
-                .and_then(|(k, p)| (*k == key).then_some(p))
-                != Some(&spec)
-            {
-                self.notes.push(format!("text {}", s.text.trim_end()));
-            }
+        let unchanged = self
+            .boxes
+            .last()
+            .and_then(|(k, p)| (*k == key).then_some(p))
+            == Some(&spec);
+        if let (Some(s), false) = (&spec, unchanged) {
+            self.notes.push(format!("text {}", s.text.trim_end()));
         }
         self.boxes.push((key, spec));
     }
@@ -299,6 +297,7 @@ impl Build {
     }
 
     /// A building block with `ins` inputs and `outs` outputs named as given.
+    #[allow(clippy::too_many_arguments)] // test builder: 60+ call sites, a struct would only add noise
     fn bb(
         &mut self,
         name: &str,
@@ -2165,8 +2164,6 @@ fn a_proximity_volume_follows_the_distance_and_ends_on_off() {
 struct InputRig {
     rt: Runtime,
     host: Rec,
-    blk: Id,
-    g: Arc<Graph>,
 }
 
 impl InputRig {
@@ -2217,8 +2214,6 @@ impl InputRig {
         let rig = InputRig {
             rt: Runtime::new(g.clone()),
             host: Rec::new(),
-            blk,
-            g,
         };
         (rig, po)
     }

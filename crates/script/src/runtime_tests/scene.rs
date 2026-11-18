@@ -445,7 +445,7 @@ fn set_ic_saves_the_state_and_restore_ic_puts_it_back() {
     host.visible[1] = false;
     rt.tick(&mut host);
     assert_eq!(host.ics, vec![Ent::Object(1)]);
-    assert_eq!(host.visible[1], true, "the saved visibility comes back");
+    assert!(host.visible[1], "the saved visibility comes back");
     assert_eq!(host.matrices[1][3], [10.0, 0.0, 0.0, 1.0]);
 }
 
@@ -506,7 +506,7 @@ fn set_physics_slider_creates_with_the_axis_and_limits_and_destroys() {
     let mut host = Rec::new();
     rt.tick(&mut host);
     assert_eq!(host.sliders.len(), 1);
-    let (e, e2, key, spec) = host.sliders[0].clone();
+    let (e, e2, key, spec) = host.sliders[0];
     assert_eq!((e, e2), (Ent::Object(0), Ent::Object(1)));
     let spec = spec.expect("created");
     assert_eq!(spec.p0, [0.0, 0.0, 0.0]);

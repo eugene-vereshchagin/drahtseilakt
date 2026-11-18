@@ -1998,7 +1998,7 @@ impl Runtime {
             self.starved = true;
             return false;
         }
-        self.budget -= cost;
+        self.budget = self.budget.saturating_sub(cost); // cost <= budget here
         true
     }
 

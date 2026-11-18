@@ -178,7 +178,7 @@ impl<'a> Parser<'a, '_> {
                     _ => None,
                 }
             }
-            Tok::Name(n) if n.eq_ignore_ascii_case("pi") => Some(f64::from(3.141_592_7_f32)),
+            Tok::Name(n) if n.eq_ignore_ascii_case("pi") => Some(f64::from(std::f32::consts::PI)), // the same f32 as the original literal
             Tok::Name(n) => {
                 if !matches!(self.peek(), Some(Tok::Open)) {
                     return None;

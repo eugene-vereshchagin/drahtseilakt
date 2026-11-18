@@ -1090,35 +1090,47 @@ pub(crate) fn invert(m: &[[f32; 4]; 4]) -> Option<[[f32; 4]; 4]> {
     let a: Vec<f64> = m.iter().flatten().map(|&x| f64::from(x)).collect();
     // Gauss-Jordan with partial pivoting on [a | 1]
     let mut w = [[0.0f64; 8]; 4];
-    for r in 0..4 {
-        for c in 0..4 {
-            w[r][c] = a.get(r * 4 + c).copied().unwrap_or(0.0);
+    for (r, row) in w.iter_mut().enumerate() {
+        for (c, cell) in row.iter_mut().take(4).enumerate() {
+            *cell = a
+                .get(r.saturating_mul(4).saturating_add(c))
+                .copied()
+                .unwrap_or(0.0);
         }
-        w[r][4 + r] = 1.0;
+        if let Some(one) = row.get_mut(4usize.saturating_add(r)) {
+            *one = 1.0;
+        }
     }
     for col in 0..4 {
-        let piv = (col..4).max_by(|&x, &y| w[x][col].abs().total_cmp(&w[y][col].abs()))?;
-        if w[piv][col].abs() < 1e-12 || !w[piv][col].is_finite() {
+        let key = |x: usize| {
+            w.get(x)
+                .and_then(|row| row.get(col))
+                .map_or(0.0, |v| v.abs())
+        };
+        let piv = (col..4).max_by(|&x, &y| key(x).total_cmp(&key(y)))?;
+        let pv = w.get(piv).and_then(|row| row.get(col)).copied()?;
+        if pv.abs() < 1e-12 || !pv.is_finite() {
             return None;
         }
         w.swap(col, piv);
-        let d = w[col][col];
-        for c in 0..8 {
-            w[col][c] /= d;
-        }
-        for r in 0..4 {
-            if r != col {
-                let f = w[r][col];
-                for c in 0..8 {
-                    w[r][c] -= f * w[col][c];
+        let pivot_row = w.get(col).copied()?;
+        let d = pivot_row.get(col).copied()?;
+        let scaled = pivot_row.map(|v| v / d);
+        for (r, row) in w.iter_mut().enumerate() {
+            if r == col {
+                *row = scaled;
+            } else {
+                let f = row.get(col).copied().unwrap_or(0.0);
+                for (cell, s) in row.iter_mut().zip(scaled) {
+                    *cell -= f * s;
                 }
             }
         }
     }
     let mut out = [[0.0f32; 4]; 4];
-    for r in 0..4 {
-        for c in 0..4 {
-            out[r][c] = w[r][4 + c] as f32;
+    for (orow, wrow) in out.iter_mut().zip(&w) {
+        for (cell, v) in orow.iter_mut().zip(wrow.iter().skip(4)) {
+            *cell = *v as f32;
         }
     }
     Some(out)

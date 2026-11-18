@@ -41,14 +41,14 @@ impl Runtime {
             Some(i) => i,
             None if self.fonts.len() < MAX_FONTS => {
                 self.fonts.push(font.clone());
-                self.fonts.len() - 1
+                self.fonts.len().saturating_sub(1)
             }
             None => return 0,
         };
         if let Some(f) = self.fonts.get_mut(at) {
             *f = font;
         }
-        i32::try_from(at + 1).unwrap_or(0)
+        i32::try_from(at.saturating_add(1)).unwrap_or(0)
     }
 
     fn font(&self, value: i32) -> Option<&Font> {
