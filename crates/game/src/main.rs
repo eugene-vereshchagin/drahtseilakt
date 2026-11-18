@@ -28,6 +28,7 @@ mod extra;
 mod facade;
 mod fallback;
 mod features;
+mod files;
 mod freecam;
 #[cfg(test)]
 mod fuzz_tests;
@@ -153,10 +154,11 @@ usage: drahtseilakt [options]
                       folder's convert-audit/), load it again and compare it with the map: contents, scripts, and
                       --ticks N (default 3000) ticks played with the same keys; one line a map (may be repeated)
   --audit-csv FILE    with --audit: write one row per map, copy and kind of issue (with the names) to FILE
-  --supports-check geometry|runs
+  --supports-check geometry|runs DIR
                       where the swinging sacks get a support (the sack-supports mod) in the original levels and the
                       shipped maps, each placed one measured again; with runs also against the ball's way in the
-                      recorded runs of the autopilot store (DRAHTSEILAKT_AUTOPILOT). Fails when one is too near the ball's space
+                      recorded runs in DIR (DIR/runs/Level_NN*.replay, DIR/Level_NN-owner.replay). Fails when one is
+                      too near the ball's space
   --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in the autopilot store:
                       DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
@@ -237,8 +239,9 @@ pub struct Options {
     pub look: Option<[f32; 6]>,
     /// Measure the original levels into this folder (levelstats.rs) and stop.
     pub level_stats: Option<PathBuf>,
-    /// Measure the sacks' supports of every original level and shipped map, then stop.
-    pub supports_check: Option<bool>,
+    /// Measure the sacks' supports of every original level and shipped map, then stop; with a folder of recorded
+    /// runs (`runs DIR`) also against the ball's way in them.
+    pub supports_check: Option<Option<PathBuf>>,
     /// No window: audit these maps (files or folders of them) for what is not drawn or not there (audit.rs).
     pub audit: Vec<PathBuf>,
     pub audit_csv: Option<PathBuf>,
@@ -437,9 +440,13 @@ fn parse_args() -> Result<Options, String> {
             "--level-stats" => o.level_stats = Some(value()?.into()),
             "--supports-check" => {
                 o.supports_check = Some(match value()?.as_str() {
-                    "geometry" => false,
-                    "runs" => true,
-                    _ => return Err("--supports-check geometry|runs".into()),
+                    "geometry" => None,
+                    "runs" => Some(
+                        args.next()
+                            .ok_or("--supports-check runs needs the folder of the runs")?
+                            .into(),
+                    ),
+                    _ => return Err("--supports-check geometry|runs DIR".into()),
                 })
             }
             "--screenshot" => o.screenshot = Some(value()?.into()),

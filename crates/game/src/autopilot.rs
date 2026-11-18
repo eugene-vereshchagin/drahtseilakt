@@ -122,15 +122,6 @@ const SHUN_COST: f32 = 60.0;
 /// The cell of the floor lookup.
 const CELL: f32 = 2.0;
 
-/// The edges of the level's floors (edges.rs), built once a level.
-pub fn level_edges(
-    level: &Level,
-    modules: &crate::scene::Modules,
-) -> std::sync::Arc<crate::edges::Edges> {
-    let (tris, own) = floor_triangles(level, modules);
-    crate::edges::Edges::of(&tris, own)
-}
-
 /// The world triangles of the floors, rails (with the rail's object) and modules; and how many are the level's own
 /// (they come first, the modules' after).
 fn floor_triangles(

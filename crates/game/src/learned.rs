@@ -306,7 +306,7 @@ pub fn load(path: &Path) -> (Learned, Vec<String>) {
     {
         return (Learned::default(), Vec::new());
     }
-    let text = crate::hints::read_plain(path, MAX_FILE)
+    let text = crate::files::read_plain(path, MAX_FILE)
         .and_then(|b| String::from_utf8(b).map_err(|_| format!("{}: not UTF-8", path.display())));
     match text {
         Ok(t) => {
@@ -372,7 +372,7 @@ pub fn learn(
 /// the same rule already (the same kind, limit and conditions): it is not added again. A file already holding
 /// MAX_RULES rules is full: the rule is not added, and the error says so.
 pub fn append(path: &Path, r: &Rule) -> Result<bool, String> {
-    let mut text = crate::hints::read_text(path, MAX_FILE)?;
+    let mut text = crate::files::read_text(path, MAX_FILE)?;
     let known = parse(&text).0;
     if known
         .rules
@@ -400,7 +400,7 @@ pub fn append(path: &Path, r: &Rule) -> Result<bool, String> {
     if u64::try_from(text.len()).map_or(true, |n| n > MAX_FILE) {
         return Err(format!("{}: full ({MAX_FILE} bytes)", path.display()));
     }
-    crate::hints::write_plain(path, &text)?;
+    crate::files::write_plain(path, &text)?;
     Ok(true)
 }
 

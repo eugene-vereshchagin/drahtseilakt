@@ -288,7 +288,7 @@ pub fn load(path: &Path) -> (Zones, Vec<String>) {
         }
         _ => {}
     }
-    let text = crate::hints::read_plain(path, MAX_FILE)
+    let text = crate::files::read_plain(path, MAX_FILE)
         .and_then(|b| String::from_utf8(b).map_err(|_| format!("{}: not UTF-8", path.display())));
     match text {
         Ok(t) => {
@@ -330,7 +330,7 @@ fn tag(id: &str) -> String {
 /// A zone marked now (with the mark's `id`), added at the end of the file (made with a heading when new). A file
 /// already holding MAX_ZONES zones is full: the zone is not added, and the error says so.
 pub fn append(path: &Path, z: &Zone, id: &str) -> Result<(), String> {
-    let mut text = crate::hints::read_text(path, MAX_FILE)?;
+    let mut text = crate::files::read_text(path, MAX_FILE)?;
     if parse(&text).0.zones.len() >= MAX_ZONES {
         return Err(format!(
             "{}: full ({MAX_ZONES} zones), delete some",
@@ -349,13 +349,13 @@ pub fn append(path: &Path, z: &Zone, id: &str) -> Result<(), String> {
     if u64::try_from(text.len()).map_or(true, |n| n > MAX_FILE) {
         return Err(format!("{}: full ({MAX_FILE} bytes)", path.display()));
     }
-    crate::hints::write_plain(path, &text)
+    crate::files::write_plain(path, &text)
 }
 
 /// The line of the mark `id` taken out of the file at `path` (a zones file or the learned table; the other lines
 /// stay as they are): the line, or None when no line has that id.
 pub fn remove_mark(path: &Path, id: &str) -> Result<Option<String>, String> {
-    let text = crate::hints::read_text(path, MAX_FILE)?;
+    let text = crate::files::read_text(path, MAX_FILE)?;
     let t = tag(id);
     let has = |l: &str| {
         l.split_once('#').is_some_and(|(_, c)| {
@@ -374,7 +374,7 @@ pub fn remove_mark(path: &Path, id: &str) -> Result<Option<String>, String> {
         .filter(|(i, _)| *i != k)
         .map(|(_, l)| format!("{l}\n"))
         .collect();
-    crate::hints::write_plain(path, &out)?;
+    crate::files::write_plain(path, &out)?;
     Ok(gone)
 }
 

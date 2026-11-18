@@ -3907,9 +3907,9 @@ fn runs_dir(number: u32) -> PathBuf {
 
 /// The best finished run of an original level, from its saved best replay.
 fn best_ticks(number: u32) -> Option<u64> {
-    let text = crate::hints::read_utf8(
+    let text = crate::files::read_utf8(
         &runs_dir(number).join("best.replay"),
-        crate::hints::MAX_REPLAY_FILE,
+        crate::files::MAX_REPLAY_FILE,
     )
     .ok()?;
     crate::replay::Replay::parse(&text).ok().map(|r| r.end)

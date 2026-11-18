@@ -26,9 +26,8 @@ pub fn root() -> Option<PathBuf> {
 pub fn for_test(what: &str) -> Option<PathBuf> {
     let dir = match std::env::var_os(ENV) {
         Some(v) => PathBuf::from(v),
-        None => {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-tools/autopilot")
-        }
+        None => std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../drahtseilakt-tools/autopilot"),
     };
     if dir.is_dir() {
         Some(dir)

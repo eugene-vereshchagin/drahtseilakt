@@ -1,5 +1,5 @@
-// The open format holds a level whole: each original level with a recorded run in the autopilot store (tests/replays/) is exported, and
-// the run gives the same events on the .nmo and on its export. Needs the player's copy (OPENBALLANCE_DATA); without
+// The open format holds a level whole: each original level with a recorded test run (DRAHTSEILAKT_TEST_RUNS) is exported,
+// and the run gives the same events on the .nmo and on its export. Needs the player's copy (OPENBALLANCE_DATA); without
 // it the test says so and passes, as the game-data tests do.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -41,17 +41,17 @@ fn recorded_runs_play_the_same_on_the_open_format() {
         eprintln!("OPENBALLANCE_DATA not set: the open format's replay check is skipped");
         return;
     };
-    // the recorded runs live in the autopilot store (DRAHTSEILAKT_AUTOPILOT, else drahtseilakt-tools/autopilot beside the repo)
-    let store = std::env::var_os("DRAHTSEILAKT_AUTOPILOT")
+    // the recorded test runs (Level_NN.replay) live outside the repository: DRAHTSEILAKT_TEST_RUNS, else
+    // drahtseilakt-tools/test-runs beside it
+    let replays = std::env::var_os("DRAHTSEILAKT_TEST_RUNS")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-tools/autopilot")
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-tools/test-runs")
         });
-    let replays = store.join("tests/replays");
     if !replays.is_dir() {
         eprintln!(
-            "no autopilot store at {}: the open format's replay check is skipped",
-            store.display()
+            "no test runs at {} (DRAHTSEILAKT_TEST_RUNS): the open format's replay check is skipped",
+            replays.display()
         );
         return;
     }

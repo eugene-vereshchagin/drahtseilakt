@@ -494,4 +494,6 @@ und lassen sich getrennt leichter verwalten. Sie sind aus `hints/` und `tests/re
 Umgebungsvariable `DRAHTSEILAKT_AUTOPILOT`, sonst `../drahtseilakt-tools/autopilot` von der Repository-Wurzel. Tests, die es
 brauchen, werden ohne es mit einer Meldung übersprungen (wie ohne `OPENBALLANCE_DATA`), sodass die CI, die keinen hat,
 grün bleibt; das Spiel selbst liest es nie. Was das Spiel einkompiliert (die Startkugeln der Sektoren), liegt jetzt in
-`crates/level/data/sector-balls.txt`. Die eigenen Daten eines Levels (`assets/levels/*/pilot/`) bleiben beim Level.
+`crates/level/data/sector-balls.txt`. Die eigenen Daten eines Levels (`assets/levels/*/pilot/`) bleiben beim Level. Die aufgezeichneten Läufe, die die eigenen Tests des Spiels spielen,
+gehören nicht dem Autopiloten: sie liegen in `drahtseilakt-tools/test-runs`, gefunden über `DRAHTSEILAKT_TEST_RUNS`
+(Besitzer, 2026-11-18: der Autopilot zieht ganz aus dem Spiel aus, also nennt ihn nichts im Spiel).

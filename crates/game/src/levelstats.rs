@@ -18,7 +18,7 @@ use crate::sim::{BALL_RADIUS, BallKind, Event};
 use glam::{Mat4, Vec3};
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// One tick of a replayed run.
 #[derive(Clone, Copy, Debug)]
@@ -641,23 +641,6 @@ const MORE_THINGS: [(&str, &str); 2] = [
     ("P_Modul_41", "m41_tipplates"),
 ];
 
-/// The sector (from 1) of a level object: its `Sector_NN` group, else the sector of the nearest object in one.
-pub(crate) fn sector_of(level: &level::Level, i: usize) -> usize {
-    for g in level.groups_of(i) {
-        if let Some(n) = g
-            .strip_prefix("Sector_")
-            .and_then(|n| n.parse::<usize>().ok())
-        {
-            return n;
-        }
-    }
-    level
-        .objects
-        .get(i)
-        .and_then(|o| crate::sim::sector_near(level, Vec3::from(o.position())))
-        .map_or(1, |s| s + 1)
-}
-
 /// Measures one level's run (or plan's way) into tallies by sector (index 0: the whole level).
 fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
     let geo = Geo::of(&run.level, &run.modules);
@@ -853,7 +836,12 @@ fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
             // an object counts by its own group (P_Box), not by sector or sound groups
             if groups.iter().any(|g| g.eq_ignore_ascii_case(prefix)) {
                 let _ = o;
-                both(&mut t, sector_of(level, i).min(sectors), key, 1.0);
+                both(
+                    &mut t,
+                    crate::supports::sector_of(level, i).min(sectors),
+                    key,
+                    1.0,
+                );
             }
         }
     }
@@ -861,32 +849,15 @@ fn measure(run: &Run, sectors: usize) -> (Vec<Tally>, Vec<Sample>) {
         if *d > MOVED
             && let Some(i) = level.objects.iter().position(|o| &o.name == name)
         {
-            both(&mut t, sector_of(level, i).min(sectors), "loose_moved", 1.0);
+            both(
+                &mut t,
+                crate::supports::sector_of(level, i).min(sectors),
+                "loose_moved",
+                1.0,
+            );
         }
     }
     (t, s)
-}
-
-/// The replays of a level found in `hints`: the clean runs first (hints/runs), then the owner's.
-pub(crate) fn replays(hints: &Path, n: u32) -> Vec<PathBuf> {
-    let stem = format!("Level_{n:02}");
-    let mut out: Vec<PathBuf> = std::fs::read_dir(hints.join("runs"))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| {
-            p.file_name()
-                .and_then(|f| f.to_str())
-                .is_some_and(|f| f.starts_with(&stem) && f.ends_with(".replay"))
-        })
-        .collect();
-    out.sort();
-    let owner = hints.join(format!("{stem}-owner.replay"));
-    if owner.is_file() {
-        out.push(owner);
-    }
-    out
 }
 
 /// `--level-stats DIR`: measures the original levels 1 to 13 (or `--level N` alone) and writes
@@ -910,7 +881,7 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
         let mut sources: Vec<(String, Run)> = Vec::new();
         // the first finished run from the level start, and the time of every finished one
         let mut times: Vec<String> = Vec::new();
-        for r in replays(hints, n) {
+        for r in crate::supports::replays(hints, n) {
             lo.replay = Some(r.clone());
             match crate::app::stats_run(&lo, &data, None) {
                 Ok(run) => {

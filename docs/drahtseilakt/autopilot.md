@@ -99,8 +99,7 @@ the nearest edge as high, and how far the middle of its floor is (the clearest p
   off that line toward the middle, when as fast; elsewhere the line is the player's.
 
 Each run's summary ends with how near the edges its ball rolled, over its ticks on a floor (not on rails): `edges:
-mean M, min N, within 1 for P% of T ticks on floors`. The same line ends `--replay FILE --headless`, so any run,
-a player's too, can be compared.
+mean M, min N, within 1 for P% of T ticks on floors`.
 
 ## Going back and trying again
 

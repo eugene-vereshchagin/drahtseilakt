@@ -540,4 +540,6 @@ one (private, never published). One resolver finds it: the environment variable 
 `../drahtseilakt-tools/autopilot` from the repository root. Tests that need it skip with a message when it is absent (as
 without `OPENBALLANCE_DATA`), so CI, which has none, stays green; the game itself never reads it. What the game
 compiles in, the sectors' starting balls, moved to `crates/level/data/sector-balls.txt`. A level's own data
-(`assets/levels/*/pilot/`) stays with the level.
+(`assets/levels/*/pilot/`) stays with the level. The recorded runs the game's own tests play are not the autopilot's:
+they are in `drahtseilakt-tools/test-runs`, found through `DRAHTSEILAKT_TEST_RUNS` (owner, 2026-11-18: the autopilot
+moves out of the game entirely, so nothing of the game names it).

@@ -51,7 +51,7 @@ new engine got level 1 playable, ahead of the phase order:
 - **Phase 6**: open format v1 with export and import; level 1 round-trips identically. An exported level is whole:
   it carries its settings (music, light, bonus, tutorial, last level) and, in its `game/` folder, its modules, the
   balls, the transformer, its sky, particles, shadow and sounds, so it plays with nothing of the copy but the
-  interface. The owner's finished runs of levels 1, 3, 5, 7 and 9 (autopilot store, tests/replays/) give the same events on the `.nmo`
+  interface. The owner's finished runs of levels 1, 3, 5, 7 and 9 (`drahtseilakt-tools/test-runs`, `DRAHTSEILAKT_TEST_RUNS`) give the same events on the `.nmo`
   and on its export (crates/game/tests/open_format.rs), also with a copy holding only the interface's files.
 
 
@@ -181,7 +181,7 @@ ball feels right.
   finish. Menu, HUD (laid out for any aspect ratio), sound, music.
 - **Replays**: a per-tick input log in a documented, versioned text format, the level identified by its hash.
   Headless playback checks checkpoints, finish and score. Replays hold only our input, so they are small; they live in the
-  autopilot store (`tests/replays/` there, see decisions.md), not on GitHub, and the tests that need them skip
+  private tools repository (`test-runs/` there for the tests, see decisions.md), not on GitHub, and the tests that need them skip
   without it.
 - Level 13: the SuDu add-on of 2004, part of the base game. The player installs it into their copy as its
   readme says (it replaces Gameplay, Menu, MenuLevel, Levelinit, Sound and PE_Balloon, adds Level_13).

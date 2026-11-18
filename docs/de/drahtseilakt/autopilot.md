@@ -109,8 +109,7 @@ freieste Punkt in der Nähe: die halbe Breite des Bodens).
   Spielers.
 
 Die Zusammenfassung jedes Laufs endet damit, wie nah den Rändern seine Kugel rollte, über seine Ticks auf einem
-Boden (nicht auf Schienen): `edges: mean M, min N, within 1 for P% of T ticks on floors`. Dieselbe Zeile beendet
-`--replay FILE --headless`, so lässt sich jeder Lauf, auch der eines Spielers, vergleichen.
+Boden (nicht auf Schienen): `edges: mean M, min N, within 1 for P% of T ticks on floors`.
 
 ## Zurück und noch einmal
 

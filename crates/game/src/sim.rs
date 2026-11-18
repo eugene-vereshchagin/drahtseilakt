@@ -5159,11 +5159,21 @@ pub(crate) mod tests {
             .expect("level 10")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let Some(store) = crate::pilotdata::for_test("the level 10 bridge run") else {
+        // the recorded test runs live outside the repository: DRAHTSEILAKT_TEST_RUNS, else drahtseilakt-tools/test-runs
+        // beside it
+        let runs = std::env::var_os("DRAHTSEILAKT_TEST_RUNS").map_or_else(
+            || {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../../drahtseilakt-tools/test-runs")
+            },
+            std::path::PathBuf::from,
+        );
+        let file = runs.join("Level_10-s1-bridge.replay");
+        if !file.is_file() {
+            eprintln!("no {}: the level 10 bridge run is skipped", file.display());
             return;
-        };
-        let text = std::fs::read_to_string(store.join("hints/Level_10-s1-bridge.replay"))
-            .expect("the bridge replay in the autopilot store");
+        }
+        let text = std::fs::read_to_string(&file).expect("the bridge replay");
         let run = crate::replay::Replay::parse(&text).expect("replay");
         let start = run.start.clone().expect("a run from the spur");
         let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, run.version);

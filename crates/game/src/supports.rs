@@ -1570,14 +1570,14 @@ fn planned(data: &crate::assets::Data, source: &crate::assets::Source) -> Result
     Ok((loaded, data, modules, plan))
 }
 
-/// `--supports-check geometry|runs`: plans the supports of the original levels 1 to 13 (with the copy) and of every shipped map,
+/// `--supports-check geometry|runs DIR`: plans the supports of the original levels 1 to 13 (with the copy) and of every shipped map,
 /// measures each placed one again (`check`), with `runs` for the original levels also against the ball's way in
-/// the runs of `hints`, and prints what stands where, what does not and why, by level and by design. An error when a placed
+/// the recorded runs in `runs` (`replays`), and prints what stands where, what does not and why, by level and by design. An error when a placed
 /// support fails a measure.
 pub fn run(
     o: &crate::Options,
     data: &crate::assets::Data,
-    hints: Option<&std::path::Path>,
+    runs: Option<&std::path::Path>,
 ) -> Result<(), String> {
     use crate::assets::Source;
     let mut sources: Vec<(String, Source, Vec<std::path::PathBuf>)> = Vec::new();
@@ -1586,7 +1586,7 @@ pub fn run(
             sources.push((
                 format!("Level_{n:02}"),
                 Source::Original(n),
-                hints.map_or_else(Vec::new, |h| crate::levelstats::replays(h, n)),
+                runs.map_or_else(Vec::new, |h| replays(h, n)),
             ));
         }
     }
@@ -1661,7 +1661,7 @@ pub fn run(
                 .map_or(("", [0.0; 3]), |o| (o.name.as_str(), o.position()));
             let object = format!(
                 "{object} (sector {}, at {:.0} {:.0} {:.0})",
-                crate::levelstats::sector_of(level, sack.object),
+                sector_of(level, sack.object),
                 at[0],
                 at[1],
                 at[2]
@@ -1767,6 +1767,46 @@ pub fn run(
         ));
     }
     Ok(())
+}
+
+/// The sector (from 1) of a level object: its `Sector_NN` group, else the sector of the nearest object in one.
+pub(crate) fn sector_of(level: &level::Level, i: usize) -> usize {
+    for g in level.groups_of(i) {
+        if let Some(n) = g
+            .strip_prefix("Sector_")
+            .and_then(|n| n.parse::<usize>().ok())
+        {
+            return n;
+        }
+    }
+    level
+        .objects
+        .get(i)
+        .and_then(|o| crate::sim::sector_near(level, glam::Vec3::from(o.position())))
+        .map_or(1, |s| s + 1)
+}
+
+/// The recorded runs of original level `n` in a folder of runs: `DIR/runs/Level_NN*.replay` first, then
+/// `DIR/Level_NN-owner.replay`.
+pub(crate) fn replays(dir: &std::path::Path, n: u32) -> Vec<std::path::PathBuf> {
+    let stem = format!("Level_{n:02}");
+    let mut out: Vec<std::path::PathBuf> = std::fs::read_dir(dir.join("runs"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|f| f.to_str())
+                .is_some_and(|f| f.starts_with(&stem) && f.ends_with(".replay"))
+        })
+        .collect();
+    out.sort();
+    let owner = dir.join(format!("{stem}-owner.replay"));
+    if owner.is_file() {
+        out.push(owner);
+    }
+    out
 }
 
 #[cfg(test)]

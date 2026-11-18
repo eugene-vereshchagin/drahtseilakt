@@ -384,7 +384,7 @@ fn read_item(path: &Path, name: &str) -> Item {
         outcome: None,
         state: State::Broken(why.to_owned()),
     };
-    let bytes = match crate::hints::read_plain(path, crate::hints::MAX_REPLAY_FILE) {
+    let bytes = match crate::files::read_plain(path, crate::files::MAX_REPLAY_FILE) {
         Ok(b) => b,
         Err(e) => return broken(&e),
     };

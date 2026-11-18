@@ -252,7 +252,7 @@ pub fn run(
                 .is_some_and(|p| p.level == *map)
         });
         if let Some(f) = level {
-            crate::hints::write_plain(
+            crate::files::write_plain(
                 &f.join(gamedata::package::REPORT_FILE),
                 &file_text(&issues),
             )?;

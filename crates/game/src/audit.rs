@@ -640,7 +640,7 @@ pub fn run(
         }
     }
     if let Some(path) = csv {
-        crate::hints::write_plain(path, &rows)?;
+        crate::files::write_plain(path, &rows)?;
     }
     println!("audit: {} maps", files.len());
     for (copy, _) in &passes {

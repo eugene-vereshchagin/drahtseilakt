@@ -249,7 +249,7 @@ impl Game {
         let replay_in = match &o.replay {
             Some(p) => {
                 let text =
-                    String::from_utf8(crate::hints::read_plain(p, crate::hints::MAX_REPLAY_FILE)?)
+                    String::from_utf8(crate::files::read_plain(p, crate::files::MAX_REPLAY_FILE)?)
                         .map_err(|_| format!("{}: not UTF-8", p.display()))?;
                 let r = Replay::parse(&text).map_err(|e| format!("{}: {e}", p.display()))?;
                 // a replay plays on its level file, or on a level converted from that file (an open-format export
@@ -842,7 +842,7 @@ impl Game {
             targets.push(r.clone());
         }
         let best = dir.join("best.replay");
-        let best_ticks = crate::hints::read_utf8(&best, crate::hints::MAX_REPLAY_FILE)
+        let best_ticks = crate::files::read_utf8(&best, crate::files::MAX_REPLAY_FILE)
             .ok()
             .and_then(|t| Replay::parse(&t).ok())
             // a stale run (recorded under the old script rules) is no longer this level's best
@@ -903,7 +903,7 @@ impl Game {
     /// The best run's sector times (each sector reached, then the finish), as the best run left them.
     fn best_splits(&self) -> Vec<u64> {
         let path = self.runs_dir(&level_stem(self)).join("splits.txt");
-        crate::hints::read_plain(&path, 4096)
+        crate::files::read_plain(&path, 4096)
             .ok()
             .and_then(|b| String::from_utf8(b).ok())
             .map(|t| {
@@ -940,7 +940,7 @@ impl Game {
     fn ghost(&self) -> Option<Ghost> {
         let path = self.runs_dir(&level_stem(self)).join("best.replay");
         let text =
-            String::from_utf8(crate::hints::read_plain(&path, crate::hints::MAX_REPLAY_FILE).ok()?)
+            String::from_utf8(crate::files::read_plain(&path, crate::files::MAX_REPLAY_FILE).ok()?)
                 .ok()?;
         let replay = Replay::parse(&text).ok()?;
         if replay.level_hash != self.level.hash || replay.start.is_some() || !replay.mods.is_empty()
@@ -1484,26 +1484,14 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
         let language = crate::lang::chosen(setting("language").as_deref());
         return crate::report::run(&o.audit_report, &data, &language);
     }
-    if let Some(runs) = o.supports_check {
+    if let Some(runs) = &o.supports_check {
         // the supports come with our own models (the original's have none), whatever the player's settings choose:
         // the check measures them, unless --models asks for another pack
         start_packs(
             o.textures.as_deref(),
             Some(o.models.as_deref().unwrap_or(gamedata::packs::OWN)),
         );
-        let store = if runs {
-            let s = crate::pilotdata::root().map(|d| d.join("hints"));
-            if s.is_none() {
-                return Err(format!(
-                    "--supports-check runs needs the autopilot store ({} or ../drahtseilakt-tools/autopilot)",
-                    crate::pilotdata::ENV
-                ));
-            }
-            s
-        } else {
-            None
-        };
-        return crate::supports::run(&o, &data, store.as_deref());
+        return crate::supports::run(&o, &data, runs.as_deref());
     }
     if let Some(dir) = &o.level_stats {
         let Some(store) = crate::pilotdata::root() else {
@@ -1576,9 +1564,6 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
             .ok_or("--headless needs --replay")?;
         // when the end music (Music_EndCheckpoint) would begin to loop, and the finish music after it
         let mut end_music = None;
-        // how near the floors' edges the ball rolls (edges.rs), for comparing runs
-        let edges = crate::autopilot::level_edges(&game.level.level, &game.modules);
-        let mut near_edges = crate::edges::EdgeStats::default();
         let mut script_lines = 0usize;
         // The whole simulation state at given points, for comparing two runs (sim.rs dump_state), with
         // DRAHTSEILAKT_DUMP_STATE set: a comma-separated list of `S:T` (sector S, 1 the first, at T on its clock:
@@ -1621,7 +1606,6 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
                     script_lines = script_lines.saturating_add(1);
                 }
             }
-            near_edges.tick(&edges, &game.sim.ball);
             if end_music.is_none() && crate::music::near_end(&game.sim) {
                 end_music = Some(game.sim.tick);
             }
@@ -1713,7 +1697,6 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
             s.lives,
             s.sector + 1
         );
-        println!("{}", near_edges.line());
         match end_music {
             Some(t) => println!(
                 "end music: Music_EndCheckpoint loops from {} ({} before the end)",
@@ -2294,13 +2277,13 @@ struct Watched {
 /// not while a ball is being lost) is its way, the transformers it went into its gates, and it begins where the run
 /// began. Each --then run (one begun at a sector) is followed from its sector on instead.
 fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
-    let text = crate::hints::read_utf8(follow, crate::hints::MAX_REPLAY_FILE)?;
+    let text = crate::files::read_utf8(follow, crate::files::MAX_REPLAY_FILE)?;
     if text.starts_with(crate::locate::TRACK_HEAD) {
         return follow_track(o, data, &text);
     }
     let mut w = watch_run(o, data, follow, &text)?;
     for more in &o.then {
-        let text = crate::hints::read_utf8(more, crate::hints::MAX_REPLAY_FILE)?;
+        let text = crate::files::read_utf8(more, crate::files::MAX_REPLAY_FILE)?;
         let m = watch_run(o, data, more, &text)?;
         let Some(from) = m.run.start.as_ref().map(|st| st.sector.saturating_sub(1)) else {
             return Err(format!(
@@ -2925,7 +2908,7 @@ fn read_plan(
     level: &level::Level,
     sector: usize,
 ) -> Result<Vec<(glam::Vec3, bool)>, String> {
-    let text = crate::hints::read_utf8(path, crate::hints::MAX_FILE)?;
+    let text = crate::files::read_utf8(path, crate::hints::MAX_FILE)?;
     let mut out = Vec::new();
     let begins = format!("PC_TwoFlames_{sector:02}");
     for line in text.lines() {
@@ -3069,7 +3052,7 @@ fn load_hints(game: &Game, data: &Data, o: &Options) -> Result<Vec<crate::hints:
                 continue;
             };
             let file = dir.join(&*file);
-            let bytes = crate::hints::read_plain(&file, crate::hints::MAX_REPLAY_FILE)?;
+            let bytes = crate::files::read_plain(&file, crate::files::MAX_REPLAY_FILE)?;
             let text =
                 String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
             let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
@@ -3112,7 +3095,7 @@ struct Played {
 }
 
 fn play_track(file: &Path, until: u64, data: &Data, o: &Options) -> Result<Played, String> {
-    let bytes = crate::hints::read_plain(file, crate::hints::MAX_REPLAY_FILE)?;
+    let bytes = crate::files::read_plain(file, crate::files::MAX_REPLAY_FILE)?;
     let text = String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", file.display()))?;
     let run = Replay::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
     let mut watch = watch_options(o, data, &run);
@@ -5316,7 +5299,7 @@ fn save_hand(
     let stem = level_stem(game);
     let name = format!("{stem}-hand-{from}.replay");
     let file = dir.join(&name);
-    crate::hints::write_plain(&file, &game.replay_out.to_text())?;
+    crate::files::write_plain(&file, &game.replay_out.to_text())?;
     let kind = format!("{kind:?}").to_ascii_lowercase();
     let line = format!(
         "at {:.2} {:.2} {:.2} r 4 sector {} kind {kind} : replay {name} {from} {}\n",
@@ -5328,12 +5311,12 @@ fn save_hand(
     );
     let hints = dir.join(format!("{stem}-hand.txt"));
     // (read as a hint file is: a plain file, capped)
-    let mut old = crate::hints::read_text(&hints, crate::hints::MAX_FILE)?;
+    let mut old = crate::files::read_text(&hints, crate::hints::MAX_FILE)?;
     if !old.is_empty() && !old.ends_with('\n') {
         old.push('\n');
     }
     old += &line;
-    crate::hints::write_plain(&hints, &old)?;
+    crate::files::write_plain(&hints, &old)?;
     Ok(format!(
         "saved {} (hint in {})",
         shown_path(&file),
@@ -6114,7 +6097,7 @@ impl App {
                 m.notice = Some(text);
             }
         };
-        let text = match crate::hints::read_plain(&path, crate::hints::MAX_REPLAY_FILE)
+        let text = match crate::files::read_plain(&path, crate::files::MAX_REPLAY_FILE)
             .and_then(|b| String::from_utf8(b).map_err(|_| "not text".to_owned()))
         {
             Ok(t) => t,
@@ -6172,7 +6155,7 @@ impl App {
                 }
                 if pk.level.is_dir() {
                     open.get_or_insert(crate::assets::Source::Open(pk.level));
-                } else if crate::hints::read_plain(&pk.level, 256 << 20)
+                } else if crate::files::read_plain(&pk.level, 256 << 20)
                     .is_ok_and(|b| gamedata::fnv1a(&b) == r.level_hash)
                 {
                     return Some(crate::assets::Source::Nmo(pk.level));
