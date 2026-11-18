@@ -326,14 +326,6 @@ jobs:
           cd dist
           ls -l
           shopt -s nullglob
-          # stable names: the version leaves the file names (it stays in the tag, the title and the packages' metadata), so
-          # https://github.com/<repo>/releases/latest/download/<name> always gives the newest release (the site links so)
-          t=${TAG//./\\.}
-          for f in *.tar.gz *.zip *.deb *.rpm *.dmg *.exe; do
-            [ -e "$f" ] || continue
-            n=$(sed -E "s/[-_]${t}(-1)?([-_.])/\\2/; s/[-_]20[0-9]{6}-1([-_.])/\\1/" <<<"$f")
-            [ "$n" = "$f" ] || { [ ! -e "$n" ] || { echo "::error::$f and $n collide"; exit 1; }; mv -- "$f" "$n"; }
-          done
           files=(*.tar.gz *.zip *.deb *.rpm *.dmg *.exe)
           sha256sum -- "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
