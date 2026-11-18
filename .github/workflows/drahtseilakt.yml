@@ -122,10 +122,10 @@ jobs:
       - name: Git's ssh first (Windows)
         if: runner.os == 'Windows'
         run: echo 'C:\Program Files\Git\usr\bin' >>"$GITHUB_PATH"
-      # the toolbox takes the game's crates by path ../ballance/drahtseilakt: both checked out in that layout
+      # the toolbox takes the game's crates by path ../drahtseilakt: both checked out side by side
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: ballance/drahtseilakt
+          path: drahtseilakt
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

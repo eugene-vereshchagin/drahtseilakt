@@ -107,7 +107,7 @@ jobs:
       OS_KIND: ${{ matrix.os }}
       ARCH: ${{ matrix.arch }}
       VERSION: ${{ needs.plan.outputs.version }}
-      GAME_BIN: ${{ github.workspace }}/ballance/drahtseilakt/target/release/drahtseilakt${{ matrix.os == 'windows' && '.exe' || '' }}
+      GAME_BIN: ${{ github.workspace }}/drahtseilakt/target/release/drahtseilakt${{ matrix.os == 'windows' && '.exe' || '' }}
     steps:
       - name: the toolbox needs its key
         if: env.TOOLBOX == '1'
@@ -126,10 +126,10 @@ jobs:
       - name: Git's ssh first (Windows)
         if: matrix.os == 'windows'
         run: echo 'C:\Program Files\Git\usr\bin' >>"$GITHUB_PATH"
-      # the toolbox takes the game's crates by path ../ballance/drahtseilakt: both checked out in that layout
+      # the toolbox takes the game's crates by path ../drahtseilakt: both checked out side by side
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: ballance/drahtseilakt
+          path: drahtseilakt
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.TOOLBOX == '1'
@@ -139,7 +139,7 @@ jobs:
           path: drahtseilakt-toolbox
           persist-credentials: false
       - name: toolchain
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
           rustup override set "$RUST_TOOLCHAIN"
@@ -149,12 +149,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libasound2-dev libxkbcommon-dev libwayland-dev
       - name: fetch crates (pinned by Cargo.lock)
         run: |
-          (cd ballance/drahtseilakt && cargo fetch --locked)
+          (cd drahtseilakt && cargo fetch --locked)
           if [ "$TOOLBOX" = 1 ]; then (cd drahtseilakt-toolbox && cargo fetch --locked); fi
       - name: build the game
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         env:
-          VXMATH_FONT_DIR: ${{ github.workspace }}/ballance/drahtseilakt/assets/fonts
+          VXMATH_FONT_DIR: ${{ github.workspace }}/drahtseilakt/assets/fonts
         run: |
           # a release package is built with DRAHTSEILAKT_RELEASE set (no debug by default, no god mode); the dev one without
           if [ "$DEV" = 1 ]; then unset DRAHTSEILAKT_RELEASE; else export DRAHTSEILAKT_RELEASE=1; fi
@@ -166,26 +166,26 @@ jobs:
       # the program alone, no data: it depends on drahtseilakt-data (the data release). .deb and .rpm (the dev flavour: .deb only)
       - name: Linux packages (.deb, .rpm)
         if: matrix.os == 'linux'
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         run: |
           args=(game --bin "$GAME_BIN" --arch "$ARCH" --version "$VERSION" --out dist)
           if [ "$DEV" = 1 ]; then args+=(--dev); fi
           scripts/make-distro-packages.sh "${args[@]}"
       - name: assets (the base data from the checkout, the manual, checksums)
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         run: scripts/ci-assets.sh
       # the base data as packages, once (it is the same for every architecture): from the checkout, before ci-package.sh moves assets/
       - name: Linux data packages (.deb, .rpm)
         if: matrix.os == 'linux' && matrix.arch == 'x86_64' && !matrix.dev
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         run: scripts/make-distro-packages.sh data --out dist
       # the .app is unsigned (no Apple developer account); assets/ is copied, so this runs before ci-package.sh moves it
       - name: macOS app and .dmg
         if: matrix.os == 'macos'
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         run: scripts/ci-macos-app.sh
       - name: portable archive
-        working-directory: ballance/drahtseilakt
+        working-directory: drahtseilakt
         env:
           TOOL_BIN: ${{ github.workspace }}/drahtseilakt-toolbox/target/release/drahtseilakt-toolbox${{ matrix.os == 'windows' && '.exe' || '' }}
           TOOLBOX_DIR: ${{ github.workspace }}/drahtseilakt-toolbox
@@ -194,11 +194,11 @@ jobs:
         with:
           name: drahtseilakt-${{ matrix.name }}
           path: |
-            ballance/drahtseilakt/dist/*.tar.gz
-            ballance/drahtseilakt/dist/*.zip
-            ballance/drahtseilakt/dist/*.deb
-            ballance/drahtseilakt/dist/*.rpm
-            ballance/drahtseilakt/dist/*.dmg
+            drahtseilakt/dist/*.tar.gz
+            drahtseilakt/dist/*.zip
+            drahtseilakt/dist/*.deb
+            drahtseilakt/dist/*.rpm
+            drahtseilakt/dist/*.dmg
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -225,7 +225,7 @@ jobs:
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: ballance/drahtseilakt
+          path: drahtseilakt
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.TOOLBOX == '1'
@@ -240,26 +240,28 @@ jobs:
           usesh: true
           envs: 'TOOLBOX VERSION'
           prepare: |
-            pkg install -y bash curl unzip git pkgconf rust py311-markdown python3 alsa-lib libudev-devd libxkbcommon wayland
+            pkg install -y bash curl unzip git pkgconf rust python3 alsa-lib libudev-devd libxkbcommon wayland
+            # python-markdown for the manual, of the VM's default Python (the pkg name carries its version: py311-, py312-)
+            pkg install -y "$(python3 -c 'import sys; print("py%d%d-markdown" % sys.version_info[:2])')"
           run: |
             set -eu
             export DEV=0 OS_KIND=freebsd ARCH=x86_64
             export DRAHTSEILAKT_RELEASE=1 CARGO_INCREMENTAL=0
             W=$(pwd)
-            export VXMATH_FONT_DIR="$W/ballance/drahtseilakt/assets/fonts"
+            export VXMATH_FONT_DIR="$W/drahtseilakt/assets/fonts"
             # the VM's own rust (pkg): the pinned toolchain is for the other targets
             rustc --version
-            (cd ballance/drahtseilakt && cargo fetch --locked && cargo build --release --locked --offline -p drahtseilakt)
+            (cd drahtseilakt && cargo fetch --locked && cargo build --release --locked --offline -p drahtseilakt)
             if [ "$TOOLBOX" = 1 ]; then (cd drahtseilakt-toolbox && cargo fetch --locked && cargo build --release --locked --offline); fi
-            cd ballance/drahtseilakt
+            cd drahtseilakt
             bash scripts/ci-assets.sh
-            GAME_BIN="$W/ballance/drahtseilakt/target/release/drahtseilakt" \
+            GAME_BIN="$W/drahtseilakt/target/release/drahtseilakt" \
             TOOL_BIN="$W/drahtseilakt-toolbox/target/release/drahtseilakt-toolbox" \
             TOOLBOX_DIR="$W/drahtseilakt-toolbox" bash scripts/ci-package.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: drahtseilakt-freebsd-x86_64
-          path: ballance/drahtseilakt/dist/*.tar.gz
+          path: drahtseilakt/dist/*.tar.gz
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
