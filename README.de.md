@@ -34,7 +34,28 @@ Archiven und Installern. Die 13 ausgewählten Karten sind ein eigener Download, 
 [release.md](docs/de/drahtseilakt/release.md).
 
 <!-- downloads:start -->
-Noch ist kein Release veröffentlicht. Die Builds erscheinen hier mit dem ersten.
+Version **0.1.0**, alle Dateien und Hinweise: [https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/0.1.0](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/0.1.0).
+
+| System | Download |
+|---|---|
+| Windows x64, Installer | [drahtseilakt-0.1.0-windows-x86_64-setup.exe](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-x86_64-setup.exe) |
+| Windows x64, portabel | [drahtseilakt-0.1.0-windows-x86_64.zip](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-x86_64.zip) |
+| Windows ARM, Installer | [drahtseilakt-0.1.0-windows-aarch64-setup.exe](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-aarch64-setup.exe) |
+| Windows ARM, portabel | [drahtseilakt-0.1.0-windows-aarch64.zip](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-aarch64.zip) |
+| macOS Apple Silicon (nicht signiert) | [drahtseilakt-0.1.0-macos-aarch64.dmg](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-aarch64.dmg) |
+| macOS Intel (nicht signiert) | [drahtseilakt-0.1.0-macos-x86_64.dmg](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-x86_64.dmg) |
+| macOS Apple Silicon, portabel | [drahtseilakt-0.1.0-macos-aarch64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-aarch64.tar.gz) |
+| macOS Intel, portabel | [drahtseilakt-0.1.0-macos-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-x86_64.tar.gz) |
+| Linux x64, portabel | [drahtseilakt-0.1.0-linux-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-linux-x86_64.tar.gz) |
+| Linux ARM, portabel | [drahtseilakt-0.1.0-linux-aarch64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-linux-aarch64.tar.gz) |
+| Debian/Ubuntu x64 (mit dem Datenpaket) | [drahtseilakt_0.1.0-1_amd64.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt_0.1.0-1_amd64.deb) |
+| Debian/Ubuntu ARM (mit dem Datenpaket) | [drahtseilakt_0.1.0-1_arm64.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt_0.1.0-1_arm64.deb) |
+| Debian/Ubuntu: das Datenpaket | [drahtseilakt-data_20261117-1_all.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-data_20261117-1_all.deb) |
+| Fedora/openSUSE x64 (mit dem Datenpaket) | [drahtseilakt-0.1.0-1.x86_64.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-1.x86_64.rpm) |
+| Fedora/openSUSE ARM (mit dem Datenpaket) | [drahtseilakt-0.1.0-1.aarch64.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-1.aarch64.rpm) |
+| Fedora/openSUSE: das Datenpaket | [drahtseilakt-data-20261117-1.noarch.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-data-20261117-1.noarch.rpm) |
+| FreeBSD x64 (experimentell) | [drahtseilakt-0.1.0-freebsd-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-freebsd-x86_64.tar.gz) |
+| Prüfsummen | [SHA256SUMS](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/SHA256SUMS) |
 
 Die 13 ausgewählten Karten, ein eigener Download (etwa 1,1 GB, je Karte ein Zip, entpacken nach `assets/levels/drahtseilakt/` des Spiels): [data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117).
 <!-- downloads:end -->

@@ -27,7 +27,28 @@ Drahtseilakt 是 **Ballance**（Cyparade / Atari，2004）的一个新引擎，�
 确切的文件列表和安装命令：[release.md](docs/zh/drahtseilakt/release.md)。
 
 <!-- downloads:start -->
-尚未发布任何版本。第一个版本发布后，构建会出现在这里。
+版本 **0.1.0**，全部文件和说明：[https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/0.1.0](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/0.1.0)。
+
+| 系统 | 下载 |
+|---|---|
+| Windows x64，安装程序 | [drahtseilakt-0.1.0-windows-x86_64-setup.exe](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-x86_64-setup.exe) |
+| Windows x64，便携版 | [drahtseilakt-0.1.0-windows-x86_64.zip](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-x86_64.zip) |
+| Windows ARM，安装程序 | [drahtseilakt-0.1.0-windows-aarch64-setup.exe](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-aarch64-setup.exe) |
+| Windows ARM，便携版 | [drahtseilakt-0.1.0-windows-aarch64.zip](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-aarch64.zip) |
+| macOS Apple Silicon（未签名） | [drahtseilakt-0.1.0-macos-aarch64.dmg](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-aarch64.dmg) |
+| macOS Intel（未签名） | [drahtseilakt-0.1.0-macos-x86_64.dmg](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-x86_64.dmg) |
+| macOS Apple Silicon，便携版 | [drahtseilakt-0.1.0-macos-aarch64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-aarch64.tar.gz) |
+| macOS Intel，便携版 | [drahtseilakt-0.1.0-macos-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-x86_64.tar.gz) |
+| Linux x64，便携版 | [drahtseilakt-0.1.0-linux-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-linux-x86_64.tar.gz) |
+| Linux ARM，便携版 | [drahtseilakt-0.1.0-linux-aarch64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-linux-aarch64.tar.gz) |
+| Debian/Ubuntu x64（需同时安装数据包） | [drahtseilakt_0.1.0-1_amd64.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt_0.1.0-1_amd64.deb) |
+| Debian/Ubuntu ARM（需同时安装数据包） | [drahtseilakt_0.1.0-1_arm64.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt_0.1.0-1_arm64.deb) |
+| Debian/Ubuntu：数据包 | [drahtseilakt-data_20261117-1_all.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-data_20261117-1_all.deb) |
+| Fedora/openSUSE x64（需同时安装数据包） | [drahtseilakt-0.1.0-1.x86_64.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-1.x86_64.rpm) |
+| Fedora/openSUSE ARM（需同时安装数据包） | [drahtseilakt-0.1.0-1.aarch64.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-1.aarch64.rpm) |
+| Fedora/openSUSE：数据包 | [drahtseilakt-data-20261117-1.noarch.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-data-20261117-1.noarch.rpm) |
+| FreeBSD x64（实验性） | [drahtseilakt-0.1.0-freebsd-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-freebsd-x86_64.tar.gz) |
+| 校验和 | [SHA256SUMS](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/SHA256SUMS) |
 
 13 张精选地图需单独下载（约 1.1 GB，每张一个 zip，解压到游戏的 `assets/levels/drahtseilakt/`）：[data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117)。
 <!-- downloads:end -->

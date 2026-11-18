@@ -33,7 +33,28 @@ Drahtseilakt — новый движок для **Ballance** (Cyparade / Atari, 
 строки установки: [release.md](docs/ru/drahtseilakt/release.md).
 
 <!-- downloads:start -->
-Релиз ещё не опубликован. Сборки появятся здесь, когда выйдет первый.
+Версия **0.1.0**, все файлы и описание: [https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/0.1.0](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/0.1.0).
+
+| Система | Скачать |
+|---|---|
+| Windows x64, установщик | [drahtseilakt-0.1.0-windows-x86_64-setup.exe](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-x86_64-setup.exe) |
+| Windows x64, портативная | [drahtseilakt-0.1.0-windows-x86_64.zip](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-x86_64.zip) |
+| Windows ARM, установщик | [drahtseilakt-0.1.0-windows-aarch64-setup.exe](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-aarch64-setup.exe) |
+| Windows ARM, портативная | [drahtseilakt-0.1.0-windows-aarch64.zip](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-windows-aarch64.zip) |
+| macOS Apple Silicon (без подписи) | [drahtseilakt-0.1.0-macos-aarch64.dmg](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-aarch64.dmg) |
+| macOS Intel (без подписи) | [drahtseilakt-0.1.0-macos-x86_64.dmg](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-x86_64.dmg) |
+| macOS Apple Silicon, портативная | [drahtseilakt-0.1.0-macos-aarch64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-aarch64.tar.gz) |
+| macOS Intel, портативная | [drahtseilakt-0.1.0-macos-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-macos-x86_64.tar.gz) |
+| Linux x64, портативная | [drahtseilakt-0.1.0-linux-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-linux-x86_64.tar.gz) |
+| Linux ARM, портативная | [drahtseilakt-0.1.0-linux-aarch64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-linux-aarch64.tar.gz) |
+| Debian/Ubuntu x64 (вместе с пакетом данных) | [drahtseilakt_0.1.0-1_amd64.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt_0.1.0-1_amd64.deb) |
+| Debian/Ubuntu ARM (вместе с пакетом данных) | [drahtseilakt_0.1.0-1_arm64.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt_0.1.0-1_arm64.deb) |
+| Debian/Ubuntu: пакет данных | [drahtseilakt-data_20261117-1_all.deb](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-data_20261117-1_all.deb) |
+| Fedora/openSUSE x64 (вместе с пакетом данных) | [drahtseilakt-0.1.0-1.x86_64.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-1.x86_64.rpm) |
+| Fedora/openSUSE ARM (вместе с пакетом данных) | [drahtseilakt-0.1.0-1.aarch64.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-1.aarch64.rpm) |
+| Fedora/openSUSE: пакет данных | [drahtseilakt-data-20261117-1.noarch.rpm](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-data-20261117-1.noarch.rpm) |
+| FreeBSD x64 (экспериментально) | [drahtseilakt-0.1.0-freebsd-x86_64.tar.gz](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/drahtseilakt-0.1.0-freebsd-x86_64.tar.gz) |
+| Контрольные суммы | [SHA256SUMS](https://github.com/eugene-vereshchagin/drahtseilakt/releases/download/0.1.0/SHA256SUMS) |
 
 13 избранных карт скачиваются отдельно (около 1,1 ГБ, по zip на карту, распаковать в `assets/levels/drahtseilakt/` игры): [data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117).
 <!-- downloads:end -->
