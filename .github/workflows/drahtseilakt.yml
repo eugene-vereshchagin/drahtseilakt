@@ -1,7 +1,7 @@
 # Drahtseilakt: builds and tests the Rust game (crates/, binary `drahtseilakt`) on Windows, Linux and macOS and
 # uploads each as a download laid out as installed: the program, assets/ (fonts, own, sounds), LICENSE, READMEs, CREDITS.md and THIRD-PARTY.md.
 # With `toolbox` checked it also builds the separate drahtseilakt-toolbox (a private repository: it needs the secret
-# TOOLBOX_TOKEN, a fine-grained token with read-only Contents on eugene-vereshchagin/drahtseilakt-toolbox).
+# TOOLBOX_DEPLOY_KEY, the private half of a read-only deploy key on eugene-vereshchagin/drahtseilakt-toolbox).
 #
 # On demand only (Actions -> Drahtseilakt -> Run workflow), never on push (CLAUDE.md, "CI runs on demand").
 # Actions are pinned by full commit SHA; the Rust toolchain by its exact version; crates by Cargo.lock (fetched
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       toolbox:
-        description: 'Also build drahtseilakt-toolbox (needs the TOOLBOX_TOKEN secret)'
+        description: 'Also build drahtseilakt-toolbox (needs the TOOLBOX_DEPLOY_KEY secret)'
         type: boolean
         default: false
 
@@ -117,6 +117,11 @@ jobs:
       # the files exactly as committed (Windows runners convert line ends by default; tests compare texts)
       - name: no line-end conversion
         run: git config --global core.autocrlf false
+      # checkout fetches the toolbox with the deploy key through the first ssh on the PATH; on some Windows images that
+      # is Windows' OpenSSH, which refuses the key file checkout writes ("bad permissions"). Git's own ssh does not.
+      - name: Git's ssh first (Windows)
+        if: runner.os == 'Windows'
+        run: echo 'C:\Program Files\Git\usr\bin' >>"$GITHUB_PATH"
       # the toolbox takes the game's crates by path ../ballance/drahtseilakt: both checked out in that layout
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -125,7 +130,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: eugene-vereshchagin/drahtseilakt-toolbox
-          token: ${{ secrets.TOOLBOX_TOKEN }}
+          ssh-key: ${{ secrets.TOOLBOX_DEPLOY_KEY }}
           path: drahtseilakt-toolbox
           persist-credentials: false
       - name: toolchain
