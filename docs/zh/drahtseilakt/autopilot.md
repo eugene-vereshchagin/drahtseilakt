@@ -55,7 +55,7 @@
 
 ## 提示文件
 
-每个关卡一个文件：游戏数据文件夹中的 `hints/<关卡>.txt`（第 1 关为 `hints/Level_01.txt`），或 `--hints FILE` 指定的文件。目前写好的提示连同它们使用的回放保存在仓库的 `hints/` 下；其中不含游戏数据。每行一条提示，`#` 开始注释：
+每个关卡一个文件：游戏数据文件夹中的 `hints/<关卡>.txt`（第 1 关为 `hints/Level_01.txt`），或 `--hints FILE` 指定的文件。目前写好的提示连同它们使用的回放保存在开发者存储库（`DRAHTSEILAKT_DEVDATA`，否则为仓库旁的 `drahtseilakt-devdata`；见 decisions.md“回放和自动驾驶数据放在单独的开发者存储库”）的 `hints/` 下；其中不含游戏数据。每行一条提示，`#` 开始注释：
 
 ```
 at X Y Z r R [sector N] [kind wood|stone|paper|sticky] [retry N] : 步骤 ; 步骤 ; ...

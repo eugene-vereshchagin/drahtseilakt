@@ -484,3 +484,14 @@ gebaut; die portablen Archive und Installer enthalten die Toolbox und die Basisd
 weil ein `level.bin` über der 100-MB-Dateigrenze von GitHub liegt). Ein Programm-Update baut so nur die Binärpakete neu. Die
 Release-Dateien haben stabile Namen ohne Version, sodass `releases/latest/download/<Name>` immer aktuell ist. Welche
 Datei für wen: `docs/de/drahtseilakt/distribution.md`; Bauen und Hochladen: `docs/de/drahtseilakt/release.md`.
+
+## Replays und die Daten des Autopiloten liegen in einem eigenen Entwicklerspeicher
+
+*Entscheidung des Besitzers, 2026-11-18.* Unsere Replays, die aufgezeichneten Läufe und alles, was der Autopilot liest
+(Routen, Pläne, Hinweise, Zonen, die gelernte Tabelle, die Handnotizen der Level-Statistik), gehören nicht auf GitHub
+und lassen sich getrennt leichter verwalten. Sie sind aus `hints/` und `tests/replays/` in ein eigenes Repository
+`drahtseilakt-devdata` neben diesem umgezogen (privat, nie veröffentlicht). Ein einziger Resolver findet es: die
+Umgebungsvariable `DRAHTSEILAKT_DEVDATA`, sonst `../drahtseilakt-devdata` von der Repository-Wurzel. Tests, die es
+brauchen, werden ohne es mit einer Meldung übersprungen (wie ohne `OPENBALLANCE_DATA`), sodass die CI, die keinen hat,
+grün bleibt; das Spiel selbst liest es nie. Was das Spiel einkompiliert (die Startkugeln der Sektoren), liegt jetzt in
+`crates/level/data/sector-balls.txt`. Die eigenen Daten eines Levels (`assets/levels/*/pilot/`) bleiben beim Level.

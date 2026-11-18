@@ -4477,7 +4477,7 @@ pub(crate) mod tests {
         assert_eq!(name_order("PC_TwoFlames", "PC_TwoFlames_01"), Less);
     }
 
-    /// Level 1's finish with the player's copy (skipped without OPENBALLANCE_DATA): rolled onto the balloon's
+    /// Level 1's finish with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): rolled onto the balloon's
     /// platform, the ball finishes the level and the balloon carries it away along +x at about 1.1 units per 20
     /// ticks, the ball 0.72 behind the platform's centre, as in the C game (docs/physics.md, the balloon).
     #[test]
@@ -4525,7 +4525,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// Level 2's first fan with the player's copy (skipped without OPENBALLANCE_DATA): its updraft lifts a paper
+    /// Level 2's first fan with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): its updraft lifts a paper
     /// ball to the top of its volume (62.8) and holds it there, its box's top touching it; a wooden ball stays down.
     #[test]
     fn a_fan_holds_a_paper_ball_at_the_top_of_its_updraft() {
@@ -4560,7 +4560,7 @@ pub(crate) mod tests {
         assert!(hi < 49.0, "wooden ball up to {hi}");
     }
 
-    /// Level 8's sack (sector 3) and swing (sector 5) with the player's copy (skipped without OPENBALLANCE_DATA):
+    /// Level 8's sack (sector 3) and swing (sector 5) with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store):
     /// their scripts' pushes swing them as in the C game, which moved them by these z offsets at these frames after
     /// their sector came in (the C build with the checkpoints moved under the ball). The C run had level 8's start
     /// ball, the wooden one, so the test asks for it: with another ball the world's shared sleep countdown falls
@@ -4616,7 +4616,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// Level 2's plate bridge (module 29) with the player's copy (skipped without OPENBALLANCE_DATA): a stone ball
+    /// Level 2's plate bridge (module 29) with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): a stone ball
     /// on plate 06 breaks the hinge between plates 06 and 07 and falls with the plates; a wooden ball only bends
     /// the bridge (about 3.7).
     #[test]
@@ -4662,7 +4662,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// A short route off level 2 with the player's copy (skipped without OPENBALLANCE_DATA): the ball is lost at
+    /// A short route off level 2 with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): the ball is lost at
     /// tick 331, as in the C game on the same input, where the depth-test cubes are tested one a frame; the new ball
     /// is a body from tick 577 (C: y 10.33 there, 10.07 at 581), and at tick 600 the points are 988 with 2 lives,
     /// the counter having waited while the ball was lost.
@@ -4710,7 +4710,7 @@ pub(crate) mod tests {
         assert_eq!((sim.points, sim.lives), (988, 2));
     }
 
-    /// Level 1's module 34 with the player's copy (skipped without OPENBALLANCE_DATA): a wooden ball pushed into
+    /// Level 1's module 34 with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): a wooden ball pushed into
     /// the box under the stone moves it to x 148.88 and stalls, the stone staying up, as in the C game (its ball
     /// brought back next to the box by a moved reset point); a stone ball pushes the box out and the stone drops.
     #[test]
@@ -4753,7 +4753,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// Level 1's start with the player's copy (skipped without OPENBALLANCE_DATA): the ball dropped onto the floor
+    /// Level 1's start with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): the ball dropped onto the floor
     /// hits it, and rolling on it touches a material the original's sound scripts know (its groups).
     #[test]
     fn the_ball_meets_sound_materials_on_level_1() {
@@ -4793,7 +4793,7 @@ pub(crate) mod tests {
         assert!(!rolls.is_empty(), "no rolling on a known material");
     }
 
-    /// Level 1's first extra point with the player's copy (skipped without OPENBALLANCE_DATA): the ball at its
+    /// Level 1's first extra point with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): the ball at its
     /// centre fires it (100 points); its six small balls fly away for a second and then reach the ball, 20 points
     /// each, as in the C game with an extra point moved onto the ball: no hit 60 frames after firing, five by 120,
     /// all six by 200.
@@ -5093,7 +5093,7 @@ pub(crate) mod tests {
         assert!(sim.mods.modded(), "and is modded");
     }
 
-    /// Level 1's dome (P_Dome_01, sector 2) with the player's copy (skipped without OPENBALLANCE_DATA): the wooden
+    /// Level 1's dome (P_Dome_01, sector 2) with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): the wooden
     /// ball at rest 6 in front of it and pushed straight at it climbs it and rolls over, as in the original (run
     /// under Wine with the start moved there) and in the C reference, where it is 7.85 high 5 ticks after hitting
     /// it and 10.71 high over its top at z -507.9. Made of the level's stand-in (format 4), the coarse, lower dome
@@ -5138,11 +5138,11 @@ pub(crate) mod tests {
         assert!(y < 9.0 && p.z > -502.0, "format 4: up to y {y}, at {p:?}");
     }
 
-    /// Level 10's first sector with the player's copy (skipped without OPENBALLANCE_DATA): the way on from the spur
+    /// Level 10's first sector with the player's copy (skipped without OPENBALLANCE_DATA or the developers' store): the way on from the spur
     /// at the hinged bridge (P_Modul_37_01), where a wooden ball is too light to tip it. Rammed by the wooden ball, the
     /// pusher (P_Modul_01_01) clears its pegs from the loop's west side enough to pass; the rails behind lead to the
     /// stone transformer P_Trafo_Stone_01; back round the loop the stone ball tips the bridge, and over it the ball
-    /// rolls on south (hints/Level_10.txt; the inputs of hints/Level_10-s1-bridge.replay, from the spur as wood).
+    /// rolls on south (hints/Level_10.txt and the inputs of hints/Level_10-s1-bridge.replay, both in the developers' store, from the spur as wood).
     #[test]
     fn level_10_s_bridge_is_crossed_after_the_stone_transformer_behind_the_pusher() {
         let Some(data) = std::env::var_os("OPENBALLANCE_DATA")
@@ -5155,9 +5155,12 @@ pub(crate) mod tests {
             .expect("level 10")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let run =
-            crate::replay::Replay::parse(include_str!("../../../hints/Level_10-s1-bridge.replay"))
-                .expect("replay");
+        let Some(store) = crate::devdata::for_test("the level 10 bridge run") else {
+            return;
+        };
+        let text = std::fs::read_to_string(store.join("hints/Level_10-s1-bridge.replay"))
+            .expect("the bridge replay in the developers' store");
+        let run = crate::replay::Replay::parse(&text).expect("replay");
         let start = run.start.clone().expect("a run from the spur");
         let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, run.version);
         sim.start_from(

@@ -530,3 +530,14 @@ picked maps (their own release `data-<DATA_VERSION>`, packed by hand, because a 
 limit). A program update then rebuilds only the binary packages. Release files have stable names without the version, so
 `releases/latest/download/<name>` is always current. Which file is for whom: `docs/drahtseilakt/distribution.md`; the
 build and upload steps: `docs/drahtseilakt/release.md`.
+
+## Replays and the autopilot's data live in a separate developers' store
+
+*Owner's decision, 2026-11-18.* Our replays, the recorded runs and everything the autopilot reads (routes, plans, hints,
+zones, the learned table, the level-stats annotations) do not belong on GitHub, and they are easier to manage apart.
+They moved out of `hints/` and `tests/replays/` into a repository of their own, `drahtseilakt-devdata`, beside this
+one (private, never published). One resolver finds it: the environment variable `DRAHTSEILAKT_DEVDATA`, else
+`../drahtseilakt-devdata` from the repository root. Tests that need it skip with a message when it is absent (as
+without `OPENBALLANCE_DATA`), so CI, which has none, stays green; the game itself never reads it. What the game
+compiles in, the sectors' starting balls, moved to `crates/level/data/sector-balls.txt`. A level's own data
+(`assets/levels/*/pilot/`) stays with the level.

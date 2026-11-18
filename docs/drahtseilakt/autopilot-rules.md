@@ -4,7 +4,8 @@ The test player's runs are the proof that a level can be played through, and the
 drives as a confident, steady player does: on the middle of the track, at an even, moderate speed, without racing
 lines and without hesitating at the obvious places. It slows down only where the level asks for it (a narrow
 stretch, a timing). These rules say how; each level's route (`hints/Level_NN.route`) says where. The mechanics
-they rest on are in [autopilot.md](autopilot.md).
+they rest on are in [autopilot.md](autopilot.md). The `hints/` paths here are in the developers' store (beside the
+repository, `DRAHTSEILAKT_DEVDATA`), not in the repository.
 
 ## Pace
 

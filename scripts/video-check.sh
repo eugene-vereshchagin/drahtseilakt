@@ -19,6 +19,9 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 game=${DRAHTSEILAKT_BIN:-$here/target/release/drahtseilakt}
 remastered=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/levels/ballance-remaster
 models=level # what scripts/video.sh takes for VIDEO_MODE=remaster
+# the recorded runs live in the developers' store, not in the repository
+devdata=${DRAHTSEILAKT_DEVDATA:-$here/../drahtseilakt-devdata}
+[ -d "$devdata" ] || { echo "no developers' store at $devdata (set DRAHTSEILAKT_DEVDATA)" >&2; exit 0; }
 mkdir -p "$out"
 sum=$out/summary.txt
 : > "$sum"
@@ -26,7 +29,7 @@ bad=0
 say() { echo "$*" | tee -a "$sum"; }
 for n in "$@"; do
     lv=$remastered/Level_$n
-    rp=$here/hints/runs/Level_$n-clean.replay; [ -f "$rp" ] || rp=$here/hints/runs/Level_$n.replay
+    rp=$devdata/hints/runs/Level_$n-clean.replay; [ -f "$rp" ] || rp=$devdata/hints/runs/Level_$n.replay
     w=$out/work-$n; mkdir -p "$w"
     fail=""
     [ -d "$lv" ] || { say "Level_$n: FAIL no remastered level at $lv"; bad=1; continue; }

@@ -1,1 +1,0 @@
-at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; trace Level_13-s4.replay 0 7500

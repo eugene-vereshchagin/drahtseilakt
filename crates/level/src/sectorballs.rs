@@ -1,7 +1,7 @@
-// The ball each sector of the original levels begins with (hints/sector-balls.txt, compiled in): the kind the player
+// The ball each sector of the original levels begins with (crates/level/data/sector-balls.txt, compiled in): the kind the player
 // has when passing the sector's checkpoint.
 
-const TABLE: &str = include_str!("../../../hints/sector-balls.txt");
+const TABLE: &str = include_str!("../data/sector-balls.txt");
 
 /// The balls of original level `level` by sector (index 0 is sector 1, which takes the level's start ball: none here).
 pub fn original(level: u32) -> Vec<Option<String>> {

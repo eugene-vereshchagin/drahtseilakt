@@ -1,3 +1,0 @@
-at -724.1 -154.2 537.2 r 6 sector 3 kind paper : trace Level_13-s3.replay 0 9900
-at -595.2 -285 -1124.9 r 4 sector 4 kind paper : sync -595.2 -285 -1124.9 200 ; trace Level_13-s4.replay 0 7466 2
-at 121.8 -334.7 -1133.6 r 4 sector 5 kind stone : sync 121.8 -334.7 -1133.6 200 ; trace Level_13-s5.replay 0 5300 ; push 0 1 40 ; round 340 -614.5 4 25 2400 -614

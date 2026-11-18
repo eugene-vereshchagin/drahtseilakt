@@ -1,7 +1,0 @@
-# Level 6 — the watcher's zones (autopilot.md, "Zones"), written by hand.
-# Plain: no learned rule here. The rules learned on level 1 ("bend, wood", "rail, wood", "floor, down, drop ahead,
-# wood": don't dawdle) cut the waits these puzzles need: the lift and the drop on the high platform of sector 2
-# (y 36 then 24.7), the paper ball's wait in the fans of sector 3.
-plain sector 2 r 10 : -41.6 36 -440 ; -41 36 -470 ; -38.5 35.5 -500 ; -41 36 -560 ; -40 36 -592
-plain sector 2 r 8 : -41 25 -557 ; -42 25 -580 ; -40 24.8 -613 ; -41.7 24.7 -643 ; -41.7 24.7 -655 ; -39 24.7 -675
-plain sector 3 r 8 : 86 12.4 -682 ; 92 12.3 -672 ; 108 10 -672.4 ; 120 7 -672 ; 102.5 1.9 -654.7 ; 118 0 -654.7 ; 108 3 -666 ; 108 18 -667 ; 121 11 -672 ; 150 19.7 -672 ; 178 16 -672

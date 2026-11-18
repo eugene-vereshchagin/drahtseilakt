@@ -4,7 +4,8 @@ Die Läufe des Testspielers sind der Beweis, dass ein Level durchspielbar ist, u
 Darum fährt er wie ein sicherer, ruhiger Spieler: in der Mitte der Bahn, mit gleichmäßiger, mäßiger Geschwindigkeit,
 ohne Ideallinien und ohne Zögern an den offensichtlichen Stellen. Langsamer wird er nur, wo das Level es verlangt
 (eine enge Stelle, ein Timing). Diese Regeln sagen, wie; die Route jedes Levels (`hints/Level_NN.route`) sagt, wo.
-Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md).
+Die Mechanik, auf der sie beruhen, steht in [autopilot.md](autopilot.md). Die `hints/`-Pfade hier liegen im Entwicklerspeicher (neben dem Repository,
+`DRAHTSEILAKT_DEVDATA`), nicht im Repository.
 
 ## Tempo
 

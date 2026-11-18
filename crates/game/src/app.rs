@@ -1482,10 +1482,28 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
             o.textures.as_deref(),
             Some(o.models.as_deref().unwrap_or(gamedata::packs::OWN)),
         );
-        return crate::supports::run(&o, &data, runs.then_some(Path::new("hints")));
+        let store = if runs {
+            let s = crate::devdata::root().map(|d| d.join("hints"));
+            if s.is_none() {
+                return Err(format!(
+                    "--supports-check runs needs the developers' store ({} or ../drahtseilakt-devdata)",
+                    crate::devdata::ENV
+                ));
+            }
+            s
+        } else {
+            None
+        };
+        return crate::supports::run(&o, &data, store.as_deref());
     }
     if let Some(dir) = &o.level_stats {
-        return crate::levelstats::run(&o, &data, dir, Path::new("hints"));
+        let Some(store) = crate::devdata::root() else {
+            return Err(format!(
+                "--level-stats needs the developers' store ({} or ../drahtseilakt-devdata)",
+                crate::devdata::ENV
+            ));
+        };
+        return crate::levelstats::run(&o, &data, dir, &store.join("hints"));
     }
     // a level folder's own game files (modules, sky, sounds) come before the copy's
     let data = data.for_source(&o.source);

@@ -1,2 +1,0 @@
-# Level 9 — hints for the test player (docs/drahtseilakt/autopilot.md). None: it follows the owner's run
-# (--follow hints/Level_09-owner.replay). The file names the folder of hints/Level_09.zones (the speedrun's calm zone).

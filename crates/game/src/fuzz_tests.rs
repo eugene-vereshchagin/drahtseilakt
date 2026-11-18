@@ -30,6 +30,14 @@ fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
+/// The developers' store's hints folder as a seed root (none without the store: the fuzzer then has the built-in seeds).
+fn store_hints() -> Vec<PathBuf> {
+    crate::devdata::for_test("the fuzz seeds from hints/")
+        .map(|d| d.join("hints"))
+        .into_iter()
+        .collect()
+}
+
 fn profile(sub: &str) -> Vec<PathBuf> {
     if std::env::var_os("FUZZ_NO_REAL").is_some() {
         return Vec::new();
@@ -61,7 +69,7 @@ fn replay_seeds() -> Vec<Vec<u8>> {
             .to_vec(),
         b"# c\ndrahtseilakt-replay 1\nlevel x 0\nstart 1 - -\nend 0\n".to_vec(),
     ];
-    let mut roots = vec![repo().join("hints")];
+    let mut roots: Vec<PathBuf> = store_hints();
     roots.extend(profile("replays"));
     out.extend(fuzzkit::read_all(&fuzzkit::files_under(
         &roots,
@@ -92,7 +100,7 @@ fn hint_seeds() -> Vec<Vec<u8>> {
         b"at 1 2 3 r 4 sector 2 kind wood : goto 1 2 3 600 ; via 4 5 6 ; push 1 0 30 ; air 0 1 20 ; wait 5 ; turn -1 ; become stone ; replay Level_01-owner.replay 10 20\n"
             .to_vec(),
     ];
-    let mut roots = vec![repo().join("hints")];
+    let mut roots: Vec<PathBuf> = store_hints();
     roots.extend(profile("hints"));
     out.extend(fuzzkit::read_all(&fuzzkit::files_under(
         &roots,
@@ -121,7 +129,7 @@ fn zone_seeds() -> Vec<Vec<u8>> {
     let mut out = vec![
         b"flow sector 1 r 4 : 1 2 3 ; 4 5 6\ncareful sector 2 r 3.5 speed 4 : 0 0 0 # c\n".to_vec(),
     ];
-    let mut roots = vec![repo().join("hints")];
+    let mut roots: Vec<PathBuf> = store_hints();
     roots.extend(profile("hints"));
     out.extend(fuzzkit::read_all(&fuzzkit::files_under(
         &roots,
@@ -154,7 +162,7 @@ fn learned_seeds() -> Vec<Vec<u8>> {
     let mut out = vec![
         b"flow when surface=rail ahead=rail-end kind=wood   # Level_01\ncareful speed 3 when surface=floor width=narrow curve=sharp module=P_Modul_25\n".to_vec(),
     ];
-    let mut roots = vec![repo().join("hints")];
+    let mut roots: Vec<PathBuf> = store_hints();
     roots.extend(profile("hints"));
     out.extend(
         fuzzkit::read_all(&fuzzkit::files_under(&roots, &["txt"], 40, 64 * 1024))
