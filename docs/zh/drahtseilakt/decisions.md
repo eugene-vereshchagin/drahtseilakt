@@ -301,7 +301,7 @@ Community picks、My maps），而是按含义，在经典和扩展模式下相�
 *记录于 2026-11-18；这一布局来自 2026-11-17（“git 中的二进制文件：基础数据”）。* 变化速度不同的三样东西分开发布：程序（每个版本
 `X.Y.Z` 一次发布，由 CI 构建；便携包和安装程序带有 toolbox 和基础数据）、基础数据（在 git 中，版本由 `scripts/DATA_VERSION` 标识）、
 13 张精选地图（单独的发布 `data-<DATA_VERSION>`，手动打包，因为 `level.bin` 超过 GitHub 单文件 100 MB 的限制）。这样更新程序
-只需重建二进制包。发布文件名固定、不含版本号，所以 `releases/latest/download/<文件名>` 总是最新的。哪个文件给谁用：
+只需重建二进制包。发布文件名保留版本号（方便人阅读）；网站通过 GitHub API（`releases/latest`）获取最新发布。哪个文件给谁用：
 `docs/zh/drahtseilakt/distribution.md`；构建和上传步骤：`docs/zh/drahtseilakt/release.md`。
 
 ## 回放和自动驾驶数据放在单独的开发者存储库

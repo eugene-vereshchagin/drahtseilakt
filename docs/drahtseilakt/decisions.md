@@ -527,8 +527,8 @@ system's opener only when the player asks. The game itself still has no network 
 different speeds are shipped apart: the program (a release per version `X.Y.Z`, built by CI; the portable archives and
 installers carry the toolbox and the base data), the base data (in git, versioned by `scripts/DATA_VERSION`), and the 13
 picked maps (their own release `data-<DATA_VERSION>`, packed by hand, because a `level.bin` is over GitHub's 100 MB file
-limit). A program update then rebuilds only the binary packages. Release files have stable names without the version, so
-`releases/latest/download/<name>` is always current. Which file is for whom: `docs/drahtseilakt/distribution.md`; the
+limit). A program update then rebuilds only the binary packages. Release file names keep the version (people read them); a site
+takes the newest release from the GitHub API (`releases/latest`). Which file is for whom: `docs/drahtseilakt/distribution.md`; the
 build and upload steps: `docs/drahtseilakt/release.md`.
 
 ## Replays and the autopilot's data live in a separate developers' store

@@ -482,7 +482,7 @@ unterschiedlich schnell ändern, werden getrennt ausgeliefert: das Programm (ein
 gebaut; die portablen Archive und Installer enthalten die Toolbox und die Basisdaten), die Basisdaten (in git, versioniert
 über `scripts/DATA_VERSION`) und die 13 ausgewählten Karten (ein eigenes Release `data-<DATA_VERSION>`, von Hand gepackt,
 weil ein `level.bin` über der 100-MB-Dateigrenze von GitHub liegt). Ein Programm-Update baut so nur die Binärpakete neu. Die
-Release-Dateien haben stabile Namen ohne Version, sodass `releases/latest/download/<Name>` immer aktuell ist. Welche
+Release-Dateien tragen die Version im Namen (Menschen lesen sie); eine Website holt das neueste Release über die GitHub-API (`releases/latest`). Welche
 Datei für wen: `docs/de/drahtseilakt/distribution.md`; Bauen und Hochladen: `docs/de/drahtseilakt/release.md`.
 
 ## Replays und die Daten des Autopiloten liegen in einem eigenen Entwicklerspeicher
