@@ -4,6 +4,19 @@ Satz Community-Karten sowie eigenen Klängen und eigener Musik (unsere 13 Liebli
 siehe [Level und Ordner](levels.md)). Wer das
 originale Ballance besitzt, kann zusätzlich dessen 13 Level aus der eigenen Kopie spielen.
 
+## Installation
+
+Laden Sie die Datei für Ihr System aus dem [neuesten Release](https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest):
+
+- **Windows**: der Installer `…-windows-x86_64-setup.exe` oder das portable `…-windows-x86_64.zip` (irgendwohin entpacken und `drahtseilakt.exe` starten). ARM-Rechner nehmen die `aarch64`-Dateien.
+- **macOS**: `…-macos-aarch64.dmg` (Apple Silicon) oder `…-macos-x86_64.dmg` (Intel). Das Spiel ist nicht signiert: beim ersten Mal mit der rechten Maustaste anklicken und *Öffnen* wählen.
+- **Linux**: das portable `…-linux-x86_64.tar.gz` (entpacken und `drahtseilakt` starten) oder die Pakete. Für die Paketinstallation braucht es zwei Dateien, das Programm und sein Datenpaket `drahtseilakt-data` (unsere Teile, Klänge, Mods, dieses Handbuch und die Community-Karten):
+  `sudo apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb` (Debian, Ubuntu) oder
+  `sudo dnf install ./drahtseilakt-data-*.noarch.rpm ./drahtseilakt-*.x86_64.rpm` (Fedora).
+- **FreeBSD** (experimentell): `…-freebsd-x86_64.tar.gz`.
+
+Installer und portable Archive enthalten schon alle Daten. Die 13 ausgewählten Karten sind ein eigener Download ([Level und Ordner](levels.md)).
+
 ## Wo anfangen
 
 1. Wählen Sie im Hauptmenü **Start** und dann **Community-Karten** (oder **Ausgewählte Karten**, wenn Sie sie heruntergeladen haben). Level aussuchen und los.
