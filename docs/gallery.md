@@ -6,8 +6,8 @@ All screenshots are taken from the game itself
 <script setup>
 const shots = [
   ["intro", "The intro"],
-  ["menu", "Main menu over the menu level"],
-  ["level-select", "Level selection"],
+  ["menu", "Main menu over the menu scene"],
+  ["level-select", "Start: the sets of levels"],
   ["options", "Options"],
   ["highscore", "Highscores"],
   ["tutorial", "Level 1: the tutorial"],

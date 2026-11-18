@@ -2,11 +2,16 @@
 
 ## Was mitgeliefert wird
 
-Zwei Kartensätze stecken im Spiel, Sie können also sofort losspielen:
+Ein Kartensatz kommt mit dem Spiel, Sie können also sofort losspielen:
 
-- **Ausgewählte Karten**: 13 von uns gewählte Karten von Community-Autoren, mit abgerundeten Formen und von uns verbesserten Texturen: nicht die, die der Autor ursprünglich verwendet hat.
-- **Community-Karten, Mitgeliefert**: 13 weitere Community-Karten in den Dateien, wie ihre Autoren sie gemacht haben, ohne die
-  Texturen des Originals, mit Namensnennung.
+- **Community-Karten, Mitgeliefert**: 13 Community-Karten in den Dateien, wie ihre Autoren sie gemacht haben, ohne die
+  Texturen des Originals, mit Namensnennung. Sie gehören zum Spiel.
+
+Ein zweiter Satz steckt **nicht** im Spiel, er ist ein eigener Download:
+
+- **Ausgewählte Karten**: 13 von uns gewählte Karten von Community-Autoren, mit abgerundeten Formen und von uns verbesserten Texturen: nicht die, die der Autor ursprünglich verwendet hat. Sie sind etwa 1,1 GB groß und darum ein eigener Download: auf der Release-Seite des Spiels das Release `data-<Datum>` (zum Beispiel `data-20261117`) mit einer `.zip` je Karte. Jede in den Spielordner `assets/levels/drahtseilakt/` entpacken. Unter Linux gibt es auch das Paket `drahtseilakt-levels` (`.deb` oder `.rpm`).
+
+Solange die ausgewählten Karten nicht installiert sind, öffnet sich *Ausgewählte Karten* im Startmenü mit nur einem Level, dem kleinen *Synthetischen Level*, das mit dem Spiel kommt (ein Testlevel mit allen Elementen des Spiels). Die 13 Karten fehlen einfach in der Liste; das Spiel beschwert sich nicht, und sonst fehlt nichts. Nach dem Entpacken erscheinen sie beim nächsten Start.
 
 Alle gehören ihren Autoren und werden mit Dank gezeigt. Bittet ein Autor darum, entfernen wir seine Karte.
 

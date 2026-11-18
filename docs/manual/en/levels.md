@@ -2,10 +2,15 @@
 
 ## What comes with the game
 
-Two sets of maps are inside the game, so you can play at once without anything else:
+The game itself brings one set of maps, so you can play at once without anything else:
 
-- **Featured maps**: 13 maps picked by us, from community authors, with rounded shapes and textures we improved: they are not the ones the author first used.
-- **Community maps, Included**: 13 more community maps in the files their authors made, without the original's textures, with their credits.
+- **Community maps, Included**: 13 community maps in the files their authors made, without the original's textures, with their credits. They come with the game.
+
+A second set is **not** inside the game; it is a separate download:
+
+- **Featured maps**: 13 maps picked by us, from community authors, with rounded shapes and textures we improved: they are not the ones the author first used. They are about 1.1 GB, so they are a download of their own: on the game's release page, the release called `data-<date>` (for example `data-20261117`), has one `.zip` per map. Unpack each into the game's folder `assets/levels/drahtseilakt/`. On Linux there is also the package `drahtseilakt-levels` (`.deb` or `.rpm`).
+
+Until the featured maps are installed, **Featured maps** in the Start menu opens with only one level, the small *Synthetic level* that comes with the game (a test level with every element of the game). The 13 picked maps are simply not in the list; the game does not complain and nothing else is missing. Once you unpack them, they appear at the next start.
 
 All of these belong to their authors and are shown with thanks. If an author asks us to remove a map, we do.
 

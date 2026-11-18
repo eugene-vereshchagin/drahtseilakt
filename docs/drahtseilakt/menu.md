@@ -128,7 +128,7 @@ development mod god-mode, [mods.md](mods.md), "God mode"). The menus keep the or
 - Texture packs and mods are here: the packs on the Textures and Models lines ([packs.md](packs.md)), the mods on the
   Mods screen ([mods.md](mods.md)), each behind its own switch; third-party content is played at the player's own
   risk.
-- **Long lists** (Start > My maps folder, mods, modified originals): Esc or Backspace (the pad's back button) leaves from any row; Back stays pinned under the list, with an "Esc: back" hint beside it. PageUp / PageDown move a page, Home / End jump to the first / last row, a held Up / Down repeats (after 0.35 s, 12 rows a second, 30 after a second more), the wheel scrolls, and a typed letter jumps to the next title starting with it. *Community picks* are the 13 maps shipped with the game (credited); *My maps folder* lists the maps you put in `levels/community/` of the game's data folder (its path is shown under the list).
+- **Long lists** (Start > Community maps > User levels, mods, modified originals): Esc or Backspace (the pad's back button) leaves from any row; Back stays pinned under the list, with an "Esc: back" hint beside it. PageUp / PageDown move a page, Home / End jump to the first / last row, a held Up / Down repeats (after 0.35 s, 12 rows a second, 30 after a second more), the wheel scrolls, and a typed letter jumps to the next title starting with it. *Included* are the 13 maps shipped with the game (credited); *User levels* lists the maps you put in `levels/community/` of the game's data folder (its path is shown under the list).
 
 
 ## Start, by meaning (owner's decision 2026-11-09)
@@ -138,12 +138,12 @@ and each submenu item says on the notes panel what it is and where it comes from
 
 | Item | Opens | Needs |
 |---|---|---|
-| *Featured maps* (ru «Избранные карты») | the owner's 13 picks of players' maps, brought into our open format, credited to their authors | |
+| *Featured maps* (ru «Избранные карты») | the owner's 13 picks of players' maps, brought into our open format, credited to their authors; a separate download (data release), so without it only the synthetic showcase level is listed | |
 | *Classic Ballance* (ru «Классический Ballance») | the 13 original levels of the player's copy, unlocking as in the original | a copy |
 | *Ballance Challenges* (ru «Испытания Ballance») | the original levels remade by the community: the camera turned 45 degrees, the way backwards, the road invisible (`levels/modified/`) | a copy and levels in the folder |
 | *Community maps* (ru «Карты сообщества») | a submenu | |
-| &nbsp;&nbsp;*Best* (ru «Лучшие») | the 13 community maps shipped with the game, with their authors and the thanks notice | |
-| &nbsp;&nbsp;*Downloaded* (ru «Скачанные») | the player's folder `levels/user-levels/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
+| &nbsp;&nbsp;*Included* (ru «В комплекте») | the 13 community maps shipped with the game, with their authors and the thanks notice | |
+| &nbsp;&nbsp;*User levels* (ru «Мои уровни») | the player's folder `levels/user-levels/` (its path is shown): community `.nmo` maps and open-format levels in one list, with those of the earlier folders `levels/community/` and `levels/open/`, which are still read | |
 
 The strings are in all seven languages. Start's order since 2026-11-11: the featured maps first, *Classic Ballance* second.
 

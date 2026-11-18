@@ -139,7 +139,7 @@ Entwicklungs-Mod god-mode bietet, [mods.md](mods.md), „Gottmodus“). Die Men�
 - Texturpakete und Mods sind hier: die Pakete in den Zeilen Textures und Models ([packs.md](packs.md)), die Mods auf
   dem Bildschirm Mods ([mods.md](mods.md)), jeweils hinter einem eigenen Schalter; Inhalte Dritter werden auf eigenes
   Risiko gespielt.
-- **Lange Listen** (Start > Mein Kartenordner, Mods, modifizierte Originale): Esc oder Backspace (die Zurück-Taste des Pads) verlässt jede Zeile; Back bleibt unter der Liste fest, daneben der Hinweis "Esc: zurück". PageUp / PageDown blättern eine Seite, Home / End springen zur ersten / letzten Zeile, gehaltenes Hoch / Runter wiederholt sich (nach 0,35 s, 12 Zeilen pro Sekunde, 30 nach einer weiteren Sekunde), das Rad scrollt, ein getippter Buchstabe springt zum nächsten Titel mit diesem Anfang. *Community-Auswahl* sind die 13 mitgelieferten Karten (mit Autoren); *Mein Kartenordner* zeigt die Karten aus `levels/community/` im Datenordner des Spiels (der Pfad steht unter der Liste).
+- **Lange Listen** (Start > Community-Karten > Eigene Level, Mods, modifizierte Originale): Esc oder Backspace (die Zurück-Taste des Pads) verlässt jede Zeile; Back bleibt unter der Liste fest, daneben der Hinweis "Esc: zurück". PageUp / PageDown blättern eine Seite, Home / End springen zur ersten / letzten Zeile, gehaltenes Hoch / Runter wiederholt sich (nach 0,35 s, 12 Zeilen pro Sekunde, 30 nach einer weiteren Sekunde), das Rad scrollt, ein getippter Buchstabe springt zum nächsten Titel mit diesem Anfang. *Mitgeliefert* sind die 13 mitgelieferten Karten (mit Autoren); *Eigene Level* zeigt die Karten aus `levels/community/` im Datenordner des Spiels (der Pfad steht unter der Liste).
 
 
 ## Start nach Bedeutung (Entscheidung des Besitzers 2026-11-09)
@@ -153,8 +153,8 @@ und Unterpunkt sagt im Hinweisfeld, was er ist und woher er kommt.
 | *Klassisches Ballance* (en *Classic Ballance*) | die 13 Original-Level der Kopie des Spielers, freigeschaltet wie im Original | eine Kopie |
 | *Ballance-Prüfungen* (en *Ballance Challenges*) | die Original-Level, von der Community umgebaut: Kamera um 45° gedreht, der Weg zurück, die Bahn unsichtbar (`levels/modified/`) | eine Kopie und Level im Ordner |
 | *Community-Karten* (en *Community maps*) | ein Untermenü | |
-| &nbsp;&nbsp;*Beste* (en *Best*) | die 13 mit dem Spiel gelieferten Community-Karten, mit Autoren und Dank | |
-| &nbsp;&nbsp;*Heruntergeladen* (en *Downloaded*) | der Ordner des Spielers `levels/user-levels/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
+| &nbsp;&nbsp;*Mitgeliefert* (en *Included*) | die 13 mit dem Spiel gelieferten Community-Karten, mit Autoren und Dank | |
+| &nbsp;&nbsp;*Eigene Level* (en *User levels*) | der Ordner des Spielers `levels/user-levels/` (sein Pfad wird gezeigt): Community-`.nmo`-Karten und Level im offenen Format in einer Liste, samt den früheren `levels/community/` und `levels/open/`, die weiter gelesen werden | |
 
 Die Texte gibt es in allen sieben Sprachen. Reihenfolge von Start seit 2026-11-11: zuerst die ausgewählten Karten, an zweiter Stelle *Klassisches Ballance*.
 
