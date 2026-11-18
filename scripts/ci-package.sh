@@ -37,8 +37,10 @@ LD_LIBRARY_PATH="$here/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec "$here/dra
 LAUNCHER
     chmod 755 "$out/drahtseilakt"
     mkdir -p "$out/lib/LICENSES"
+    # libcap only where the build host's libudev links it (Debian 12 yes, Ubuntu 22.04 no): bundled when ldd lists it
     for lib in libasound.so.2 libudev.so.1 libcap.so.2; do
         path=$(ldd "$GAME_BIN" | awk -v l="$lib" '$1 == l { print $3 }')
+        if [ "$lib" = libcap.so.2 ] && [ -z "$path" ]; then continue; fi
         [ -n "$path" ] && [ -f "$path" ] || die "$lib: not found by ldd for the game"
         real=$(readlink -f "$path")
         install -m 644 "$real" "$out/lib/$lib"
