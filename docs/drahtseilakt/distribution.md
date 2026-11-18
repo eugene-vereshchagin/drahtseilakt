@@ -42,26 +42,24 @@ The only level bound to the game in code is the showcase `00-Showcase`; all othe
 
 ## I want X: download Y
 
-Links give the newest release: `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<file>`
-(the files have no version in their names; it is in the tag and in the packages' metadata). Check a download against
-`SHA256SUMS` from the same release.
+The newest release is found through the GitHub API, not by a fixed link: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, then pick from `assets[]` the file whose `name` matches a pattern such as `drahtseilakt-*-windows-x86_64-setup.exe` and use its `browser_download_url`. The release page <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> always shows the newest. File names keep the version (`<version>` below; `<data-version>` for the data packages), so people can read it. Check a download against `SHA256SUMS` from the same release.
 
 | I want | Download |
 |---|---|
-| To play on Windows, installed (per user, no administrator, `%LOCALAPPDATA%\Programs\Drahtseilakt`) | `drahtseilakt-windows-x86_64-setup.exe` (ARM: `-aarch64-`) |
-| To play on Windows, nothing installed | `drahtseilakt-windows-x86_64.zip` (ARM: `-aarch64`) |
-| To play on Linux without installing | `drahtseilakt-linux-x86_64.tar.gz` (ARM: `-aarch64`) |
-| Debian / Ubuntu packages | `drahtseilakt_amd64.deb` + `drahtseilakt-data_all.deb` (ARM: `drahtseilakt_arm64.deb`) |
-| Fedora / openSUSE packages | `drahtseilakt.x86_64.rpm` + `drahtseilakt-data.noarch.rpm` (ARM: `drahtseilakt.aarch64.rpm`) |
-| To play on macOS | `drahtseilakt-macos-aarch64.dmg` (Apple silicon) or `drahtseilakt-macos-x86_64.dmg` (Intel); unsigned: the first start needs right-click, Open. `.tar.gz` with the same names is the portable form |
-| FreeBSD (experimental) | `drahtseilakt-freebsd-x86_64.tar.gz` |
+| To play on Windows, installed (per user, no administrator, `%LOCALAPPDATA%\Programs\Drahtseilakt`) | `drahtseilakt-<version>-windows-x86_64-setup.exe` (ARM: `-aarch64-`) |
+| To play on Windows, nothing installed | `drahtseilakt-<version>-windows-x86_64.zip` (ARM: `-aarch64`) |
+| To play on Linux without installing | `drahtseilakt-<version>-linux-x86_64.tar.gz` (ARM: `-aarch64`) |
+| Debian / Ubuntu packages | `drahtseilakt_<version>-1_amd64.deb` + `drahtseilakt-data_<data-version>-1_all.deb` (ARM: `drahtseilakt_<version>-1_arm64.deb`) |
+| Fedora / openSUSE packages | `drahtseilakt-<version>-1.x86_64.rpm` + `drahtseilakt-data-<data-version>-1.noarch.rpm` (ARM: `drahtseilakt-<version>-1.aarch64.rpm`) |
+| To play on macOS | `drahtseilakt-<version>-macos-aarch64.dmg` (Apple silicon) or `drahtseilakt-<version>-macos-x86_64.dmg` (Intel); unsigned: the first start needs right-click, Open. `.tar.gz` with the same names is the portable form |
+| FreeBSD (experimental) | `drahtseilakt-<version>-freebsd-x86_64.tar.gz` |
 | The toolbox | inside every portable archive and installer; or its own releases: [drahtseilakt-toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox/releases) |
 | The 13 picked maps | the data release `data-<DATA_VERSION>`: one `.zip` per map (unpack into `assets/levels/drahtseilakt/`), or on Linux `drahtseilakt-levels` (`.deb`/`.rpm`) |
 | The original Ballance levels | not downloadable from us: the toolbox imports them from your own copy |
 | To try the newest unreleased code | build it ([README](https://github.com/eugene-vereshchagin/drahtseilakt#readme)) or take a workflow run's artifacts (`git-<sha>` builds, packages `0~git<sha>`) |
 
 The portable archives and installers include the base data, so they play at once; the Linux packages need the data
-package beside the program (`apt install ./drahtseilakt-data_all.deb ./drahtseilakt_amd64.deb`).
+package beside the program (`apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb`).
 The exact file list of a release and the install lines are in [release.md](release.md).
 
 ## Where things live
@@ -75,7 +73,7 @@ The exact file list of a release and the install lines are in [release.md](relea
 | `docs/manual/<lang>/` | the player's manual; `tools/make_manual.py` builds it into `assets/manual`, which is not in git: CI makes it (`scripts/ci-assets.sh`), and the game opens it with F1 |
 | `scripts/` | packaging for the release (`ci-package.sh`, `make-distro-packages.sh`, `pack-assets.sh`, `DATA_VERSION`) |
 | `.github/workflows/` | CI: tests (`drahtseilakt.yml`) and the release (`drahtseilakt-release.yml`); both run on demand |
-| `docs/guide/`, `docs/howto/`, `docs/*.md` in the root | upstream OpenBallance's notes and reverse-engineering references, kept as reference |
+| `docs/internals/`, `docs/*.md` in the root | upstream OpenBallance's notes and reverse-engineering references, kept as reference |
 
 ## Rules for contributors
 

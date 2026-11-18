@@ -85,7 +85,7 @@ Actions -> «Drahtseilakt release» -> Run workflow (файлы — артефа
 создаёт **черновик** релиза с файлами ниже и `SHA256SUMS` (без уровней). Параметр `dev` добавляет
 dev-вариант (в релиз не попадает никогда). Push в ветку ничего не запускает.
 
-**У ресурсов релиза стабильные имена**: при выпуске релиза по тегу версия вырезается из имён файлов (и версия данных из имён пакетов данных: `drahtseilakt_amd64.deb`, `drahtseilakt.x86_64.rpm`, `drahtseilakt-data_all.deb`, `drahtseilakt-windows-x86_64-setup.exe`), поэтому `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<имя>` всегда отдаёт самый свежий релиз; версия остаётся в теге, заголовке и метаданных пакетов. Артефакты запусков сохраняют имена с `<V>`, как ниже. Какой файл кому: [distribution.md](distribution.md).
+**В именах файлов релиза остаётся версия** (люди их читают): релиз по тегу публикует файлы ниже как есть, например `drahtseilakt-0.1.0-windows-x86_64-setup.exe`, `drahtseilakt_0.1.0-1_amd64.deb`. Скрипт или сайт берёт самый свежий релиз через API (`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`), выбирает в `assets[]` файл, чьё `name` подходит под шаблон, например `drahtseilakt-*-windows-x86_64-setup.exe`, и использует его `browser_download_url`; в браузере самый свежий показывает <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest>. Избранные карты лежат в релизе с тегом `data-<DATA_VERSION>`, а не в «latest». Какой файл кому: [distribution.md](distribution.md).
 
 Где `<V>` — тег (или `git-<sha>` вне тега), делаются такие файлы:
 

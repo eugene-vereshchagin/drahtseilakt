@@ -23,8 +23,7 @@ Drahtseilakt 是 **Ballance**（Cyparade / Atari，2004）的一个新引擎，�
 
 每次发布都包含 Windows、Linux 和 macOS 的安装程序和便携压缩包（FreeBSD 为实验性）、Linux 的 `.deb`/`.rpm` 软件包，
 [toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox) 包含在便携包和安装程序中。13 张精选地图是单独的下载，
-很少变化。文件名固定，所以 `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<文件名>`
-总是指向最新版本。哪个文件给谁用、为什么这样拆分下载：[distribution.md](docs/zh/drahtseilakt/distribution.md)；
+很少变化。文件名保留版本号。最新发布：`https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest`；脚本通过 API 获取（`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`，再在 `assets[]` 中选 `name` 符合如 `drahtseilakt-*-windows-x86_64-setup.exe` 的文件，用它的 `browser_download_url`）。哪个文件给谁用、为什么这样拆分下载：[distribution.md](docs/zh/drahtseilakt/distribution.md)；
 确切的文件列表和安装命令：[release.md](docs/zh/drahtseilakt/release.md)。
 
 ## 构建与游玩

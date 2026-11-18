@@ -28,8 +28,7 @@ Drahtseilakt — новый движок для **Ballance** (Cyparade / Atari, 
 
 В каждом релизе есть установщики и портативные архивы для Windows, Linux и macOS (FreeBSD — экспериментально), пакеты
 `.deb`/`.rpm` для Linux, а [toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox) входит в портативные
-архивы и установщики. 13 избранных карт — отдельная загрузка, которая меняется редко. У файлов постоянные имена, поэтому
-`https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<файл>` всегда ведёт на самый свежий. Какой
+архивы и установщики. 13 избранных карт — отдельная загрузка, которая меняется редко. В именах файлов остаётся версия. Самый свежий релиз: `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest`; скрипт берёт его из API (`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, затем файл из `assets[]`, чьё `name` подходит, например, под `drahtseilakt-*-windows-x86_64-setup.exe`, и его `browser_download_url`). Какой
 файл кому нужен и почему загрузки разделены: [distribution.md](docs/ru/drahtseilakt/distribution.md); точный список и
 строки установки: [release.md](docs/ru/drahtseilakt/release.md).
 

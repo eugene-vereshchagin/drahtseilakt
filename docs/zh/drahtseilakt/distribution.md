@@ -36,25 +36,24 @@ Drahtseilakt 由三部分组成，它们变化的速度不同，所以分开发�
 
 ## 我想要 X：下载 Y
 
-下面的链接总是指向最新发布：`https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<文件名>`
-（文件名中没有版本号，版本在标签和包的元数据中）。请用同一发布中的 `SHA256SUMS` 校验下载。
+最新发布通过 GitHub API 查找，而不是固定链接：`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`，然后在 `assets[]` 中选出 `name` 符合模式（如 `drahtseilakt-*-windows-x86_64-setup.exe`）的文件，使用它的 `browser_download_url`。页面 <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> 始终显示最新发布。文件名保留版本号（下文 `<version>`；数据包用 `<data-version>`），方便阅读。请用同一发布中的 `SHA256SUMS` 校验下载。
 
 | 我想要 | 下载 |
 |---|---|
-| 在 Windows 上安装后游玩（按用户安装，无需管理员，`%LOCALAPPDATA%\Programs\Drahtseilakt`） | `drahtseilakt-windows-x86_64-setup.exe`（ARM：`-aarch64-`） |
-| 在 Windows 上免安装游玩 | `drahtseilakt-windows-x86_64.zip`（ARM：`-aarch64`） |
-| 在 Linux 上免安装游玩 | `drahtseilakt-linux-x86_64.tar.gz`（ARM：`-aarch64`） |
-| Debian / Ubuntu 软件包 | `drahtseilakt_amd64.deb` + `drahtseilakt-data_all.deb`（ARM：`drahtseilakt_arm64.deb`） |
-| Fedora / openSUSE 软件包 | `drahtseilakt.x86_64.rpm` + `drahtseilakt-data.noarch.rpm`（ARM：`drahtseilakt.aarch64.rpm`） |
-| 在 macOS 上游玩 | `drahtseilakt-macos-aarch64.dmg`（Apple 芯片）或 `drahtseilakt-macos-x86_64.dmg`（Intel）；未签名：首次启动需右键点击并选“打开”。同名的 `.tar.gz` 是便携形式 |
-| FreeBSD（实验性） | `drahtseilakt-freebsd-x86_64.tar.gz` |
+| 在 Windows 上安装后游玩（按用户安装，无需管理员，`%LOCALAPPDATA%\Programs\Drahtseilakt`） | `drahtseilakt-<version>-windows-x86_64-setup.exe`（ARM：`-aarch64-`） |
+| 在 Windows 上免安装游玩 | `drahtseilakt-<version>-windows-x86_64.zip`（ARM：`-aarch64`） |
+| 在 Linux 上免安装游玩 | `drahtseilakt-<version>-linux-x86_64.tar.gz`（ARM：`-aarch64`） |
+| Debian / Ubuntu 软件包 | `drahtseilakt_<version>-1_amd64.deb` + `drahtseilakt-data_<data-version>-1_all.deb`（ARM：`drahtseilakt_<version>-1_arm64.deb`） |
+| Fedora / openSUSE 软件包 | `drahtseilakt-<version>-1.x86_64.rpm` + `drahtseilakt-data-<data-version>-1.noarch.rpm`（ARM：`drahtseilakt-<version>-1.aarch64.rpm`） |
+| 在 macOS 上游玩 | `drahtseilakt-<version>-macos-aarch64.dmg`（Apple 芯片）或 `drahtseilakt-<version>-macos-x86_64.dmg`（Intel）；未签名：首次启动需右键点击并选“打开”。同名的 `.tar.gz` 是便携形式 |
+| FreeBSD（实验性） | `drahtseilakt-<version>-freebsd-x86_64.tar.gz` |
 | toolbox | 包含在每个便携包和安装程序里；或到它自己的发布页：[drahtseilakt-toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox/releases) |
 | 13 张精选地图 | 数据发布 `data-<DATA_VERSION>`：每张地图一个 `.zip`（解压到 `assets/levels/drahtseilakt/`），Linux 上可用 `drahtseilakt-levels`（`.deb`/`.rpm`） |
 | 原版 Ballance 的关卡 | 我们不提供下载：toolbox 会从你自己的拷贝中导入 |
 | 试用最新的未发布代码 | 自己构建（见 [README](https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/README.zh.md)），或取工作流运行的产物（`git-<sha>` 构建，软件包版本 `0~git<sha>`） |
 
 便携包和安装程序包含基础数据，可直接游玩；Linux 软件包需要数据包与程序一起安装
-（`apt install ./drahtseilakt-data_all.deb ./drahtseilakt_amd64.deb`）。一次发布的完整文件列表和安装命令见 [release.md](release.md)。
+（`apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb`）。一次发布的完整文件列表和安装命令见 [release.md](release.md)。
 
 ## 东西放在哪里
 
@@ -67,7 +66,7 @@ Drahtseilakt 由三部分组成，它们变化的速度不同，所以分开发�
 | `docs/manual/<语言>/` | 玩家手册；`tools/make_manual.py` 将其生成到 `assets/manual`（不在 git 中，由 CI 生成：`scripts/ci-assets.sh`），游戏按 F1 打开 |
 | `scripts/` | 发布打包（`ci-package.sh`、`make-distro-packages.sh`、`pack-assets.sh`、`DATA_VERSION`） |
 | `.github/workflows/` | CI：测试（`drahtseilakt.yml`）和发布（`drahtseilakt-release.yml`）；都按需运行 |
-| `docs/guide/`、`docs/howto/`、根目录的 `docs/*.md` | 上游 OpenBallance 的笔记和逆向工程资料，作为参考保留 |
+| `docs/internals/`、根目录的 `docs/*.md` | 上游 OpenBallance 的笔记和逆向工程资料，作为参考保留 |
 
 ## 贡献者须遵守的规则
 

@@ -46,26 +46,24 @@ Ordnern ([levels.md](levels.md)).
 
 ## Ich will X: lade Y herunter
 
-Die Links liefern das neueste Release: `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<Datei>`
-(die Dateinamen enthalten keine Version; sie steht im Tag und in den Paket-Metadaten). Prüfen Sie einen Download gegen
-`SHA256SUMS` aus demselben Release.
+Das neueste Release findet man über die GitHub-API, nicht über einen festen Link: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, dann aus `assets[]` die Datei wählen, deren `name` zu einem Muster wie `drahtseilakt-*-windows-x86_64-setup.exe` passt, und ihre `browser_download_url` verwenden. Die Seite <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> zeigt immer das neueste Release. Die Dateinamen behalten die Version (unten `<version>`; `<data-version>` bei den Datenpaketen), damit man sie lesen kann. Prüfen Sie einen Download gegen `SHA256SUMS` aus demselben Release.
 
 | Ich will | Herunterladen |
 |---|---|
-| Unter Windows spielen, installiert (pro Benutzer, ohne Administrator, `%LOCALAPPDATA%\Programs\Drahtseilakt`) | `drahtseilakt-windows-x86_64-setup.exe` (ARM: `-aarch64-`) |
-| Unter Windows spielen, ohne Installation | `drahtseilakt-windows-x86_64.zip` (ARM: `-aarch64`) |
-| Unter Linux spielen, ohne Installation | `drahtseilakt-linux-x86_64.tar.gz` (ARM: `-aarch64`) |
-| Pakete für Debian / Ubuntu | `drahtseilakt_amd64.deb` + `drahtseilakt-data_all.deb` (ARM: `drahtseilakt_arm64.deb`) |
-| Pakete für Fedora / openSUSE | `drahtseilakt.x86_64.rpm` + `drahtseilakt-data.noarch.rpm` (ARM: `drahtseilakt.aarch64.rpm`) |
-| Unter macOS spielen | `drahtseilakt-macos-aarch64.dmg` (Apple Silicon) oder `drahtseilakt-macos-x86_64.dmg` (Intel); unsigniert: beim ersten Start Rechtsklick, Öffnen. Die `.tar.gz` mit denselben Namen ist die portable Form |
-| FreeBSD (experimentell) | `drahtseilakt-freebsd-x86_64.tar.gz` |
+| Unter Windows spielen, installiert (pro Benutzer, ohne Administrator, `%LOCALAPPDATA%\Programs\Drahtseilakt`) | `drahtseilakt-<version>-windows-x86_64-setup.exe` (ARM: `-aarch64-`) |
+| Unter Windows spielen, ohne Installation | `drahtseilakt-<version>-windows-x86_64.zip` (ARM: `-aarch64`) |
+| Unter Linux spielen, ohne Installation | `drahtseilakt-<version>-linux-x86_64.tar.gz` (ARM: `-aarch64`) |
+| Pakete für Debian / Ubuntu | `drahtseilakt_<version>-1_amd64.deb` + `drahtseilakt-data_<data-version>-1_all.deb` (ARM: `drahtseilakt_<version>-1_arm64.deb`) |
+| Pakete für Fedora / openSUSE | `drahtseilakt-<version>-1.x86_64.rpm` + `drahtseilakt-data-<data-version>-1.noarch.rpm` (ARM: `drahtseilakt-<version>-1.aarch64.rpm`) |
+| Unter macOS spielen | `drahtseilakt-<version>-macos-aarch64.dmg` (Apple Silicon) oder `drahtseilakt-<version>-macos-x86_64.dmg` (Intel); unsigniert: beim ersten Start Rechtsklick, Öffnen. Die `.tar.gz` mit denselben Namen ist die portable Form |
+| FreeBSD (experimentell) | `drahtseilakt-<version>-freebsd-x86_64.tar.gz` |
 | Die Toolbox | in jedem portablen Archiv und Installer enthalten; oder in ihren eigenen Releases: [drahtseilakt-toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox/releases) |
 | Die 13 ausgewählten Karten | das Daten-Release `data-<DATA_VERSION>`: eine `.zip` je Karte (nach `assets/levels/drahtseilakt/` entpacken), unter Linux `drahtseilakt-levels` (`.deb`/`.rpm`) |
 | Die Original-Levels von Ballance | von uns nicht herunterladbar: die Toolbox importiert sie aus Ihrer eigenen Kopie |
 | Den neuesten unveröffentlichten Code ausprobieren | selbst bauen ([README](https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/README.de.md)) oder die Artefakte eines Workflow-Laufs nehmen (`git-<sha>`-Builds, Pakete `0~git<sha>`) |
 
 Die portablen Archive und Installer enthalten die Basisdaten und laufen sofort; die Linux-Pakete brauchen das Datenpaket
-neben dem Programm (`apt install ./drahtseilakt-data_all.deb ./drahtseilakt_amd64.deb`). Die genaue Dateiliste eines Releases
+neben dem Programm (`apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb`). Die genaue Dateiliste eines Releases
 und die Installationszeilen stehen in [release.md](release.md).
 
 ## Wo was liegt
@@ -79,7 +77,7 @@ und die Installationszeilen stehen in [release.md](release.md).
 | `docs/manual/<Sprache>/` | das Handbuch für Spieler; `tools/make_manual.py` baut es nach `assets/manual`, das nicht in git liegt: die CI erzeugt es (`scripts/ci-assets.sh`), und das Spiel öffnet es mit F1 |
 | `scripts/` | das Verpacken des Releases (`ci-package.sh`, `make-distro-packages.sh`, `pack-assets.sh`, `DATA_VERSION`) |
 | `.github/workflows/` | CI: Tests (`drahtseilakt.yml`) und Release (`drahtseilakt-release.yml`); beide laufen auf Anforderung |
-| `docs/guide/`, `docs/howto/`, `docs/*.md` im Wurzelverzeichnis | Notizen und Reverse-Engineering-Referenzen aus dem Upstream OpenBallance, als Referenz behalten |
+| `docs/internals/`, `docs/*.md` im Wurzelverzeichnis | Notizen und Reverse-Engineering-Referenzen aus dem Upstream OpenBallance, als Referenz behalten |
 
 ## Regeln für Mitwirkende
 

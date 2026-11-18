@@ -1,7 +1,7 @@
 # Gallery
 
-All screenshots are taken from OpenBallance itself, with the gasm headless runner
-(see [Headless runs and screenshots](/howto/headless)).
+All screenshots are taken from the game itself
+(headless runs of the game).
 
 <script setup>
 const shots = [

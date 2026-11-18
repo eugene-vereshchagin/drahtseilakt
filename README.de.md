@@ -29,9 +29,7 @@ die Downloads unten Entwürfe oder CI-Builds.
 
 Jedes Release enthält Installer und portable Archive für Windows, Linux und macOS (FreeBSD experimentell), `.deb`-/`.rpm`-Pakete
 für Linux, und die [Toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox) steckt in den portablen
-Archiven und Installern. Die 13 ausgewählten Karten sind ein eigener Download, der sich selten ändert. Die Dateien haben
-stabile Namen, sodass `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<Datei>` immer das
-neueste liefert. Welche Datei für wen ist und warum die Downloads so aufgeteilt sind:
+Archiven und Installern. Die 13 ausgewählten Karten sind ein eigener Download, der sich selten ändert. Die Dateinamen behalten die Version. Das neueste Release: `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest`; ein Skript holt es über die API (`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, dann die Datei aus `assets[]`, deren `name` z. B. zu `drahtseilakt-*-windows-x86_64-setup.exe` passt, und ihre `browser_download_url`). Welche Datei für wen ist und warum die Downloads so aufgeteilt sind:
 [distribution.md](docs/de/drahtseilakt/distribution.md); die genaue Liste und die Installationszeilen:
 [release.md](docs/de/drahtseilakt/release.md).
 

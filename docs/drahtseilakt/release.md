@@ -84,7 +84,7 @@ Actions -> "Drahtseilakt release" -> Run workflow (the files are run artifacts),
 makes a **draft** release with the files below and `SHA256SUMS` (not the levels). The input `dev` adds the dev
 flavour (never in a release). Nothing runs on a push to a branch.
 
-**Release assets have stable names**: when a tag release is made, the version is cut out of the file names (and the data version out of the data packages': `drahtseilakt_amd64.deb`, `drahtseilakt.x86_64.rpm`, `drahtseilakt-data_all.deb`, `drahtseilakt-windows-x86_64-setup.exe`), so `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<name>` always gives the newest release; the version stays in the tag, the title and the packages' metadata. Run artifacts keep the `<V>` names below. Which file for whom: [distribution.md](distribution.md).
+**Release file names keep the version** (people read them): a tag release publishes the files below as they are, e.g. `drahtseilakt-0.1.0-windows-x86_64-setup.exe`, `drahtseilakt_0.1.0-1_amd64.deb`. A script or a site takes the newest release from the API (`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`), picks from `assets[]` the file whose `name` matches a pattern such as `drahtseilakt-*-windows-x86_64-setup.exe` and uses its `browser_download_url`; <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> shows the newest in a browser. The picked maps are in the release tagged `data-<DATA_VERSION>`, not in "latest". Which file for whom: [distribution.md](distribution.md).
 
 With `<V>` the tag (or `git-<sha>` outside a tag), these files are made:
 

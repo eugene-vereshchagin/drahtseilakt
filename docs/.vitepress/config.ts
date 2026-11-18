@@ -1,14 +1,11 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "OpenBallance",
-  description: "A faithful reimplementation of Ballance (2004): the original Virtools scripts on a new runtime, using the data from your own CD.",
+  title: "Drahtseilakt",
+  description: "A new native engine for Ballance (2004), written in Rust: your own copy of the game and community maps on Linux, Windows and macOS.",
   cleanUrls: true,
   lastUpdated: true,
   srcExclude: ["README.md", "AGENTS.md"],
-  sitemap: { hostname: "https://openballance.emdzej.pl" },
-  // The browser player is a static page in public/play/, not a Markdown page.
-  ignoreDeadLinks: [/^\/play\//],
 
   // English is the root locale; every other language mirrors the same paths under /<lang>/ (see CLAUDE.md).
   locales: {
@@ -21,7 +18,7 @@ export default defineConfig({
         nav: [
           { text: "План работ", link: "/ru/drahtseilakt/roadmap" },
           { text: "Решения", link: "/ru/drahtseilakt/decisions" },
-          { text: "Документация (англ.)", link: "/guide/" },
+          { text: "Заметки об устройстве (англ.)", link: "/internals/" },
         ],
         sidebar: {
           "/ru/": [
@@ -70,7 +67,7 @@ export default defineConfig({
         nav: [
           { text: "Fahrplan", link: "/de/drahtseilakt/roadmap" },
           { text: "Entscheidungen", link: "/de/drahtseilakt/decisions" },
-          { text: "Dokumentation (engl.)", link: "/guide/" },
+          { text: "Notizen zum Aufbau (engl.)", link: "/internals/" },
         ],
         sidebar: {
           "/de/": [
@@ -119,7 +116,7 @@ export default defineConfig({
         nav: [
           { text: "路线图", link: "/zh/drahtseilakt/roadmap" },
           { text: "决定", link: "/zh/drahtseilakt/decisions" },
-          { text: "文档（英文）", link: "/guide/" },
+          { text: "内部笔记（英文）", link: "/internals/" },
         ],
         sidebar: {
           "/zh/": [
@@ -166,58 +163,25 @@ export default defineConfig({
     ["link", { rel: "icon", href: "/favicon.ico", sizes: "any" }],
     ["link", { rel: "icon", href: "/favicon-32.png", type: "image/png", sizes: "32x32" }],
     ["meta", { name: "theme-color", content: "#e8835a" }],
-    ["meta", { property: "og:title", content: "OpenBallance: Ballance, rolling again" }],
-    ["meta", { property: "og:description", content: "A faithful reimplementation of Ballance: the original game scripts on a new Virtools-compatible runtime with a port of its physics engine. Runs on gasm, natively and in the browser." }],
-    ["meta", { property: "og:image", content: "https://openballance.emdzej.pl/screenshots/level01.jpg" }],
-    ["meta", { property: "og:url", content: "https://openballance.emdzej.pl/" }],
   ],
 
   themeConfig: {
-    siteTitle: "OpenBallance",
+    siteTitle: "Drahtseilakt",
     logo: "/favicon-32.png",
 
     nav: [
-      { text: "User guide", link: "/guide/", activeMatch: "/guide/" },
-      { text: "How-tos", link: "/howto/build-from-source", activeMatch: "/howto/" },
+      { text: "Roadmap", link: "/drahtseilakt/roadmap" },
+      { text: "Distribution", link: "/drahtseilakt/distribution" },
+      { text: "Manual", link: "/manual/en/" },
       {
         text: "Internals",
         link: "/internals/",
         activeMatch: "/(internals|ck-runtime|gameplay_bbs|fonts|sky|animation|particles|physics|ivp_)",
       },
       { text: "Gallery", link: "/gallery" },
-      // A static app in docs/public/play/: target _self makes it a full page load, not a VitePress route.
-      { text: "Play", link: "/play/", target: "_self" },
     ],
 
     sidebar: {
-      "/guide/": [
-        {
-          text: "User guide",
-          items: [
-            { text: "Introduction", link: "/guide/" },
-            { text: "Status and compatibility", link: "/guide/status" },
-            { text: "Installing", link: "/guide/install" },
-            { text: "Game data", link: "/guide/game-data" },
-            { text: "Running on gasm", link: "/guide/running" },
-            { text: "Playing in the browser", link: "/guide/browser" },
-            { text: "Controls", link: "/guide/controls" },
-            { text: "Launch parameters", link: "/guide/parameters" },
-            { text: "Troubleshooting", link: "/guide/troubleshooting" },
-          ],
-        },
-      ],
-      "/howto/": [
-        {
-          text: "How-tos",
-          items: [
-            { text: "Build from source", link: "/howto/build-from-source" },
-            { text: "Run the tests", link: "/howto/tests" },
-            { text: "Headless runs and screenshots", link: "/howto/headless" },
-            { text: "Make a release", link: "/howto/release" },
-            { text: "Reverse-engineering workflow", link: "/howto/reverse-engineering" },
-          ],
-        },
-      ],
       "/": [
         {
           text: "Drahtseilakt",
@@ -276,16 +240,16 @@ export default defineConfig({
           text: "Design records",
           items: [
             { text: "Initial analysis", link: "/internals/analysis" },
-            { text: "gasm gfx requirements", link: "/internals/gasm-gfx-requirements" },
+            { text: "gasm gfx requirements (upstream)", link: "/internals/gasm-gfx-requirements" },
           ],
         },
       ],
     },
 
-    socialLinks: [{ icon: "github", link: "https://github.com/emdzej/openballance" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/eugene-vereshchagin/drahtseilakt" }],
 
     editLink: {
-      pattern: "https://github.com/emdzej/openballance/edit/main/docs/:path",
+      pattern: "https://github.com/eugene-vereshchagin/drahtseilakt/edit/main/docs/:path",
       text: "Edit this page on GitHub",
     },
 
@@ -295,7 +259,7 @@ export default defineConfig({
 
     footer: {
       message:
-        "OpenBallance is released under the GPL-3.0. Ballance is © 2004 Cyparade / Atari. OpenBallance contains no original code or assets: it runs the game from your own copy. It runs on <a href=\"https://gasm.emdzej.pl\">gasm</a>.",
+        "Drahtseilakt is released under the GPL-3.0. It began as a fork of <a href=\"https://github.com/emdzej/openballance\">OpenBallance</a> by emdzej. Ballance is © 2004 Cyparade / Atari; no original code or assets are shipped: the game runs from your own copy.",
     },
   },
 });

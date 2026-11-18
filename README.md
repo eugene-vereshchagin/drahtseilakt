@@ -28,8 +28,7 @@ owner only; until then the downloads below are drafts or CI builds.
 
 Every release has installers and portable archives for Windows, Linux and macOS (FreeBSD experimental), Linux
 `.deb`/`.rpm` packages, and the [toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox) inside the
-portable archives and installers. The 13 picked maps are a separate download that rarely changes. Files have stable
-names, so `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<file>` is always the newest.
+portable archives and installers. The 13 picked maps are a separate download that rarely changes. File names keep the version. The newest release is `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest`; a script takes it from the API (`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, then the `assets[]` file whose `name` matches e.g. `drahtseilakt-*-windows-x86_64-setup.exe`, and its `browser_download_url`).
 Which file is for whom, and why the downloads are split like this: [distribution.md](docs/drahtseilakt/distribution.md);
 the exact list and install lines: [release.md](docs/drahtseilakt/release.md).
 

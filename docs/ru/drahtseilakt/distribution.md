@@ -44,25 +44,24 @@ Drahtseilakt состоит из трёх частей, которые меня�
 
 ## Я хочу X: скачать Y
 
-Ссылки ведут на самый свежий релиз: `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<файл>`
-(в именах файлов нет версии: она в теге и в метаданных пакетов). Сверяйте загрузку с `SHA256SUMS` из того же релиза.
+Самый свежий релиз находят через GitHub API, а не по фиксированной ссылке: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, затем в `assets[]` берут файл, чьё `name` подходит под шаблон, например `drahtseilakt-*-windows-x86_64-setup.exe`, и используют его `browser_download_url`. Страница <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> всегда показывает самый свежий релиз. В именах файлов версия остаётся (ниже `<version>`; `<data-version>` у пакетов данных), чтобы её было видно. Сверяйте загрузку с `SHA256SUMS` из того же релиза.
 
 | Я хочу | Скачать |
 |---|---|
-| Играть в Windows с установкой (для одного пользователя, без прав администратора, `%LOCALAPPDATA%\Programs\Drahtseilakt`) | `drahtseilakt-windows-x86_64-setup.exe` (ARM: `-aarch64-`) |
-| Играть в Windows без установки | `drahtseilakt-windows-x86_64.zip` (ARM: `-aarch64`) |
-| Играть в Linux без установки | `drahtseilakt-linux-x86_64.tar.gz` (ARM: `-aarch64`) |
-| Пакеты Debian / Ubuntu | `drahtseilakt_amd64.deb` + `drahtseilakt-data_all.deb` (ARM: `drahtseilakt_arm64.deb`) |
-| Пакеты Fedora / openSUSE | `drahtseilakt.x86_64.rpm` + `drahtseilakt-data.noarch.rpm` (ARM: `drahtseilakt.aarch64.rpm`) |
-| Играть в macOS | `drahtseilakt-macos-aarch64.dmg` (Apple silicon) или `drahtseilakt-macos-x86_64.dmg` (Intel); без подписи: при первом запуске — правый клик, «Открыть». `.tar.gz` с теми же именами — портативный вариант |
-| FreeBSD (экспериментально) | `drahtseilakt-freebsd-x86_64.tar.gz` |
+| Играть в Windows с установкой (для одного пользователя, без прав администратора, `%LOCALAPPDATA%\Programs\Drahtseilakt`) | `drahtseilakt-<version>-windows-x86_64-setup.exe` (ARM: `-aarch64-`) |
+| Играть в Windows без установки | `drahtseilakt-<version>-windows-x86_64.zip` (ARM: `-aarch64`) |
+| Играть в Linux без установки | `drahtseilakt-<version>-linux-x86_64.tar.gz` (ARM: `-aarch64`) |
+| Пакеты Debian / Ubuntu | `drahtseilakt_<version>-1_amd64.deb` + `drahtseilakt-data_<data-version>-1_all.deb` (ARM: `drahtseilakt_<version>-1_arm64.deb`) |
+| Пакеты Fedora / openSUSE | `drahtseilakt-<version>-1.x86_64.rpm` + `drahtseilakt-data-<data-version>-1.noarch.rpm` (ARM: `drahtseilakt-<version>-1.aarch64.rpm`) |
+| Играть в macOS | `drahtseilakt-<version>-macos-aarch64.dmg` (Apple silicon) или `drahtseilakt-<version>-macos-x86_64.dmg` (Intel); без подписи: при первом запуске — правый клик, «Открыть». `.tar.gz` с теми же именами — портативный вариант |
+| FreeBSD (экспериментально) | `drahtseilakt-<version>-freebsd-x86_64.tar.gz` |
 | Toolbox | внутри каждого портативного архива и установщика; или его собственные релизы: [drahtseilakt-toolbox](https://github.com/eugene-vereshchagin/drahtseilakt-toolbox/releases) |
 | 13 выбранных карт | релиз данных `data-<DATA_VERSION>`: по одному `.zip` на карту (распаковать в `assets/levels/drahtseilakt/`), а в Linux — `drahtseilakt-levels` (`.deb`/`.rpm`) |
 | Оригинальные уровни Ballance | у нас не скачать: toolbox импортирует их из вашей собственной копии |
 | Попробовать самый свежий невыпущенный код | собрать самому ([README](https://github.com/eugene-vereshchagin/drahtseilakt/blob/main/README.ru.md)) или взять артефакты запуска workflow (сборки `git-<sha>`, пакеты `0~git<sha>`) |
 
 Портативные архивы и установщики содержат базовые данные, поэтому играть можно сразу; пакетам Linux нужен пакет с данными
-рядом с программой (`apt install ./drahtseilakt-data_all.deb ./drahtseilakt_amd64.deb`). Точный список файлов релиза и строки
+рядом с программой (`apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb`). Точный список файлов релиза и строки
 установки — в [release.md](release.md).
 
 ## Где что лежит
@@ -76,7 +75,7 @@ Drahtseilakt состоит из трёх частей, которые меня�
 | `docs/manual/<язык>/` | руководство игрока; `tools/make_manual.py` собирает его в `assets/manual`, которого нет в git: его делает CI (`scripts/ci-assets.sh`), а игра открывает его по F1 |
 | `scripts/` | упаковка релиза (`ci-package.sh`, `make-distro-packages.sh`, `pack-assets.sh`, `DATA_VERSION`) |
 | `.github/workflows/` | CI: тесты (`drahtseilakt.yml`) и релиз (`drahtseilakt-release.yml`); оба запускаются по требованию |
-| `docs/guide/`, `docs/howto/`, `docs/*.md` в корне | заметки и справочники по обратной разработке из upstream OpenBallance, оставлены как справочный материал |
+| `docs/internals/`, `docs/*.md` в корне | заметки и справочники по обратной разработке из upstream OpenBallance, оставлены как справочный материал |
 
 ## Правила для контрибьюторов
 

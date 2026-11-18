@@ -87,7 +87,7 @@ Actions -> „Drahtseilakt release“ -> Run workflow (die Dateien sind Lauf-Art
 Der Lauf erzeugt dann auch ein **Entwurfs**-Release mit den Dateien unten und `SHA256SUMS` (ohne die Levels).
 Die Eingabe `dev` fügt die Dev-Variante hinzu (nie in einem Release). Ein Push auf einen Branch startet nichts.
 
-**Release-Assets haben stabile Namen**: Beim Tag-Release wird die Version aus den Dateinamen geschnitten (bei den Datenpaketen auch die Datenversion: `drahtseilakt_amd64.deb`, `drahtseilakt.x86_64.rpm`, `drahtseilakt-data_all.deb`, `drahtseilakt-windows-x86_64-setup.exe`), sodass `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<Name>` immer das neueste Release liefert; die Version bleibt im Tag, im Titel und in den Paket-Metadaten. Lauf-Artefakte behalten die Namen mit `<V>` wie unten. Welche Datei für wen: [distribution.md](distribution.md).
+**Die Dateinamen eines Releases behalten die Version** (man liest sie): ein Tag-Release veröffentlicht die Dateien unten unverändert, z. B. `drahtseilakt-0.1.0-windows-x86_64-setup.exe`, `drahtseilakt_0.1.0-1_amd64.deb`. Ein Skript oder eine Website holt das neueste Release über die API (`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`), wählt aus `assets[]` die Datei, deren `name` zu einem Muster wie `drahtseilakt-*-windows-x86_64-setup.exe` passt, und nutzt ihre `browser_download_url`; im Browser zeigt <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> das neueste. Die ausgewählten Karten liegen im Release mit dem Tag `data-<DATA_VERSION>`, nicht in „latest“. Welche Datei für wen: [distribution.md](distribution.md).
 
 Mit `<V>` = Tag (außerhalb eines Tags `git-<sha>`) entstehen diese Dateien:
 

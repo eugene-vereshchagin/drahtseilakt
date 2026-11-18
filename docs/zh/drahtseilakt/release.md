@@ -72,7 +72,7 @@ gh release create "data-$V" --repo eugene-vereshchagin/drahtseilakt --draft --la
 
 Actions -> “Drahtseilakt release” -> Run workflow（文件是运行产物），或推送标签 `X.Y.Z`：该运行还会创建一个包含下列文件和 `SHA256SUMS` 的**草稿**发布（不含数据和关卡）。输入项 `dev` 会加上开发版（绝不进入发布）。推送到分支不会触发任何运行。
 
-**发布附件的文件名是固定的**：按标签发布时，版本号会从文件名中去掉（数据包名中的数据版本也一样：`drahtseilakt_amd64.deb`、`drahtseilakt.x86_64.rpm`、`drahtseilakt-data_all.deb`、`drahtseilakt-windows-x86_64-setup.exe`），因此 `https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest/download/<文件名>` 总是指向最新发布；版本号保留在标签、标题和包的元数据中。工作流运行产物仍使用下面带 `<V>` 的名称。哪个文件给谁用见 [distribution.md](distribution.md)。
+**发布文件名保留版本号**（便于阅读）：按标签发布时，下表文件原样发布，例如 `drahtseilakt-0.1.0-windows-x86_64-setup.exe`、`drahtseilakt_0.1.0-1_amd64.deb`。脚本或网站通过 API 取最新发布（`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`），在 `assets[]` 中选出 `name` 符合模式（如 `drahtseilakt-*-windows-x86_64-setup.exe`）的文件，使用它的 `browser_download_url`；在浏览器里 <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> 显示最新发布。精选地图在标签为 `data-<DATA_VERSION>` 的发布里，不在 “latest” 中。哪个文件给谁：[distribution.md](distribution.md)。
 
 `<V>` 为标签（不在标签上时为 `git-<sha>`），生成这些文件：
 
