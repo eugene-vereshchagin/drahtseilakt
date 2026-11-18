@@ -273,8 +273,10 @@ fn a_maps_texture_name_never_reads_a_path() {
     assert_eq!(&rgba[..4], &[200, 0, 0, 255]);
 
     // the same names in a level exported to the open format: only the copy's texture is written
-    let mut lvl = level::Level::default();
-    lvl.textures = names.iter().cloned().map(named).collect();
+    let mut lvl = level::Level {
+        textures: names.iter().cloned().map(named).collect(),
+        ..level::Level::default()
+    };
     lvl.textures.push(named("/x/Inside.png".into()));
     let loaded = gamedata::assets::LoadedLevel {
         level: lvl,
@@ -323,9 +325,9 @@ fn an_open_levels_textures_are_its_own_files() {
     }
     let rel = rel.join(out.strip_prefix("/").unwrap_or(&out));
     let back = level::open::import(&rel).unwrap();
-    match &back.textures[0].source {
-        level::TextureSource::LevelFile(p) => assert!(p.is_absolute() && p.starts_with(&out)),
-        other => panic!("{other:?}"),
-    }
+    let level::TextureSource::LevelFile(p) = &back.textures[0].source else {
+        unreachable!("{:?}", back.textures[0].source)
+    };
+    assert!(p.is_absolute() && p.starts_with(&out));
     let _ = std::fs::remove_dir_all(&r);
 }

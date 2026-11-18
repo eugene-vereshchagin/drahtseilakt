@@ -1474,6 +1474,8 @@ pub struct PicturePlan {
 
 /// A texture chosen and counted, not yet read: `texture_plan` makes the plans one after another (the budget is
 /// taken in the level's order, so a level looks the same each time), `load` reads them, on any thread.
+// Plans are short-lived and few (one per texture of a level); boxing the one big variant would only add an indirection.
+#[allow(clippy::large_enum_variant)]
 pub enum TexturePlan {
     /// Pixels already there (a small picture of the copy, of ours or of a pack).
     Pixels(u32, u32, Vec<u8>),
@@ -2079,7 +2081,7 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<Str
                 color_key: t.color_key,
             });
             pictures.push(pic);
-            keep.len() - 1
+            keep.len().saturating_sub(1)
         };
         let idx = match (named, found) {
             (None, found) if has_slots => {
@@ -2152,7 +2154,7 @@ fn export_level(data: &Data, level: &level::Level, dir: &Path) -> Result<Vec<Str
                 ..slot
             });
             pictures.push(pic);
-            images.push(keep.len() - 1);
+            images.push(keep.len().saturating_sub(1));
         }
         slots.push((img, images));
     }

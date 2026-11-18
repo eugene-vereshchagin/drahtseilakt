@@ -193,60 +193,6 @@ pub fn migrate_in(root: &Path, skip: impl Fn(Kind, &str) -> bool) -> Vec<String>
     log
 }
 
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn earlier_folders_move_once_and_nothing_is_lost() {
-        let root =
-            std::env::temp_dir().join(format!("drahtseilakt-migrate-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
-        for d in [
-            "original",
-            "remastered",
-            "downloaded/A",
-            "community/B",
-            "community/A",
-            "open/C",
-            "modified",
-        ] {
-            std::fs::create_dir_all(root.join(d)).unwrap();
-        }
-        std::fs::write(root.join("original/base.cmo"), "x").unwrap();
-        let log = migrate_in(&root, |_, _| false);
-        assert!(root.join("ballance-original/base.cmo").is_file());
-        assert!(root.join("ballance-remaster").is_dir() && !root.join("original").exists());
-        // downloaded became user-levels; community and open merged in; the clashing A stays in community
-        for d in [
-            "user-levels/A",
-            "user-levels/B",
-            "user-levels/C",
-            "community/A",
-            "modified",
-        ] {
-            assert!(root.join(d).is_dir(), "{d}");
-        }
-        assert!(
-            log.iter().any(|l| l.contains("community/A stays")),
-            "{log:?}"
-        );
-        // a second run changes nothing
-        assert!(
-            migrate_in(&root, |_, _| false)
-                .iter()
-                .all(|l| l.contains("stays"))
-        );
-        // a folder the settings place elsewhere is left
-        std::fs::create_dir_all(root.join("original")).unwrap();
-        std::fs::remove_dir_all(root.join("ballance-original")).unwrap();
-        migrate_in(&root, |k, _| k == Kind::Original);
-        assert!(root.join("original").is_dir());
-        let _ = std::fs::remove_dir_all(&root);
-    }
-}
-
 /// A folder named in the settings: `~/` is the home folder, and a relative path is taken from the data folder (never
 /// from wherever the game was started).
 pub fn resolve(p: &str) -> PathBuf {
@@ -299,4 +245,58 @@ pub fn setting_in(text: &str, key: &str) -> Option<String> {
         .filter_map(|l| l.split_once(' '))
         .find(|(k, _)| *k == key)
         .map(|(_, v)| v.trim().to_owned())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn earlier_folders_move_once_and_nothing_is_lost() {
+        let root =
+            std::env::temp_dir().join(format!("drahtseilakt-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for d in [
+            "original",
+            "remastered",
+            "downloaded/A",
+            "community/B",
+            "community/A",
+            "open/C",
+            "modified",
+        ] {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+        }
+        std::fs::write(root.join("original/base.cmo"), "x").unwrap();
+        let log = migrate_in(&root, |_, _| false);
+        assert!(root.join("ballance-original/base.cmo").is_file());
+        assert!(root.join("ballance-remaster").is_dir() && !root.join("original").exists());
+        // downloaded became user-levels; community and open merged in; the clashing A stays in community
+        for d in [
+            "user-levels/A",
+            "user-levels/B",
+            "user-levels/C",
+            "community/A",
+            "modified",
+        ] {
+            assert!(root.join(d).is_dir(), "{d}");
+        }
+        assert!(
+            log.iter().any(|l| l.contains("community/A stays")),
+            "{log:?}"
+        );
+        // a second run changes nothing
+        assert!(
+            migrate_in(&root, |_, _| false)
+                .iter()
+                .all(|l| l.contains("stays"))
+        );
+        // a folder the settings place elsewhere is left
+        std::fs::create_dir_all(root.join("original")).unwrap();
+        std::fs::remove_dir_all(root.join("ballance-original")).unwrap();
+        migrate_in(&root, |k, _| k == Kind::Original);
+        assert!(root.join("original").is_dir());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

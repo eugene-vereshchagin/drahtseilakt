@@ -613,7 +613,7 @@ fn is_nmo(p: &Path) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     #[test]
     fn level_txt_names_sky_music_and_light() {

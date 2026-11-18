@@ -111,7 +111,7 @@ fn cells(p: &Picture, n: usize) -> Vec<[f32; 4]> {
                 let row = y.saturating_mul(w);
                 let from = row.saturating_add(x0).saturating_mul(4);
                 let to = row.saturating_add(x1).saturating_mul(4);
-                for px in p.rgba.get(from..to).unwrap_or_default().chunks_exact(4) {
+                for px in p.rgba.get(from..to).unwrap_or_default().as_chunks::<4>().0 {
                     for (acc, &v) in sum.iter_mut().zip(px) {
                         *acc += f64::from(v);
                     }
@@ -219,7 +219,7 @@ pub fn print(p: &Picture) -> Print {
     );
     let (mut exact_rgb, mut exact_a) = (sides, sides);
     let mut alpha_values = (u8::MAX, u8::MIN);
-    for px in p.rgba.chunks_exact(4) {
+    for px in p.rgba.as_chunks::<4>().0 {
         exact_rgb = fnv(exact_rgb, px.get(..3).unwrap_or_default());
         let a = px.get(3).copied().unwrap_or(u8::MAX);
         exact_a = fnv(exact_a, &[a]);
@@ -593,7 +593,11 @@ mod tests {
     fn the_same_pixels_are_exact_whatever_the_alpha() {
         let a = drawn(64, 64, 1);
         let mut b = a.clone();
-        b.rgba.chunks_exact_mut(4).for_each(|px| px[3] = 7);
+        b.rgba
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .for_each(|px| px[3] = 7);
         assert_eq!(compare(&print(&b), &print(&a)), Some(Match::Exact));
     }
 
@@ -620,7 +624,9 @@ mod tests {
         let mut tinted = a.clone();
         tinted
             .rgba
-            .chunks_exact_mut(4)
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
             .for_each(|px| px[0] = px[0].saturating_add(8));
         assert!(matches!(
             compare(&print(&tinted), &print(&a)),
@@ -654,7 +660,9 @@ mod tests {
             height: p.height,
             rgba: p
                 .rgba
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .flat_map(|px| [0, 0, 0, px[1]])
                 .collect(),
         };
@@ -667,7 +675,12 @@ mod tests {
         ));
         // another shadow on the same black is only a flat look-alike
         let mut other = drawn(64, 64, 2);
-        other.rgba.chunks_exact_mut(4).for_each(|px| px[1] = px[0]);
+        other
+            .rgba
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .for_each(|px| px[1] = px[0]);
         let other = shade(&other);
         assert!(!compare(&print(&other), &print(&a)).unwrap().is_copy());
     }

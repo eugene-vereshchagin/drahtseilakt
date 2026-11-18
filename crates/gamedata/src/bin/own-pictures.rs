@@ -132,9 +132,9 @@ fn replacement(
         let first = a.next().unwrap_or(255);
         a.any(|v| v != first)
     };
-    let shipped_opaque = shipped.rgba.chunks_exact(4).all(|p| p.get(3) == Some(&255));
+    let shipped_opaque = shipped.rgba.as_chunks::<4>().0.iter().all(|p| p[3] == 255);
     let mut rgba = Vec::with_capacity(shipped.rgba.len());
-    for (s, o) in shipped.rgba.chunks_exact(4).zip(own.pixels()) {
+    for (s, o) in shipped.rgba.as_chunks::<4>().0.iter().zip(own.pixels()) {
         let o = o.0;
         let px = if hit.alpha_only {
             if !own_alpha_drawn {
@@ -206,7 +206,7 @@ impl Run<'_> {
             let name = original_name(orig_label);
             let Some(own_path) = self.own.get(&name) else {
                 println!("LEFT {label}: {hit:?} of {orig_label}, and no own picture named {name}");
-                self.left += 1;
+                self.left = self.left.saturating_add(1);
                 return None;
             };
             let made = image::open(own_path)
@@ -228,7 +228,7 @@ impl Run<'_> {
                 }
                 Err(e) => {
                     println!("LEFT {label}: {e}");
-                    self.left += 1;
+                    self.left = self.left.saturating_add(1);
                     return None;
                 }
             }
@@ -237,7 +237,7 @@ impl Run<'_> {
             && let Some((still, _, h)) = best_hit(&provenance::print(p), self.originals)
         {
             println!("LEFT {label}: ours still matches {still} ({h:?})");
-            self.left += 1;
+            self.left = self.left.saturating_add(1);
             return None;
         }
         current
@@ -255,7 +255,7 @@ impl Run<'_> {
                 // a file the map carries after its data (the editor's thumbnail): not a texture
                 if best_hit(&provenance::print(&found.picture), self.originals).is_some() {
                     println!("LEFT {}: an included file", found.label());
-                    self.left += 1;
+                    self.left = self.left.saturating_add(1);
                 }
                 continue;
             }
@@ -293,7 +293,7 @@ impl Run<'_> {
                         best_hit(&provenance::print(&found.picture), self.originals)
                     {
                         println!("LEFT {}: {hit:?} of {orig}, not a .png", found.label());
-                        self.left += 1;
+                        self.left = self.left.saturating_add(1);
                     }
                     continue;
                 }
@@ -332,7 +332,7 @@ impl Run<'_> {
                     );
                 } else {
                     println!("LEFT {}: {:?} of {orig}", found.label(), hit);
-                    self.left += 1;
+                    self.left = self.left.saturating_add(1);
                 }
             }
         }
@@ -479,7 +479,7 @@ fn main() -> ExitCode {
         };
         if let Err(e) = r {
             eprintln!("{e}");
-            run.left += 1;
+            run.left = run.left.saturating_add(1);
         }
     }
     if run.left > 0 {

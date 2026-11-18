@@ -1176,7 +1176,7 @@ fn parse_option(rest: &str) -> Result<OptSpec, String> {
                 ));
             }
             let list: Vec<String> = names.iter().map(|k| (*k).to_owned()).collect();
-            if list.iter().enumerate().any(|(i, k)| list[..i].contains(k)) {
+            if list.iter().enumerate().any(|(i, k)| list.get(..i).is_some_and(|before| before.contains(k))) {
                 return Err("a choice named twice".into());
             }
             let Some(default) = list.iter().position(|k| k == d) else {
@@ -1573,7 +1573,9 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                     .ok_or_else(|| at("expected: label <name> <lang> <text>".into()))?;
                 // `<option>.<choice>` labels a choice of a choice option
                 let named = match name.split_once('.') {
-                    Some((o, c)) => ident(o) && ident(c) && o.len() + c.len() < MAX_KEY,
+                    Some((o, c)) => {
+                        ident(o) && ident(c) && o.len().saturating_add(c.len()) < MAX_KEY
+                    }
                     None => ident(name),
                 };
                 if !named || !LANGUAGES.contains(&lang) {
