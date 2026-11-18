@@ -1,7 +1,7 @@
 // Running the game: in a window (keyboard or a replay drives the simulation), or without one (replay checks and
 // screenshots). The simulation always advances in fixed 60 Hz ticks; the window draws at the display's rate and
 // interpolates between the last two ticks.
-// Reason for the allow: the game loop and its capture/replay drivers work on the validated level model and the parsed Replay (file reading and parsing are in replay.rs, hints.rs, userreplay.rs; the few outside values here are checked at the spot).
+// Reason for the allow: the game loop and its capture/replay drivers work on the validated level model and the parsed Replay (file reading and parsing are in replay.rs, hints.rs, userreplay.rs; the few outside values here, such as a replay's end tick, are checked at the spot with saturating or checked arithmetic).
 #![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::Options;
@@ -7806,7 +7806,7 @@ impl App {
                 .game
                 .replay_in
                 .as_ref()
-                .is_some_and(|r| self.game.sim.tick >= r.end + 120)
+                .is_some_and(|r| self.game.sim.tick >= r.end.saturating_add(120))
         {
             self.stop_replay();
         }

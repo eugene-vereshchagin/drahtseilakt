@@ -5,7 +5,7 @@
 // Language page. Chosen with the arrows and Enter, or with the mouse (the cursor, a click, the wheel, on the very
 // rectangles drawn); drawn with the interface's textures (our own, or the copy's) and its face (ui.rs), or with the
 // prototype's font when there is neither.
-// Reason for the allow: menu layout and drawing over fixed tables and parsed settings; the files it lists are parsed in userreplay.rs, lang.rs and levels.rs.
+// Reason for the allow: menu layout and drawing over fixed tables and parsed settings; the files it lists are parsed in userreplay.rs, lang.rs and levels.rs; the one file it reads itself, a pack's or theme's description (description_of), is capped at 4096 bytes and handled with string operations only.
 #![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::assets::Data;

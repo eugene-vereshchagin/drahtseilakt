@@ -167,10 +167,11 @@ pub fn parse_ogg(bytes: &[u8]) -> Result<Sound, String> {
     Ok(Sound { frames, rate })
 }
 
-/// The largest WAV file read (the game's longest music part is about 4 MB).
-/// The most samples one `pass` mixes into a file output (a minute of stereo at the file rate).
+/// The most samples one `pass` mixes into a file output: a minute of stereo at 48 kHz, above the file rate
+/// (FILE_RATE); one pass covers a few ticks, so the cap is never reached by the game itself.
 const FILE_PASS_MAX: usize = 48_000 * 2 * 60;
 
+/// The largest WAV file read (the game's longest music part is about 4 MB).
 const MAX_WAV_BYTES: usize = 64 << 20;
 
 /// Reads an uncompressed PCM WAV file (8 or 16 bit, mono or stereo). The file is the player's, so every read is

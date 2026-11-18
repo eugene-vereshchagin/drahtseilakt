@@ -11,6 +11,8 @@ use std::process::Command;
 /// The events of a headless replay: checkpoints, lost balls, transformations, the finish.
 fn events(args: &[&OsStr]) -> Vec<String> {
     let out = Command::new(env!("CARGO_BIN_EXE_drahtseilakt"))
+        // a test must not write into the player's profile (dev logs of an unattended run)
+        .env("DRAHTSEILAKT_DEV_LOGS", "0")
         .args(args)
         .output()
         .expect("the game runs");
@@ -74,6 +76,8 @@ fn recorded_runs_play_the_same_on_the_open_format() {
         let dir = tmp.join(format!("Level_{n:02}"));
         let (d, l, r) = (data.as_os_str(), OsStr::new(&level), replay.as_os_str());
         let export = Command::new(env!("CARGO_BIN_EXE_drahtseilakt"))
+            // a test must not write into the player's profile (dev logs of an unattended run)
+            .env("DRAHTSEILAKT_DEV_LOGS", "0")
             .args([
                 OsStr::new("--data"),
                 d,

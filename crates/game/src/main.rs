@@ -251,7 +251,7 @@ pub struct Options {
     /// Draw the floors, rails and stoppers a map hides as translucent markers.
     pub show_colliders: bool,
     /// The development logs of `data/replays/<level>/` (session logs, watch log, spin-loss dumps, attempts and every
-    /// finished run's replay) are written: unattended runs, `--debug` given, DRAHTSEILAKT_DEV_LOGS set, or
+    /// finished run's replay) are written: unattended runs, `--debug` given, DRAHTSEILAKT_DEV_LOGS set (`0` turns them off for any run), or
     /// `dev-logs on` in the settings. A player's game writes none (their replays are the Replays setting's).
     pub dev_logs: bool,
     /// Nothing is written to the player's profile: no runs, attempts or moved folders (the converter's audit plays
@@ -531,8 +531,12 @@ fn parse_args() -> Result<Options, String> {
         || debug == Some(true)
         || std::env::var_os("DRAHTSEILAKT_DEV_LOGS").is_some_and(|v| !v.is_empty() && v != "0")
         || gamedata::profile::setting("dev-logs").is_some_and(|v| matches!(v.trim(), "on" | "yes"));
-    // the converter's audit plays hundreds of maps with made-up keys: none of it belongs in the player's runs
-    if !o.convert_audit.is_empty() {
+    // the converter's audit plays hundreds of maps with made-up keys: none of it belongs in the player's runs; and
+    // DRAHTSEILAKT_DEV_LOGS=0 turns the logs off for any run (tests and scripts, which must not write into the
+    // player's profile)
+    if !o.convert_audit.is_empty()
+        || std::env::var_os("DRAHTSEILAKT_DEV_LOGS").is_some_and(|v| v == "0")
+    {
         o.dev_logs = false;
     }
     Ok(o)
