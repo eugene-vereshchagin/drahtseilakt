@@ -22,7 +22,6 @@ mod ballsound;
 mod clouds;
 mod collide;
 mod convert_audit;
-mod devdata;
 mod edges;
 mod endscreen;
 mod extra;
@@ -54,6 +53,7 @@ mod partcheck;
 mod particles;
 mod physics;
 mod pieces;
+mod pilotdata;
 mod playtime;
 mod proximity;
 mod render;
@@ -156,8 +156,8 @@ usage: drahtseilakt [options]
   --supports-check geometry|runs
                       where the swinging sacks get a support (the sack-supports mod) in the original levels and the
                       shipped maps, each placed one measured again; with runs also against the ball's way in the
-                      recorded runs of the developers' store (DRAHTSEILAKT_DEVDATA). Fails when one is too near the ball's space
-  --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in the developers' store:
+                      recorded runs of the autopilot store (DRAHTSEILAKT_AUTOPILOT). Fails when one is too near the ball's space
+  --level-stats DIR   measure the original levels (or --level N alone) along the finished runs and plans in the autopilot store:
                       DIR/level-stats-auto.csv and the way's samples (scripts/level-stats.py)
   --look X,Y,Z,TX,TY,TZ  with --screenshot: camera at X,Y,Z looking at TX,TY,TZ instead of the game camera
 

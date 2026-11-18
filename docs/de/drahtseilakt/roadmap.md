@@ -57,7 +57,7 @@ der neuen Engine hat Level 1 spielbar gemacht, der Phasenreihenfolge voraus:
   exportiertes Level ist vollständig: es trägt seine Einstellungen (Musik, Licht, Bonus, Tutorial, letztes Level) und
   in seinem Ordner `game/` seine Module, die Kugeln, den Transformator, Himmel, Partikel, Schatten und Klänge, sodass
   es mit nichts aus der Kopie außer der Oberfläche spielt. Die beendeten Läufe des Inhabers in Level 1, 3, 5, 7 und 9
-  (Entwicklerspeicher, tests/replays/) ergeben auf der `.nmo` und auf ihrem Export dieselben Ereignisse (crates/game/tests/open_format.rs),
+  (Autopilot-Speicher, tests/replays/) ergeben auf der `.nmo` und auf ihrem Export dieselben Ereignisse (crates/game/tests/open_format.rs),
   auch mit einer Kopie, die nur die Dateien der Oberfläche hat.
 
 
@@ -195,7 +195,7 @@ sagt, dass sich die Kugel richtig anfühlt.
   bewegte Objekte, Ziel. Menü, HUD (für jedes Seitenverhältnis angeordnet), Ton, Musik.
 - **Replays**: ein Eingabeprotokoll je Takt in einem dokumentierten, versionierten Textformat, das Level per
   Hash bezeichnet. Die Wiedergabe ohne Fenster prüft Checkpoints, Ziel und Punkte. Replays enthalten nur
-  unsere Eingaben, sind daher klein; sie liegen im Entwicklerspeicher (dort `tests/replays/`, siehe decisions.md), nicht auf GitHub, und die Tests, die sie brauchen, werden ohne ihn übersprungen.
+  unsere Eingaben, sind daher klein; sie liegen im Autopilot-Speicher (dort `tests/replays/`, siehe decisions.md), nicht auf GitHub, und die Tests, die sie brauchen, werden ohne ihn übersprungen.
 - Level 13: die SuDu-Erweiterung von 2004, Teil des Grundspiels. Der Spieler installiert sie nach ihrem Readme
   in seine Kopie (sie ersetzt Gameplay, Menu, MenuLevel, Levelinit, Sound und PE_Balloon und fügt Level_13 hinzu).
 

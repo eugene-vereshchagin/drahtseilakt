@@ -169,7 +169,7 @@ jede halbe Sekunde aus) und Lösungsvideos wird ein Hinweis geschrieben.
 ## Hinweisdateien
 
 Eine Datei je Level: `hints/<Level>.txt` im Datenordner des Spiels (`hints/Level_01.txt` für Level 1) oder die
-Datei, die `--hints FILE` nennt. Die bisher geschriebenen Hinweise liegen im Entwicklerspeicher (`DRAHTSEILAKT_DEVDATA`, sonst `drahtseilakt-devdata` neben dem Repository; decisions.md, „Replays und die Daten des Autopiloten liegen in einem eigenen Entwicklerspeicher“) unter `hints/`, mit den
+Datei, die `--hints FILE` nennt. Die bisher geschriebenen Hinweise liegen im Autopilot-Speicher (`DRAHTSEILAKT_AUTOPILOT`, sonst `drahtseilakt-autopilot` neben dem Repository; decisions.md, „Replays und die Daten des Autopiloten liegen in einem eigenen Autopilot-Speicher“) unter `hints/`, mit den
 Replays, die sie benutzen; sie enthalten keine Spieldaten. Ein Hinweis je Zeile, `#` beginnt einen Kommentar:
 
 ```

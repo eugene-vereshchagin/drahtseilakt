@@ -2,7 +2,7 @@
 // over, sector by sector, along the way a finished run took (the runs in hints/), or, for a level without one, along
 // the way the test player finds through its plan. Every number here is computed from the level's objects, its floors'
 // geometry and the run; the judgements (hidden ways, tricks) are written by hand beside it
-// (hints/level-stats-manual.csv in the developers' store) and joined in by scripts/level-stats.py, which also writes the report.
+// (hints/level-stats-manual.csv in the autopilot store) and joined in by scripts/level-stats.py, which also writes the report.
 //
 // The way is sampled every `STEP` units. At each sample the floor is read across the way, to each side: where it
 // drops away, where something rises from it (a low rim or a wall), whether it curves up as a trough does. From the two

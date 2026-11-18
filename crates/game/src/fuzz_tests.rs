@@ -30,9 +30,9 @@ fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The developers' store's hints folder as a seed root (none without the store: the fuzzer then has the built-in seeds).
+/// The autopilot store's hints folder as a seed root (none without the store: the fuzzer then has the built-in seeds).
 fn store_hints() -> Vec<PathBuf> {
-    crate::devdata::for_test("the fuzz seeds from hints/")
+    crate::pilotdata::for_test("the fuzz seeds from hints/")
         .map(|d| d.join("hints"))
         .into_iter()
         .collect()

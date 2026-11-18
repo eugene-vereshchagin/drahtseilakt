@@ -152,9 +152,9 @@ place every half second) and walkthrough videos, a hint is written.
 ## Hint files
 
 One file a level: `hints/<level>.txt` in the game's data folder (`hints/Level_01.txt` for level 1), or the file
-`--hints FILE` names. The hints written so far are kept in the developers' store (`DRAHTSEILAKT_DEVDATA`, else
-`drahtseilakt-devdata` beside the repository; decisions.md, "Replays and the autopilot's data live in a separate
-developers' store") under `hints/`, with the replays they use; they hold no game data. Every `hints/...` and
+`--hints FILE` names. The hints written so far are kept in the autopilot store (`DRAHTSEILAKT_AUTOPILOT`, else
+`drahtseilakt-autopilot` beside the repository; decisions.md, "Replays and the autopilot's data live in a separate
+autopilot store") under `hints/`, with the replays they use; they hold no game data. Every `hints/...` and
 `tests/replays/` path in this document is in that store, never in the game's repository. A hint a line, `#` begins a comment:
 
 ```

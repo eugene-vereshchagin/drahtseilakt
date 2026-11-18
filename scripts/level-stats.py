@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # The level statistics report (in Russian, for the owner): joins the measurements of `drahtseilakt --level-stats DIR`
-# (DIR/level-stats-auto.csv) with the hand annotations ($DRAHTSEILAKT_DEVDATA/hints/level-stats-manual.csv), works out a difficulty index
+# (DIR/level-stats-auto.csv) with the hand annotations ($DRAHTSEILAKT_AUTOPILOT/hints/level-stats-manual.csv), works out a difficulty index
 # per level and the targets once set for our own levels (shelved 2026-11-11, removed 2026-11-16; the report keeps them
 # as a measure of a difficulty curve), and writes level-stats.md, level-stats.csv and level-stats.png.
 #
@@ -255,7 +255,7 @@ p("")
 p("**Как читать.** Числа без пометки посчитаны программой автоматически (`drahtseilakt --level-stats`, ветка "
   "`level-stats`): по типам объектов уровня, геометрии полов и рельсов и по прогону автопилота от старта до финиша. "
   "Пометка **(р)** - ручная оценка по маршрутам, подсказкам и раскадровке прохождения "
-  "(`$DRAHTSEILAKT_DEVDATA/hints/level-stats-manual.csv`, там же описание каждой колонки). Пометка **\\*** - у уровня нет законченного "
+  "(`$DRAHTSEILAKT_AUTOPILOT/hints/level-stats-manual.csv`, там же описание каждой колонки). Пометка **\\*** - у уровня нет законченного "
   "прогона (12 и 13): путь взят из плана автопилота, длины умножены на поправку, остальное оценено (см. в конце).")
 p("")
 p("Единица длины - игровая единица; шар имеет диаметр 4. Длины - вдоль реального пути шара (без попыток, "
@@ -450,6 +450,6 @@ p("- Сырые точки пути с классом каждой (для пр�
   "замеров (`target/level-stats/` ветки).")
 p("")
 p("Как пересчитать: `drahtseilakt --data <Ballance> --level-stats DIR` (из корня репозитория, читает `hints/` хранилища разработчиков), "
-  "затем `scripts/level-stats.py DIR/level-stats-auto.csv $DRAHTSEILAKT_DEVDATA/hints/level-stats-manual.csv $DRAHTSEILAKT_DEVDATA/hints OUT`.")
+  "затем `scripts/level-stats.py DIR/level-stats-auto.csv $DRAHTSEILAKT_AUTOPILOT/hints/level-stats-manual.csv $DRAHTSEILAKT_AUTOPILOT/hints OUT`.")
 open(os.path.join(OUT, "level-stats.md"), "w").write("\n".join(o) + "\n")
 print("written", OUT)

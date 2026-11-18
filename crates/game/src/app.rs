@@ -1492,11 +1492,11 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
             Some(o.models.as_deref().unwrap_or(gamedata::packs::OWN)),
         );
         let store = if runs {
-            let s = crate::devdata::root().map(|d| d.join("hints"));
+            let s = crate::pilotdata::root().map(|d| d.join("hints"));
             if s.is_none() {
                 return Err(format!(
-                    "--supports-check runs needs the developers' store ({} or ../drahtseilakt-devdata)",
-                    crate::devdata::ENV
+                    "--supports-check runs needs the autopilot store ({} or ../drahtseilakt-autopilot)",
+                    crate::pilotdata::ENV
                 ));
             }
             s
@@ -1506,10 +1506,10 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
         return crate::supports::run(&o, &data, store.as_deref());
     }
     if let Some(dir) = &o.level_stats {
-        let Some(store) = crate::devdata::root() else {
+        let Some(store) = crate::pilotdata::root() else {
             return Err(format!(
-                "--level-stats needs the developers' store ({} or ../drahtseilakt-devdata)",
-                crate::devdata::ENV
+                "--level-stats needs the autopilot store ({} or ../drahtseilakt-autopilot)",
+                crate::pilotdata::ENV
             ));
         };
         return crate::levelstats::run(&o, &data, dir, &store.join("hints"));

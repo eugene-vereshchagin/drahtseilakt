@@ -1,4 +1,4 @@
-// The open format holds a level whole: each original level with a recorded run in the developers' store (tests/replays/) is exported, and
+// The open format holds a level whole: each original level with a recorded run in the autopilot store (tests/replays/) is exported, and
 // the run gives the same events on the .nmo and on its export. Needs the player's copy (OPENBALLANCE_DATA); without
 // it the test says so and passes, as the game-data tests do.
 
@@ -41,16 +41,16 @@ fn recorded_runs_play_the_same_on_the_open_format() {
         eprintln!("OPENBALLANCE_DATA not set: the open format's replay check is skipped");
         return;
     };
-    // the recorded runs live in the developers' store (DRAHTSEILAKT_DEVDATA, else drahtseilakt-devdata beside the repo)
-    let store = std::env::var_os("DRAHTSEILAKT_DEVDATA")
+    // the recorded runs live in the autopilot store (DRAHTSEILAKT_AUTOPILOT, else drahtseilakt-autopilot beside the repo)
+    let store = std::env::var_os("DRAHTSEILAKT_AUTOPILOT")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-devdata")
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-autopilot")
         });
     let replays = store.join("tests/replays");
     if !replays.is_dir() {
         eprintln!(
-            "no developers' store at {}: the open format's replay check is skipped",
+            "no autopilot store at {}: the open format's replay check is skipped",
             store.display()
         );
         return;
