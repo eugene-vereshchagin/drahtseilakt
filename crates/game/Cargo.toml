@@ -7,6 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+# The game's modules as a library (src/lib.rs), for the thin binary and for our tools that drive the game.
+[lib]
+name = "drahtseilakt"
+path = "src/lib.rs"
+
 [[bin]]
 name = "drahtseilakt"
 path = "src/main.rs"
