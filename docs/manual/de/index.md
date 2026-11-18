@@ -13,6 +13,7 @@ Laden Sie die Datei für Ihr System aus dem [neuesten Release](https://github.co
 - **Linux**: das portable `…-linux-x86_64.tar.gz` (entpacken und `drahtseilakt` starten) oder die Pakete. Für die Paketinstallation braucht es zwei Dateien, das Programm und sein Datenpaket `drahtseilakt-data` (unsere Teile, Klänge, Mods, dieses Handbuch und die Community-Karten):
   `sudo apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb` (Debian, Ubuntu) oder
   `sudo dnf install ./drahtseilakt-data-*.noarch.rpm ./drahtseilakt-*.x86_64.rpm` (Fedora).
+  Mit den 13 ausgewählten Karten kommt `./drahtseilakt-levels_*_all.deb` (oder `./drahtseilakt-levels-*.noarch.rpm`) aus dem Release `data-<Datum>` dazu.
 - **FreeBSD** (experimentell): `…-freebsd-x86_64.tar.gz`.
 
 Installer und portable Archive enthalten schon alle Daten. Die 13 ausgewählten Karten sind ein eigener Download ([Level und Ordner](levels.md)).

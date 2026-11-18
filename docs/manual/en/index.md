@@ -13,6 +13,7 @@ Download the file for your system from the [newest release](https://github.com/e
 - **Linux**: the portable `…-linux-x86_64.tar.gz` (unpack and start `drahtseilakt`), or the packages. A package install needs two files, the program and its data package `drahtseilakt-data` (our parts, sounds, mods, this manual and the community maps):
   `sudo apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb` (Debian, Ubuntu) or
   `sudo dnf install ./drahtseilakt-data-*.noarch.rpm ./drahtseilakt-*.x86_64.rpm` (Fedora).
+  With the 13 featured maps add `./drahtseilakt-levels_*_all.deb` (or `./drahtseilakt-levels-*.noarch.rpm`) from the `data-<date>` release.
 - **FreeBSD** (experimental): `…-freebsd-x86_64.tar.gz`.
 
 The installers and portable archives already hold all the data. The 13 featured maps are a separate download ([Levels and folders](levels.md)).

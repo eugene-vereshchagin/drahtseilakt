@@ -11,6 +11,7 @@ Drahtseilakt（德语意为“走钢丝”）是 **Ballance** 的全新引擎。
 - **Linux**：便携版 `…-linux-x86_64.tar.gz`（解压后运行 `drahtseilakt`），或软件包。软件包安装需要两个文件：程序本身和它的数据包 `drahtseilakt-data`（我们的部件、声音、模组、本手册和社区地图）：
   `sudo apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb`（Debian、Ubuntu）或
   `sudo dnf install ./drahtseilakt-data-*.noarch.rpm ./drahtseilakt-*.x86_64.rpm`（Fedora）。
+  如需同时安装 13 张精选地图，再加上 `data-<日期>` 版本中的 `./drahtseilakt-levels_*_all.deb`（或 `./drahtseilakt-levels-*.noarch.rpm`）。
 - **FreeBSD**（实验性）：`…-freebsd-x86_64.tar.gz`。
 
 安装程序和便携压缩包已包含全部数据。13 张精选地图需单独下载（[关卡与文件夹](levels.md)）。

@@ -13,6 +13,7 @@ Drahtseilakt (по-немецки «номер на канате») — новы
 - **Linux**: портативный `…-linux-x86_64.tar.gz` (распакуйте и запустите `drahtseilakt`) или пакеты. Для установки пакетами нужны два файла: сама программа и её пакет данных `drahtseilakt-data` (наши детали, звуки, моды, это руководство и карты сообщества):
   `sudo apt install ./drahtseilakt-data_*_all.deb ./drahtseilakt_*_amd64.deb` (Debian, Ubuntu) или
   `sudo dnf install ./drahtseilakt-data-*.noarch.rpm ./drahtseilakt-*.x86_64.rpm` (Fedora).
+  Чтобы поставить и 13 избранных карт, добавьте `./drahtseilakt-levels_*_all.deb` (или `./drahtseilakt-levels-*.noarch.rpm`) из релиза `data-<дата>`.
 - **FreeBSD** (экспериментально): `…-freebsd-x86_64.tar.gz`.
 
 В установщиках и портативных архивах уже есть все данные. 13 избранных карт скачиваются отдельно ([Уровни и папки](levels.md)).
