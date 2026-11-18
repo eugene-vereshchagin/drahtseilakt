@@ -129,6 +129,9 @@ pub struct Game {
     assisted: bool,
     /// Nothing of this game is written to the profile (Options::no_save).
     no_save: bool,
+    /// Nobody plays this run by hand (a program drives it, or it runs without a window): it is never the player's best
+    /// run or a highscore, so a tool's run cannot replace what the player did.
+    unattended: bool,
     /// The mods that run on the run's side (modrt.rs), as each new run starts with them: a replay's own (its `mod`
     /// lines), else what the window sets (the mods switched on).
     mods: crate::modrt::SimMods,
@@ -405,6 +408,7 @@ impl Game {
             sound_ticks,
             assisted: false,
             no_save: o.no_save,
+            unattended: o.driven || o.headless,
             mods,
             last_level: level.level.settings.last_level,
             placeholder: empty,
@@ -855,6 +859,7 @@ impl Game {
         // A run begun elsewhere than the level start is a test, never the level's best; nor is a modded run.
         if self.start.is_none()
             && !self.assisted
+            && !self.unattended
             && !self.sim.mods.modded()
             && best_ticks.is_none_or(|b| self.sim.tick < b)
         {
@@ -961,10 +966,12 @@ impl Game {
         })
     }
 
-    /// The run counts (a best run, a highscore): begun at the level start, not helped, not modded, not a replay.
+    /// The run counts (a best run, a highscore): begun at the level start, played by hand, not helped, not modded,
+    /// not a replay.
     fn counts(&self) -> bool {
         self.start.is_none()
             && !self.assisted
+            && !self.unattended
             && !self.sim.mods.modded()
             && self.replay_in.is_none()
     }
