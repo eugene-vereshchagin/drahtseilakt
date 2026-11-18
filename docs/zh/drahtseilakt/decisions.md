@@ -306,4 +306,4 @@ Community picks、My maps），而是按含义，在经典和扩展模式下相�
 
 ## 回放和自动驾驶数据放在单独的自动驾驶数据库
 
-*所有者的决定，2026-11-18。* 我们的回放、录制的运行记录以及自动驾驶读取的一切（路线、计划、提示、区域、学习表、关卡统计的手工标注）不属于 GitHub，分开管理也更容易。它们已从 `hints/` 和 `tests/replays/` 迁到与本仓库并列的独立仓库 `drahtseilakt-autopilot`（私有，从不公开）。由一个解析器统一查找：环境变量 `DRAHTSEILAKT_AUTOPILOT`，否则为仓库根目录的 `../drahtseilakt-autopilot`。需要它的测试在缺失时会带提示跳过（与没有 `OPENBALLANCE_DATA` 时相同），因此没有它的 CI 保持绿色；游戏本身从不读取它。游戏编译进去的内容（各区段的起始球）移到了 `crates/level/data/sector-balls.txt`。关卡自带的数据（`assets/levels/*/pilot/`）仍属于关卡。
+*所有者的决定，2026-11-18。* 我们的回放、录制的运行记录以及自动驾驶读取的一切（路线、计划、提示、区域、学习表、关卡统计的手工标注）不属于 GitHub，分开管理也更容易。它们已从 `hints/` 和 `tests/replays/` 迁到与本仓库并列的独立仓库 `drahtseilakt-tools/autopilot`（私有，从不公开）。由一个解析器统一查找：环境变量 `DRAHTSEILAKT_AUTOPILOT`，否则为仓库根目录的 `../drahtseilakt-tools/autopilot`。需要它的测试在缺失时会带提示跳过（与没有 `OPENBALLANCE_DATA` 时相同），因此没有它的 CI 保持绿色；游戏本身从不读取它。游戏编译进去的内容（各区段的起始球）移到了 `crates/level/data/sector-balls.txt`。关卡自带的数据（`assets/levels/*/pilot/`）仍属于关卡。

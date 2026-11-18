@@ -41,11 +41,11 @@ fn recorded_runs_play_the_same_on_the_open_format() {
         eprintln!("OPENBALLANCE_DATA not set: the open format's replay check is skipped");
         return;
     };
-    // the recorded runs live in the autopilot store (DRAHTSEILAKT_AUTOPILOT, else drahtseilakt-autopilot beside the repo)
+    // the recorded runs live in the autopilot store (DRAHTSEILAKT_AUTOPILOT, else drahtseilakt-tools/autopilot beside the repo)
     let store = std::env::var_os("DRAHTSEILAKT_AUTOPILOT")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-autopilot")
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-tools/autopilot")
         });
     let replays = store.join("tests/replays");
     if !replays.is_dir() {

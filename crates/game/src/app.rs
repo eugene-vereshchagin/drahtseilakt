@@ -1495,7 +1495,7 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
             let s = crate::pilotdata::root().map(|d| d.join("hints"));
             if s.is_none() {
                 return Err(format!(
-                    "--supports-check runs needs the autopilot store ({} or ../drahtseilakt-autopilot)",
+                    "--supports-check runs needs the autopilot store ({} or ../drahtseilakt-tools/autopilot)",
                     crate::pilotdata::ENV
                 ));
             }
@@ -1508,7 +1508,7 @@ pub fn run(mut o: Options, data: Data) -> Result<(), String> {
     if let Some(dir) = &o.level_stats {
         let Some(store) = crate::pilotdata::root() else {
             return Err(format!(
-                "--level-stats needs the autopilot store ({} or ../drahtseilakt-autopilot)",
+                "--level-stats needs the autopilot store ({} or ../drahtseilakt-tools/autopilot)",
                 crate::pilotdata::ENV
             ));
         };

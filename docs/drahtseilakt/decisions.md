@@ -535,9 +535,9 @@ build and upload steps: `docs/drahtseilakt/release.md`.
 
 *Owner's decision, 2026-11-18.* Our replays, the recorded runs and everything the autopilot reads (routes, plans, hints,
 zones, the learned table, the level-stats annotations) do not belong on GitHub, and they are easier to manage apart.
-They moved out of `hints/` and `tests/replays/` into a repository of their own, `drahtseilakt-autopilot`, beside this
+They moved out of `hints/` and `tests/replays/` into a repository of their own, `drahtseilakt-tools/autopilot`, beside this
 one (private, never published). One resolver finds it: the environment variable `DRAHTSEILAKT_AUTOPILOT`, else
-`../drahtseilakt-autopilot` from the repository root. Tests that need it skip with a message when it is absent (as
+`../drahtseilakt-tools/autopilot` from the repository root. Tests that need it skip with a message when it is absent (as
 without `OPENBALLANCE_DATA`), so CI, which has none, stays green; the game itself never reads it. What the game
 compiles in, the sectors' starting balls, moved to `crates/level/data/sector-balls.txt`. A level's own data
 (`assets/levels/*/pilot/`) stays with the level.

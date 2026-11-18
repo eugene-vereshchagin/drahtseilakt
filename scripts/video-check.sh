@@ -20,7 +20,7 @@ game=${DRAHTSEILAKT_BIN:-$here/target/release/drahtseilakt}
 remastered=${XDG_DATA_HOME:-$HOME/.local/share}/drahtseilakt/levels/ballance-remaster
 models=level # what scripts/video.sh takes for VIDEO_MODE=remaster
 # the recorded runs live in the autopilot store, not in the repository
-pilot=${DRAHTSEILAKT_AUTOPILOT:-$here/../drahtseilakt-autopilot}
+pilot=${DRAHTSEILAKT_AUTOPILOT:-$here/../drahtseilakt-tools/autopilot}
 [ -d "$pilot" ] || { echo "no autopilot store at $pilot (set DRAHTSEILAKT_AUTOPILOT)" >&2; exit 0; }
 mkdir -p "$out"
 sum=$out/summary.txt

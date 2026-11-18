@@ -8,14 +8,14 @@ use std::path::PathBuf;
 /// The environment variable that names the store.
 pub const ENV: &str = "DRAHTSEILAKT_AUTOPILOT";
 
-/// The store: `DRAHTSEILAKT_AUTOPILOT`, else `drahtseilakt-autopilot` beside the repository (the working directory is its
+/// The store: `DRAHTSEILAKT_AUTOPILOT`, else `drahtseilakt-tools/autopilot` beside the repository (the working directory is its
 /// root for the developer commands). None when there is no such folder.
 pub fn root() -> Option<PathBuf> {
     let dir = match std::env::var_os(ENV) {
         Some(v) => PathBuf::from(v),
         None => std::env::current_dir()
             .ok()?
-            .join("../drahtseilakt-autopilot"),
+            .join("../drahtseilakt-tools/autopilot"),
     };
     dir.is_dir().then_some(dir)
 }
@@ -27,14 +27,14 @@ pub fn for_test(what: &str) -> Option<PathBuf> {
     let dir = match std::env::var_os(ENV) {
         Some(v) => PathBuf::from(v),
         None => {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-autopilot")
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../drahtseilakt-tools/autopilot")
         }
     };
     if dir.is_dir() {
         Some(dir)
     } else {
         eprintln!(
-            "{ENV} not set and no drahtseilakt-autopilot beside the repository: {what} is skipped"
+            "{ENV} not set and no drahtseilakt-tools/autopilot beside the repository: {what} is skipped"
         );
         None
     }

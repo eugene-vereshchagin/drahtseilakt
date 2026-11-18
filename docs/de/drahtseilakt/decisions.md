@@ -490,8 +490,8 @@ Datei für wen: `docs/de/drahtseilakt/distribution.md`; Bauen und Hochladen: `do
 *Entscheidung des Besitzers, 2026-11-18.* Unsere Replays, die aufgezeichneten Läufe und alles, was der Autopilot liest
 (Routen, Pläne, Hinweise, Zonen, die gelernte Tabelle, die Handnotizen der Level-Statistik), gehören nicht auf GitHub
 und lassen sich getrennt leichter verwalten. Sie sind aus `hints/` und `tests/replays/` in ein eigenes Repository
-`drahtseilakt-autopilot` neben diesem umgezogen (privat, nie veröffentlicht). Ein einziger Resolver findet es: die
-Umgebungsvariable `DRAHTSEILAKT_AUTOPILOT`, sonst `../drahtseilakt-autopilot` von der Repository-Wurzel. Tests, die es
+`drahtseilakt-tools/autopilot` neben diesem umgezogen (privat, nie veröffentlicht). Ein einziger Resolver findet es: die
+Umgebungsvariable `DRAHTSEILAKT_AUTOPILOT`, sonst `../drahtseilakt-tools/autopilot` von der Repository-Wurzel. Tests, die es
 brauchen, werden ohne es mit einer Meldung übersprungen (wie ohne `OPENBALLANCE_DATA`), sodass die CI, die keinen hat,
 grün bleibt; das Spiel selbst liest es nie. Was das Spiel einkompiliert (die Startkugeln der Sektoren), liegt jetzt in
 `crates/level/data/sector-balls.txt`. Die eigenen Daten eines Levels (`assets/levels/*/pilot/`) bleiben beim Level.
