@@ -70,7 +70,7 @@ und die Installationszeilen stehen in [release.md](release.md).
 
 | Wo | Was |
 |---|---|
-| `eugene-vereshchagin/drahtseilakt` (dieses Repository) | das Spiel, die Engine-Crates (`crates/`: `nmo`, `level`, `gamedata`, die Physik `ivp`, `script`, `game`, ...), `assets/` (Basisdaten), `docs/`, `scripts/`, `tools/`, `hints/` (Autopilot-Pläne), `tests/` |
+| `eugene-vereshchagin/drahtseilakt` (dieses Repository) | das Spiel, die Engine-Crates (`crates/`: `nmo`, `level`, `gamedata`, die Physik `ivp`, `script`, `game`, ...), `assets/` (Basisdaten), `docs/`, `scripts/`, `tools/`, `tests/` |
 | `eugene-vereshchagin/drahtseilakt-toolbox` | die Toolbox, mit eigenen Releases und eigener CI; sie liest Levels über `crates/gamedata` und `crates/level` dieses Repositorys |
 | `assets/` | was mit dem Spiel ausgeliefert wird: unsere Teile, Schriften, Klänge, Werksmods, `levels/community/` und `levels/drahtseilakt/` (dort nur die `level.txt` der ausgewählten Karten; ihre Dateien sind Release-Assets) |
 | `docs/drahtseilakt/` | die Projektdoku (Fahrplan, Entscheidungen, Formate, Menüs, Mods); jede Seite auch in `docs/ru/`, `docs/de/`, `docs/zh/` |

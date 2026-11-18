@@ -66,7 +66,7 @@ The exact file list of a release and the install lines are in [release.md](relea
 
 | Where | What |
 |---|---|
-| `eugene-vereshchagin/drahtseilakt` (this repository) | the game, the engine crates (`crates/`: `nmo`, `level`, `gamedata`, `ivp` physics, `script`, `game`, ...), `assets/` (base data), `docs/`, `scripts/`, `tools/`, `hints/` (autopilot plans), `tests/` |
+| `eugene-vereshchagin/drahtseilakt` (this repository) | the game, the engine crates (`crates/`: `nmo`, `level`, `gamedata`, `ivp` physics, `script`, `game`, ...), `assets/` (base data), `docs/`, `scripts/`, `tools/`, `tests/` |
 | `eugene-vereshchagin/drahtseilakt-toolbox` | the toolbox, with its own releases and CI; it reads levels through this repository's `crates/gamedata` and `crates/level` |
 | `assets/` | what the game ships: our parts, fonts, sounds, factory mods, `levels/community/` and `levels/drahtseilakt/` (the picked maps' `level.txt` only; their files are release assets) |
 | `docs/drahtseilakt/` | the project's docs (roadmap, decisions, formats, menus, mods); each also in `docs/ru/`, `docs/de/`, `docs/zh/` |

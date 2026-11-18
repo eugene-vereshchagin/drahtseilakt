@@ -265,11 +265,6 @@ alles Folgende gilt. Stand 2026-11-16: **erledigt**, **teilweise**, **offen**.
   weiter verbessert (resources.md).
 - **Keine Kopie nötig**: Das Spiel startet und spielt ganz ohne Kopie des Originals; der Import der Originallevel
   bleibt über die Toolbox angeboten. **Erledigt.**
-- **Läufe des Autopiloten und Videos** sind von den Originalleveln und von den veränderten Sätzen (45°-Kamera,
-  unsichtbare Bahn), die Videos für YouTube (4K, jedes mit seinem README). Läufe des Autopiloten auf den mitgelieferten
-  Community-Karten sind **keine** Bedingung für die Veröffentlichung (Eigentümer, 2026-11-14). Läufe: **erledigt** für
-  die 13 Originallevel (`hints/runs/`), den 45°-Satz und den unsichtbaren Satz (`hints/runs/modified/`); Videos:
-  **teilweise** (einzelne Level aufgenommen, die ganze Reihe und der Upload offen).
 - **Builds für jede Desktop-Plattform**: Linux, Windows und macOS (BSD willkommen), als Installer und als portabler
   Ordner. **Teilweise**: der portable Linux-Build existiert und wird aktuell gehalten; die Builds für Windows und macOS
   sind in der CI vorbereitet (`.github/workflows/drahtseilakt-release.yml`, Stand 2026-11-18: Windows-Installer und portables Zip, portables Linux-Archiv und `.deb`/`.rpm`, macOS-`.dmg` und portables Archiv, FreeBSD experimentell; Release-Entwurf bei einem Versions-Tag; was man herunterlädt: [distribution.md](distribution.md)) und warten auf den Befehl des Eigentümers, zu taggen und zu veröffentlichen.

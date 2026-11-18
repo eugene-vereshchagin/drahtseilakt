@@ -19,7 +19,7 @@ hörte zu und sagte, was nicht stimmte.
 | | Zeilen |
 |---|---|
 | Rust, 6 Crates | 44.108 |
-| — game (Fenster, Menü, Klang, Spielregeln, Autopilot) | 22.882 |
+| — game (Fenster, Menü, Klang, Spielregeln) | 22.882 |
 | — ivp (die Physik-Engine, portiert) | 14.080 |
 | — gamedata, level, nmo, cdimage (Dateien, Formate, die CD) | 7.146 |
 | Shader (WGSL) | 296 |

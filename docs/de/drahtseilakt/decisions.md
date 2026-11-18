@@ -485,29 +485,6 @@ weil ein `level.bin` über der 100-MB-Dateigrenze von GitHub liegt). Ein Program
 Release-Dateien tragen die Version im Namen (Menschen lesen sie); eine Website holt das neueste Release über die GitHub-API (`releases/latest`). Welche
 Datei für wen: `docs/de/drahtseilakt/distribution.md`; Bauen und Hochladen: `docs/de/drahtseilakt/release.md`.
 
-## Replays und die Daten des Autopiloten liegen in einem eigenen Autopilot-Speicher
+## Unsere Replays und aufgezeichneten Läufe liegen nicht in diesem Repository
 
-*Entscheidung des Besitzers, 2026-11-18.* Unsere Replays, die aufgezeichneten Läufe und alles, was der Autopilot liest
-(Routen, Pläne, Hinweise, Zonen, die gelernte Tabelle, die Handnotizen der Level-Statistik), gehören nicht auf GitHub
-und lassen sich getrennt leichter verwalten. Sie sind aus `hints/` und `tests/replays/` in ein eigenes Repository
-`drahtseilakt-tools/autopilot` neben diesem umgezogen (privat, nie veröffentlicht). Ein einziger Resolver findet es: die
-Umgebungsvariable `DRAHTSEILAKT_AUTOPILOT`, sonst `../drahtseilakt-tools/autopilot` von der Repository-Wurzel. Tests, die es
-brauchen, werden ohne es mit einer Meldung übersprungen (wie ohne `OPENBALLANCE_DATA`), sodass die CI, die keinen hat,
-grün bleibt; das Spiel selbst liest es nie. Was das Spiel einkompiliert (die Startkugeln der Sektoren), liegt jetzt in
-`crates/level/data/sector-balls.txt`. Die eigenen Daten eines Levels (`assets/levels/*/pilot/`) bleiben beim Level. Die aufgezeichneten Läufe, die die eigenen Tests des Spiels spielen,
-gehören nicht dem Autopiloten: sie liegen in `drahtseilakt-tools/test-runs`, gefunden über `DRAHTSEILAKT_TEST_RUNS`
-(Besitzer, 2026-11-18: der Autopilot zieht ganz aus dem Spiel aus, also nennt ihn nichts im Spiel).
-
-## Der Autopilot verlässt das Spiel
-
-*Entscheidung des Besitzers, 2026-11-18.* Der Autopilot (der Testspieler, die Videoverfolgung, die Läufe der
-Level-Statistik) ist unser Werkzeug für die Videos, kein Teil des Spiels: er zieht ganz in das private Repository
-`drahtseilakt-tools` um, und das Spiel behält keinen Verweis auf ihn. Das Spiel wird eine Bibliothek
-(`crates/game/src/lib.rs`) mit einer dünnen Binärdatei; ein Werkzeug steuert es über die öffentliche API der Bibliothek
-und einen allgemeinen Haken für einen äußeren Spieler eines Laufs im Fenster (`control.rs`, `Controller`: er spielt die
-Takte, nimmt eigene Tasten, zeichnet eigene Markierungen), den die Binärdatei des Spiels selbst nie belegt. Der
-Live-Beobachtungsmodus (`--watch`, Übernahme von Hand, Zonenmarkierungen) bleibt, auf diesem Haken. Die
-Entwicklerprotokolle bleiben als allgemeine Diagnose im Spiel, ebenso `scripts/video.sh`. Die aufgezeichneten Läufe, die
-die Tests des Spiels spielen, liegen in `drahtseilakt-tools/test-runs` (`DRAHTSEILAKT_TEST_RUNS`). Die Docs des
-Autopiloten gehen ins Werkzeug-Repository, nur auf Englisch. Erste Stufe: der Code des Autopiloten liegt abgesondert in
-`crates/game/src/pilot/` und nutzt nur die öffentliche API; die nächste verlegt diesen Baum hinaus.
+*Entscheidung des Besitzers, 2026-11-18.* Unsere eigenen Replays, aufgezeichneten Läufe und Entwicklungswerkzeuge liegen in einem eigenen privaten Repository und werden nie veröffentlicht. Die aufgezeichneten Läufe, die die eigenen Tests des Spiels spielen, findet die Umgebungsvariable `DRAHTSEILAKT_TEST_RUNS`; Tests, die sie brauchen, werden ohne sie mit einer Meldung übersprungen.

@@ -175,8 +175,7 @@ dass jedes unserer Teile im Level steht und jedes Element in der Physik des Spie
 richtigen und der falschen Art mit den Pfeiltasten durch jedes Element und prüft, wohin sie kommt, wie weit sich die
 Teile des Moduls drehen oder bewegen und wo ein herausgestoßenes Teil liegt; jede Prüfung ist Pflicht.
 `SHOWCASE_COPY_PARTS=<Kopie>` führt dieselben Prüfungen mit den Teilen der Kopie statt unserer aus,
-`SHOWCASE_ONLY=<Präfix>` nur die so benannten, `SHOWCASE_TRACE=<Prüfung>` gibt den Weg der Kugel aus. Der Lauf des
-Testspielers wird für das Level nicht mehr aufbewahrt.
+`SHOWCASE_ONLY=<Präfix>` nur die so benannten, `SHOWCASE_TRACE=<Prüfung>` gibt den Weg der Kugel aus.
 Ohne Kopie des Originals steht hinter dem Menü der erste mitgelieferte Level nach dem Schaulevel (order 0), damit das
 Menü nicht seine Schilder zeigt.
 Seit den Notizen 11 des Eigentümers (2026-11-16): die Bahn der Zugbrücke hat zu beiden Seiten ihrer Lücke eine Stufe, 1 lang und 0,5 tief, wie in Level 5, so dass das gefallene Deck bündig mit der Bahn liegt (die Prüfung misst die Höhe der Kugel darauf); die Mulden aller Checkpoints und des Starts werden ganz gezeichnet; keine zwei sichtbaren Flächen liegen in einer Ebene übereinander (der Baukasten lehnt sie ab, `check_coplanar`, und `kit_levels_have_no_faces_flickering_in_one_plane` prüft jedes von ihm gebaute Level); Schilder stehen, wo kein Weg vorbeiführt; das Gitter des Ventilators ist ein Raster aus Stäben mit dunkler Mitte wie das des Originals; wo die Steinkugel auf blankem Boden fährt, hat jede scharfe Ecke ein Geländer an ihrer Außenseite (die schmalen Steinbahnen des Originals sind stattdessen Rinnen, 0,68 tief); die klebrige Kugel, die kein Level des Originals und keine konvertierte Community-Karte hat (sie stammt aus dem Mod BallSticky), steht im Community-Teil, mit einem Hang von 40 Grad, den sie aus dem Stand hinauffährt und die Holzkugel nicht.
@@ -456,15 +455,6 @@ seinen Enden weitergehen, oder ein Weg breiter als 14 von ihm weitergeht; das sy
 dem Checkpoint auf 12, `make_test_level.py` gibt Parts_Test 12 breite Hälse zwischen
 seinen Stücken und seinen breiten Böden (das ausgelieferte Parts_Test ist noch ein Bau eines früheren Kits: neu gebaut,
 bestehen seine T-Stöße der Platten `our_floors_have_no_seams` nicht).
-
-**Was der Testspieler über ein Level weiß**, steht in derselben Datei. Aus dem gelegten Weg schreibt leveldsl.py die
-Hinweisdateien des Testspielers für drei Stile in den Ordner `pilot/` des Levels (autopilot.md, „Hinweisdateien“):
-`safe` (rollt von Punkt zu Punkt und hält an, nimmt jeden Kontrollpunkt, kein Risiko), `speed` (rollt ohne Halt durch
-die Punkte) und `collector` (wie safe, und holt jeden Extrapunkt und jedes Extraleben abseits des Wegs). Lücken,
-Wippen und drehende Arme werden in jedem Stil mit Tempo genommen (von den vorsichtigen mit Anlauf); eine Stelle, die
-mehr braucht, sagt es mit `pilot STYLES : STEPS` (die Schritte des Hinweises, ihre Punkte als `ahead side up` um den
-Cursor; z. B. ein auf eine Schaukel abgestimmtes Warten) und `nopilot STYLES` / `autopilot STYLES` um ein Stück, das
-die Stile von selbst nehmen.
 
 **Um ein Level zu bauen** aus seiner Beschreibung: `python3 -I assets/own/make/leveldsl.py DIR/level.lvl` (das
 Schaufensterlevel: `make_synthetic_level.py`). `scripts/video.sh LEVEL RUN out.mp4` macht aus einem Lauf davon ein Video.

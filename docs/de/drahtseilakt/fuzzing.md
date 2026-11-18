@@ -1,7 +1,7 @@
 # Fuzzing der Parser
 
 Jeder Leser einer Datei, die das Spiel nicht selbst geschrieben hat — `.nmo`/`.cmo`-Level und Community-Karten, das
-offene Levelformat, Bilder, Klänge, das CD-Abbild und sein InstallShield-Archiv, Replays, Hinweisdateien, die
+offene Levelformat, Bilder, Klänge, das CD-Abbild und sein InstallShield-Archiv, Replays, die
 `level.txt` der Levelordner, Klangthemen, die Einstellungs- und Highscore-Dateien — hat ein Fuzz-Ziel. Es gibt zwei
 Wege, sie laufen zu lassen.
 

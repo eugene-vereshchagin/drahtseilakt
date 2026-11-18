@@ -68,7 +68,7 @@ Drahtseilakt состоит из трёх частей, которые меня�
 
 | Где | Что |
 |---|---|
-| `eugene-vereshchagin/drahtseilakt` (этот репозиторий) | игра, крейты движка (`crates/`: `nmo`, `level`, `gamedata`, физика `ivp`, `script`, `game`, ...), `assets/` (базовые данные), `docs/`, `scripts/`, `tools/`, `hints/` (планы автопилота), `tests/` |
+| `eugene-vereshchagin/drahtseilakt` (этот репозиторий) | игра, крейты движка (`crates/`: `nmo`, `level`, `gamedata`, физика `ivp`, `script`, `game`, ...), `assets/` (базовые данные), `docs/`, `scripts/`, `tools/`, `tests/` |
 | `eugene-vereshchagin/drahtseilakt-toolbox` | toolbox, со своими релизами и CI; читает уровни через `crates/gamedata` и `crates/level` этого репозитория |
 | `assets/` | то, что поставляется с игрой: наши детали, шрифты, звуки, фабричные моды, `levels/community/` и `levels/drahtseilakt/` (там только `level.txt` выбранных карт; их файлы — ресурсы релиза) |
 | `docs/drahtseilakt/` | документация проекта (дорожная карта, решения, форматы, меню, моды); каждая страница есть и в `docs/ru/`, `docs/de/`, `docs/zh/` |

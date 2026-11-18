@@ -98,8 +98,7 @@ an ellipsoid), and the physics values (masses, frictions, joints, forces) are th
 to 12 with the copy's part and with ours from the same start and input and compares the ways.
 
 Where a part's drawn shape is richer than its plain one, the plain shape stays the object's mesh and the drawn one is
-its look (open-format.md): the physics takes its hull from the mesh, and the test player reads the modules' meshes as
-floors and walls, so both see the same thing whatever is drawn. The lift (`P_Modul_03`, 2026-11-12) is drawn this
+its look (open-format.md): the physics takes its hull from the mesh, so it sees the same thing whatever is drawn. The lift (`P_Modul_03`, 2026-11-12) is drawn this
 way: a turned metal disc with a bolted rim and an oak deck, its loose panels red-painted frames with a boarded foot
 and bars above (the ball is seen through them); its slab, panels and gate are unchanged as meshes.
 Five more parts are drawn this way since (second round, 2026-11-12), every object, pivot and plain mesh as before: the

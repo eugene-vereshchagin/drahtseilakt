@@ -1,7 +1,7 @@
 # Fuzzing the parsers
 
 Every reader of a file the game did not write itself — `.nmo`/`.cmo` levels and community maps, the open level
-format, pictures, sounds, the CD image and its InstallShield archive, replays, hint files, level folders' `level.txt`,
+format, pictures, sounds, the CD image and its InstallShield archive, replays, level folders' `level.txt`,
 sound themes, the settings and highscore files — has a fuzz target. There are two ways to run them.
 
 ## The stable fuzzer (runs anywhere, offline)

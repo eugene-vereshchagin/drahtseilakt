@@ -194,8 +194,7 @@ alpha test, two-sided) lies over them. Blocks reach it through `Host::material_s
 - Set Euler Orientation, Scale, Get Nearest In Group, Row Search, Remove Row, Object Rename.
 
 Later stages (2-4, merged) did the physics by script, the drawn copies (the portals' particle frames) and the
-sounds; the census counts every scripted map at full effect. The test player (`--autopilot`) does not know the
-portals: its way stops at one. A level in the open format keeps its arrays' key column and column kinds
+sounds; the census counts every scripted map at full effect. A level in the open format keeps its arrays' key column and column kinds
 (`script_json.rs`); the picks exported before that kept neither, so their portals never made their copies, and they
 were exported again (2026-11-12). A replay of a scripted map recorded
 before this change may play differently (the scripts now do more).

@@ -200,10 +200,7 @@ box side -9 ahead 7
 floor 20
 sign "P_Dome: bumper"
 dome side 0 ahead 10
-pilot all : goto 0 9 0 ; goto 10 10.5 0 ; goto 20 9 0 ; goto 26 0 0
-nopilot all
 floor 26
-autopilot all
 sign "P_Ball_Wood / P_Ball_Stone"
 loose wood side 9 ahead 6
 loose stone side -9 ahead 6
@@ -270,9 +267,7 @@ check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; k
 plaza 18 15 kerb up -6.2
 block 15.4 6.2 width 3 side 10.5 ahead -0.2 top 0
 block 15.4 6.2 width 3 side -10.5 ahead -0.2 top 0
-pilot safe,collector : goto -8 0 0 ; wait 50 ; via 0 0 0 ; via 9 0 0
-pilot speed : via 0 0 0 ; via 9 0 0
-swingbridge nopilot
+swingbridge
 floor 20
 checkpoint
 
@@ -285,7 +280,6 @@ floor 16
 box ahead 4 side -2.4 shove
 box ahead 10 side 2.4 shove
 floor 20
-nopilot all
 columns 0
 safety none
 width 6
@@ -332,7 +326,7 @@ floor 28.95
 corner left
 floor 7.2
 rebate 1 0.5
-gap 7.6 nopilot
+gap 7.6
 rebate 1 0.5
 floor 7.2
 corner right
@@ -427,7 +421,6 @@ safety border
 floor 10
 floor 20
 floor 18
-autopilot all
 columns 60
 checkpoint
 """

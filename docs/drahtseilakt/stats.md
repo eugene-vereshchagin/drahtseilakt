@@ -18,7 +18,7 @@ project, wrote none of it: he set the goals, made the decisions, played, listene
 | | Lines |
 |---|---|
 | Rust, 6 crates | 44,108 |
-| — game (window, menu, sound, simulation rules, autopilot) | 22,882 |
+| — game (window, menu, sound, simulation rules) | 22,882 |
 | — ivp (the physics engine, ported) | 14,080 |
 | — gamedata, level, nmo, cdimage (files, formats, the CD) | 7,146 |
 | Shaders (WGSL) | 296 |

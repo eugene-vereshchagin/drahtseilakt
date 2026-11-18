@@ -178,7 +178,7 @@ part of ours stands in the level and that each element does its job in the game'
 through each element with the arrows and checks where it gets to, how far the module's parts turned or moved and
 where a knocked-out part lies; every check is required. `SHOWCASE_COPY_PARTS=<copy>` runs the same checks with the
 copy's parts in place of ours, `SHOWCASE_ONLY=<prefix>` only the checks so named, `SHOWCASE_TRACE=<check>` prints the
-ball's way. The test player's run is no longer kept for the level. Since the owner's notes 11 (2026-11-16): the drawbridge's lane has a ledge 1 long and 0.5 deep either side of its gap, as level 5's, so the fallen deck lies flush with the lane (its check asserts the ball's height on it); every checkpoint's and the start's bowl is drawn whole; no two drawn faces overlap in one plane (the kit refuses them, `check_coplanar`, and `kit_levels_have_no_faces_flickering_in_one_plane` checks every level it made); signs stand where no way passes; the fan's grille is a grid of bars with a dark hub, as the original's; where the stone ball goes on a bare floor every hard corner has a railing on its outer side (the original's narrow stone lanes are troughs 0.68 deep instead); the sticky ball, which no original level and no converted community map has (it is the BallSticky mod's), stands in the community part with a 40-degree slope it climbs from rest and the wooden ball does not.
+ball's way. Since the owner's notes 11 (2026-11-16): the drawbridge's lane has a ledge 1 long and 0.5 deep either side of its gap, as level 5's, so the fallen deck lies flush with the lane (its check asserts the ball's height on it); every checkpoint's and the start's bowl is drawn whole; no two drawn faces overlap in one plane (the kit refuses them, `check_coplanar`, and `kit_levels_have_no_faces_flickering_in_one_plane` checks every level it made); signs stand where no way passes; the fan's grille is a grid of bars with a dark hub, as the original's; where the stone ball goes on a bare floor every hard corner has a railing on its outer side (the original's narrow stone lanes are troughs 0.68 deep instead); the sticky ball, which no original level and no converted community map has (it is the BallSticky mod's), stands in the community part with a 40-degree slope it climbs from rest and the wooden ball does not.
 Without a copy of the original the level behind the menu is the first shipped level past the showcase (order 0),
 so the menu never shows its sign boards.
 
@@ -455,14 +455,6 @@ another floor's top within 6 of such a piece (within 4 of its height) but the fl
 a way wider than 14 running on from one; the synthetic level narrows its sector 3 to 12 before the checkpoint, and
 `make_test_level.py` gives Parts_Test necks 12 wide between its pieces and its wide floors (the shipped Parts_Test
 is still an earlier kit's build: rebuilt, its slabs' T-joints fail `our_floors_have_no_seams`).
-
-**The test player's knowledge of a level** is in the same file. From the way laid, leveldsl.py writes the test
-player's hint files for three styles into the level's `pilot/` folder (autopilot.md, "Hint files"): `safe` (rolls
-from point to point and stops, takes every checkpoint, no risks), `speed` (rolls through the points without stopping)
-and `collector` (as safe, and fetches every extra point and life off the way). Gaps, seesaws and turning arms are
-taken at speed in every style (the careful ones with a run-up); a place that needs more says so with `pilot STYLES :
-STEPS` (the hint steps, their points as `ahead side up` about the cursor; e.g. a wait timed for a swing) and `nopilot
-STYLES` / `autopilot STYLES` around a stretch the styles take on their own.
 
 **To build a level** from its description: `python3 -I assets/own/make/leveldsl.py DIR/level.lvl` (the showcase
 level: `make_synthetic_level.py`). `scripts/video.sh LEVEL RUN out.mp4` renders a run of it as a video.

@@ -1523,9 +1523,8 @@ def make_modul_03():
     lintel = lambda m, mt: k.hexahedron(m, mt, [
         (-3.582, 4.287, -0.491), (3.601, 4.287, -0.491), (3.25, 4.287, 0.395), (-3.21, 4.287, 0.395),
         (-3.582, 5.438, -0.491), (3.601, 5.28, -0.491), (3.25, 5.09, 0.395), (-3.21, 5.09, 0.395)])
-    # The plain shapes stay the objects' meshes, as they were: the slab is the physics' shape, and the test player
-    # reads the modules' meshes as floors and walls (autopilot.rs, floor_triangles), so a panel must stay one closed
-    # wall to it, not rails and bars. What is drawn is each mesh's look.
+    # The plain shapes stay the objects' meshes, as they were: the slab is the physics' shape, so a panel must stay one
+    # closed wall, not rails and bars. What is drawn is each mesh's look.
     mf = k.Mesh("P_Modul_03_Floor_Mesh")
     slab(mf, floor)
     mf.look = lift_disc("P_Modul_03_Floor_Look", floor, trim, deck, bolts)

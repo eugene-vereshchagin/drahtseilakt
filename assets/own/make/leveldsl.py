@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Compiles a level description (`level.lvl`, a small text language) into a level of the open format beside it
-(docs/drahtseilakt/levels.md, "The level kit"), with levelkit.py, and writes the test player's hint
-files for it (one a style: `pilot/safe.txt`, `pilot/speed.txt`, `pilot/collector.txt`; docs/drahtseilakt/autopilot.md).
+(docs/drahtseilakt/levels.md, "The level kit"), with levelkit.py.
 
 A description lays a track like a turtle: a cursor (a point on the floor's top and a heading) moves on with each
 piece, and parts are put where the cursor is. The heading starts along +X (the camera's view at the start); "left" is
@@ -34,8 +33,7 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     left A R [up H|down H]   a floor turning A degrees to the left on a radius R (right A R: to the right)
     rails L [up H|down H] [ties]   a pair of rails L long (rails-left A R, rails-right A R: turning); with `ties`,
                              ties across between the tubes (a harder ride, for later levels)
-    gap L [up H|down H] [runup R]  the cursor jumps L ahead (and H up or down): nothing built; the test player
-                             takes it at speed (the careful styles with a run-up of R, 14 if not given)
+    gap L [up H|down H]      the cursor jumps L ahead (and H up or down): nothing built
     rebate L D               a floor L long, D lower than the cursor (which stays at its height): the ledge a deck
                              lies in flush with the way, either side of the gap it falls into (the drawbridge's lane,
                              level 5: 1 long, 0.5 deep, the deck's thickness)
@@ -61,8 +59,6 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
     pusher left|right        a pusher (P_Modul_01) in a slot of 1.6 across the way: its block fills the way (at
                              most 6 wide), its target plate stands 5 out past the way's edge on that side, over a
                              floor 2.5 lower (laid by the description) from where a ball pushes the block out
-    smooth                   the careful styles' hints roll through the way's points (`pass`, no stop at each; a
-                             hard corner at a set speed)
     corner left|right [rail] [gap G]   a hard 90 degree corner at the end of a floor (a mitred ring: the outer corner
                              filled, the profile unbroken); `rail`: a railing on its outer side 8 either side, open
                              for G along the way straight on
@@ -84,11 +80,6 @@ piece, and parts are put where the cursor is. The heading starts along +X (the c
                              too), the other stands up beside the way, 15 to the left
     module NAME [side S] [ahead A] [up U] [turn A] [tilt T]  any module, its frame at the cursor (x along the
                              heading, turned A to the left and tilted T up)
-    pilot STYLES : STEP ; STEP    the test player's steps here (STYLES: safe,speed,collector or all), points as
-                             `F S U` about the cursor: goto F S U [T] | via F S U [T] | push F S T | air F S T |
-                             wait T | become KIND | turn N | shove F S U F2 S2 U2 T | lead F S U D T |
-                             press F S U OF OS V T | pass F S U V [T] | hold F S U T
-    nopilot STYLES           no automatic steps from here (until `autopilot STYLES`)
 
 Run: python3 -I assets/own/make/leveldsl.py DIR/level.lvl ...
 (The showcase level is made through compile_level by make_synthetic_level.py; the ten levels of our own once written in
@@ -110,7 +101,6 @@ import levelparts as P  # noqa: E402
 import ownkit as K  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STYLES = ("safe", "speed", "collector")
 LANGS = ("ru", "de", "zh", "fr", "es", "it")
 BALLS = {"wood": "Wood", "stone": "Stone", "paper": "Paper", "sticky": "Sticky"}
 # The masses the game gives the balls, the loose balls and a box (crates/game/src/sim.rs): who can shove whom.
@@ -121,18 +111,13 @@ BOX_MASS = 1.0
 DOME_R = 6.65
 # No loose ball nearer than this to the end of rails.
 RAIL_KEEP = 14.0
-# The test player's automatic steps: a point every this many units along the way, by style.
-SPACING = {"safe": 9.0, "speed": 14.0, "collector": 9.0}
-# the speeds the careful styles roll through the way's points at, and through a hard corner (hint step `pass`)
-PASS_V = {"safe": 8.0, "collector": 8.0}
-CORNER_V = 5.0
 # The slots the stone on the crate and a pusher stand in (crateblock, pusher): the stone is 5 on a side (its slot 5.3, as
 # level 1 has it), the pusher's beam 1.2 wide in its channel.
 # How far a floor's end may be from a checkpoint piece's edge and still join it (the path drifts by a few thousandths).
 JOIN_TOL = 0.02
 CORNER_RAIL = 8.0
 # Commands between a stone corner and the floor out of it that leave its railing to that floor (they lay nothing).
-KEEPS_CORNER_RAIL = ("floor", "width", "sign", "check", "pilot", "nopilot", "autopilot", "smooth", "columns", "drop",
+KEEPS_CORNER_RAIL = ("floor", "width", "sign", "check", "columns", "drop",
                      "surface", "mark")
 CRATE_SLOT = 5.3
 PUSHER_SLOT = 1.6
@@ -152,63 +137,9 @@ BOARD_GAP = 9.1
 # the drawbridge (P_Modul_37; the original's level 5): its frame 1.2 past the spur's end, the crossing lane's middle
 # 13.75 past the frame, its gap 7.6 long
 HINGE_BACK, HINGE_LANE, HINGE_GAP = 1.2, 13.75, 7.6
-# A hint's steps at most (hints.rs takes 64).
-HINT_STEPS = 60
-
 
 class LevelError(Exception):
     pass
-
-
-class Pilot:
-    """The test player's steps by style, in the order the way goes, cut into sectors."""
-
-    def __init__(self):
-        self.sectors = []  # [(trigger point, sector number, {style: [steps]})]
-        self.auto = {s: True for s in STYLES}
-        # `smooth`: the careful styles roll through the way's points (hint step `pass`) instead of stopping at each
-        self.smooth = False
-        self.last = {s: None for s in STYLES}
-
-    def begin(self, at, sector):
-        self.sectors.append((at, sector, {s: [] for s in STYLES}))
-        for s in STYLES:
-            self.last[s] = np.asarray(at, np.float64)
-
-    def step(self, styles, text, at=None):
-        for s in styles:
-            if self.sectors:
-                self.sectors[-1][2][s].append(text)
-                if at is not None:
-                    self.last[s] = np.asarray(at, np.float64)
-
-    def way(self, p, force=False):
-        """A point of the way: a goto (safe, collector) or via (speed) when far enough on from the last."""
-        for s in STYLES:
-            if not self.auto[s] or not self.sectors:
-                continue
-            if force or np.linalg.norm(p - self.last[s]) >= SPACING[s]:
-                if s == "speed":
-                    self.step([s], f"via {fmt(p)}", p)
-                elif not self.smooth:
-                    self.step([s], f"goto {fmt(p)}", p)
-                else:
-                    # rolling on through the point, no faster than PASS_V: a smooth ride (no stop at each point)
-                    self.step([s], f"pass {fmt(p)} {PASS_V[s]:g}", p)
-
-    def corner(self, p, v):
-        """A hard corner at `p`: every style takes it through (the last point of the floor before it, when it is this
-        one, is replaced), no faster than v."""
-        if not self.smooth:
-            return
-        for s in STYLES:
-            if not self.auto[s] or not self.sectors:
-                continue
-            steps = self.sectors[-1][2][s]
-            if steps and steps[-1].split()[0] in ("pass", "via", "goto") and \
-                    np.linalg.norm(np.array(steps[-1].split()[1:4], float) - p) < 0.02:
-                steps.pop()
-            self.step([s], f"pass {fmt(p)} {v if s != 'speed' else v + 3:g}", p)
 
 
 def fmt(p):
@@ -280,7 +211,6 @@ class Track:
         self.sector = 1
         self.marks = {}
         self.count = {}
-        self.pilot = Pilot()
         self.info = {"author": "Drahtseilakt", "sky": "A", "music": 1, "bonus": 100, "ball": "wood",
                      "light": (1.0, 1.0, 1.0), "titles": {}}
         self.started = self.finished = False
@@ -301,8 +231,6 @@ class Track:
         self.lighthouse_at = None
         self.column_run = 0.0
         self.column_spots = []
-        # the length of floor laid since the last gap: the most a run-up to the next can take
-        self.since_gap = 0.0
         self.floor_points = []
         # each point's reach across (half the floor's width, or the rails'), for keeping columns clear of it
         self.floor_reach = []
@@ -360,22 +288,12 @@ class Track:
             if straight:
                 pts, heads = [pts[0], pts[-1]], [heads[0], heads[-1]]
             self.extend_stretch(pts, heads)
-        # a straight piece has only its two ends; a hint's step takes at most 600 ticks, so a long one gets points on it
-        way = [pts[0]]
-        for q in pts[1:]:
-            d = float(np.linalg.norm(q - way[-1]))
-            k = int(d // 30.0) if self.pilot.smooth else 0
-            way += [way[-1] + (q - way[-1]) * (j / (k + 1)) for j in range(1, k + 1)]
-            way.append(q)
-        for p in way[1:]:
-            self.pilot.way(p)
         # every few units of it, for keeping columns clear of it
         self.floor_points.extend(dense)
         self.floor_reach.extend([L.RAIL_GAUGE / 2 + 1.0 if kind == "Rails" else self.width / 2] * len(dense))
         # where along the way each lies (an overpass is a floor far on along the way, not the one before or after)
         self.floor_along.extend([self.along] * len(dense))
         self.floor_rails.extend([kind == "Rails"] * len(dense))
-        self.since_gap += sum(float(np.linalg.norm(b - a)) for a, b in zip(pts, pts[1:]))
         if self.columns and kind == "Floor":
             for a, c in zip(pts, pts[1:]):
                 self.column_run += float(np.linalg.norm(c - a))
@@ -579,9 +497,7 @@ class Track:
             length = num(args, 0, line)
             rise = self.rise(opts, line)
             pts, heads = self.straight(length, rise)
-            if cmd == "gap":
-                self.jump(pts[-1], opts)
-            else:
+            if cmd != "gap":
                 self.lay(pts, heads, "Rails" if cmd == "rails" else "Floor", straight=True, ties="ties" in opts)
             self.move_along(pts)
         elif cmd in ("left", "right", "rails-left", "rails-right"):
@@ -658,8 +574,6 @@ class Track:
             self.floor_end = None
         elif cmd == "corner":
             self.corner(args, opts, line)
-        elif cmd == "smooth":
-            self.pilot.smooth = True
         elif cmd == "plaza":
             self.plaza(args, opts, line)
         elif cmd == "disc":
@@ -685,7 +599,6 @@ class Track:
                 self.pos = np.array([num(args, i, line) for i in range(3)])
             # built with the first floor, as wide as it
             self.start_at = self.pos.copy()
-            self.pilot.begin(self.pos + np.array([0, L.RESET_UP, 0]), 1)
             self.pos = self.at(10.0)
             self.started = True
         elif cmd == "checkpoint":
@@ -694,7 +607,6 @@ class Track:
             self.checkpoints += 1
             self.sector_balls.append(self.ball_kind)
             self.sector_ends.append(self.along)
-            self.pilot.way(self.pos, force=True)
             self.end_rails()
             self.resolve_pending()
             # the piece takes the last half of its length of the floor before it and the first of the floor after;
@@ -714,15 +626,11 @@ class Track:
             self.skip = L.CHECK_LEN / 2
             self.pending = {"n": self.checkpoints, "at": self.pos.copy(), "width": self.width,
                             "fwd": self.fwd(), "back": back, "along": self.along}
-            bottom_reset = self.pos + np.array([0.0, L.CHECK_RESET - L.check_bowl()[-1][1], 0.0])
             self.sector += 1
-            self.pilot.begin(bottom_reset, self.sector)
         elif cmd == "finish":
             at = self.at(22.0)
             self.sector_ends.append(self.along + 22.0)
             self.b.finish(tuple(at), self.sector, xaxis=tuple(-self.fwd()))
-            self.pilot.step(STYLES, f"via {fmt(self.at(12.0))}")
-            self.pilot.step(STYLES, f"goto {fmt(at)} 1200")
             self.finished = True
         elif cmd == "seesaw":
             self.seesaw(line)
@@ -730,16 +638,12 @@ class Track:
             # as every original level has it (levels 2-10): a gap of 15.4, the frame 6.9 on from its near edge
             self.module_at("P_Modul_29", 6.9, 0.0, 0.0)
             pts, _ = self.straight(15.4, 0.0)
-            for p in pts[1:]:
-                self.pilot.way(p)
             self.move_along(pts)
         elif cmd == "swingbridge":
             # as levels 8-10 have it: over a gap of 15, its frame in the middle, 1.2 under the floors' top
             gap = float(opts.get("ahead", 15.0))
             self.module_at("P_Modul_08", gap / 2, -1.2, 0.0)
             pts, _ = self.straight(gap, 0.0)
-            if "nopilot" not in opts:
-                self.pilot.way(pts[-1], force=True)
             self.move_along(pts)
         elif cmd == "crateblock":
             self.crateblock()
@@ -748,19 +652,11 @@ class Track:
         elif cmd == "fan":
             q = self.module_at("P_Modul_18", float(opts.get("ahead", 0)), 0.6, 0.0, float(opts.get("side", 0)))
             self.b.fan_housing(f"Fan_Housing_{self.n('housing'):02d}", tuple(q - np.array([0, 0.6, 0])))
-            if "nopilot" not in opts:
-                self.pilot.step(STYLES, f"goto {fmt(q)}", q)
-                self.pilot.step(STYLES, "wait 240")
         elif cmd == "sack":
             self.module_at("P_Modul_26", float(opts.get("ahead", 0)), 3.0, 0.0, float(opts.get("side", 0)))
         elif cmd == "arms":
             ahead = float(opts.get("ahead", 0))
             self.module_at("P_Modul_17", ahead, 4.5, 0.0, float(opts.get("side", 0)))
-            if "nopilot" not in opts:
-                # through the arms at some speed: a ball rolling up slowly does not turn them
-                for s in ("safe", "collector"):
-                    self.pilot.step([s], f"goto {fmt(self.at(ahead - 14))}", self.at(ahead - 14))
-                self.pilot.step(STYLES, f"via {fmt(self.at(ahead + 8))}", self.at(ahead + 8))
         elif cmd == "flaps":
             self.flaps("stand" in args)
         elif cmd == "flapslot":
@@ -779,11 +675,6 @@ class Track:
             self.hingebridge()
         elif cmd in ("point", "life", "box", "dome", "trafo", "loose", "column", "module"):
             self.part(cmd, args, opts, line)
-        elif cmd == "pilot":
-            self.pilot_steps(args, line)
-        elif cmd in ("nopilot", "autopilot"):
-            for s in styles_of(word(args, 0, line), line):
-                self.pilot.auto[s] = cmd == "autopilot"
         else:
             raise LevelError(f"line {line}: unknown command {cmd}")
 
@@ -819,7 +710,6 @@ class Track:
             st["rails"].insert(-1, st["rails"][-1])
             old = st["rails"][-1]
             st["rails"][-1] = (old[0] or outer[0], old[1] or outer[1])
-        self.pilot.corner(self.pos.copy(), CORNER_V)
         st["heads"][-1] = self.fwd(self.head + 45.0 * sgn)
         st["scales"][-1] = math.sqrt(2.0)
         self.head += 90.0 * sgn
@@ -924,12 +814,9 @@ class Track:
         self.rail_sides = (True, True) if kind == "railings" else (False, False)
 
     def slot(self, length):
-        """The way goes on `length` further with nothing built (a slot a module's part stands or slides in); the test
-        player rolls on over it."""
+        """The way goes on `length` further with nothing built (a slot a module's part stands or slides in)."""
         pts, _ = self.straight(length, 0.0)
         self.end_stretch()
-        for p in pts[1:]:
-            self.pilot.way(p)
         self.move_along(pts)
 
     def crateblock(self):
@@ -975,20 +862,6 @@ class Track:
         self.b.module(name, self.n(name), K.pose(tuple(q), tuple(self.fwd(self.head + turn))), self.sector)
         return q
 
-    def jump(self, land, opts):
-        """A gap: the styles that go carefully take a run-up first; all go over it at speed."""
-        if "nopilot" in opts:
-            return
-        run = min(float(opts.get("runup", 14.0)), max(self.since_gap - 2.0, 0.0))
-        self.since_gap = 0.0
-        take_off = self.pos.copy()
-        for s in ("safe", "collector"):
-            if self.pilot.auto[s] and run > 0:
-                self.pilot.step([s], f"goto {fmt(self.at(-run))}", self.at(-run))
-        on = land + (land - take_off) / (np.linalg.norm(land - take_off) + 1e-9) * 4.0
-        self.pilot.step(STYLES, f"via {fmt(take_off)}", take_off)
-        self.pilot.step(STYLES, f"via {fmt(on)}", on)
-
     def seesaw(self, line):
         """A seesaw (P_Modul_30) over a gap of 12.9 (its board 14.8 long lying on both edges), its frame in the middle
         half a unit under the floor, as every original level sets it (levels 2-9), an unseen stopper under the board."""
@@ -999,8 +872,6 @@ class Track:
         lo, hi = np.minimum(*corners), np.maximum(*corners)
         self.b.stopper(f"Stopper_{self.n('stopper'):03d}", tuple(lo), tuple(hi))
         pts, _ = self.straight(board, 0.0)
-        # onto the board's raised end at some speed (a heavy ball from rest does not get up it)
-        self.jump(pts[-1], {})
         self.move_along(pts)
 
     def fanpad(self, size):
@@ -1209,10 +1080,8 @@ class Track:
         s = self.sector
         if cmd == "point":
             self.b.extra_point(self.n("point"), tuple(p), s)
-            self.pilot.step(["collector"], f"goto {fmt(p)}", p)
         elif cmd == "life":
             self.b.extra_life(self.n("life"), tuple(p), s)
-            self.pilot.step(["collector"], f"goto {fmt(p)}", p)
         elif cmd == "box":
             # a box on a box (`up 5`): it stands on the one under it, not on the floor
             up = float(opts.get("up", 0))
@@ -1232,8 +1101,6 @@ class Track:
                 raise LevelError(f"line {line}: trafo wood|stone|paper|sticky")
             self.b.trafo(kind, self.n("trafo" + kind), tuple(p), s)
             self.ball_kind = kind.lower()
-            if "nopilot" not in opts:
-                self.pilot.step(STYLES, f"become {kind.lower()}", p)
         elif cmd == "loose":
             kind = BALLS.get(word(args, 0, line))
             if kind is None:
@@ -1251,54 +1118,6 @@ class Track:
             tilt = math.radians(float(opts.get("tilt", 0)))
             x = self.fwd(h) * math.cos(tilt) + np.array([0.0, math.sin(tilt), 0.0])
             self.b.module(name, self.n(name), K.pose(tuple(q), tuple(x)), s)
-
-    def pilot_steps(self, args, line):
-        """`pilot STYLES : STEP ; STEP`: the steps with their points about the cursor, turned into world ones."""
-        text = " ".join(args)
-        if ":" not in text:
-            raise LevelError(f"line {line}: pilot STYLES : STEPS")
-        head, body = text.split(":", 1)
-        styles = styles_of(head.strip(), line)
-        for st in (x.split() for x in body.split(";")):
-            if not st:
-                continue
-            verb, w = st[0], [float(x) if is_num(x) else x for x in st[1:]]
-            try:
-                if verb in ("goto", "via"):
-                    p = self.at(w[0], w[1], w[2])
-                    t = f" {int(w[3])}" if len(w) > 3 else ""
-                    self.pilot.step(styles, f"{verb} {fmt(p)}{t}", p)
-                elif verb in ("push", "air"):
-                    d = self.fwd() * w[0] + self.left() * w[1]
-                    self.pilot.step(styles, f"{verb} {d[0]:.3f} {d[2]:.3f} {int(w[2])}")
-                elif verb == "shove":
-                    a, b = self.at(w[0], w[1], w[2]), self.at(w[3], w[4], w[5])
-                    self.pilot.step(styles, f"shove {fmt(a)} {fmt(b)} {int(w[6])}")
-                elif verb == "lead":
-                    a = self.at(w[0], w[1], w[2])
-                    self.pilot.step(styles, f"lead {fmt(a)} {w[3]:.2f} {int(w[4])}")
-                elif verb == "press":
-                    # press F S U OA OS V T: along the line to the point, kept to it (an offset OA OS across it, turned
-                    # as push's direction), on while slower than V
-                    p = self.at(w[0], w[1], w[2])
-                    o = self.fwd() * w[3] + self.left() * w[4]
-                    self.pilot.step(styles, f"press {fmt(p)} {o[0]:.3f} {o[2]:.3f} {w[5]:g} {int(w[6])}", p)
-                elif verb == "pass":
-                    p = self.at(w[0], w[1], w[2])
-                    t = f" {int(w[4])}" if len(w) > 4 else ""
-                    self.pilot.step(styles, f"pass {fmt(p)} {w[3]:g}{t}", p)
-                elif verb == "hold":
-                    p = self.at(w[0], w[1], w[2])
-                    self.pilot.step(styles, f"hold {fmt(p)} {int(w[3])}", p)
-                elif verb in ("wait", "turn"):
-                    self.pilot.step(styles, f"{verb} {int(w[0])}")
-                elif verb == "become":
-                    self.pilot.step(styles, f"become {st[1]}")
-                else:
-                    raise LevelError(f"line {line}: unknown pilot step {verb}")
-            except (IndexError, TypeError, ValueError):
-                raise LevelError(f"line {line}: a malformed pilot step {' '.join(st)}") from None
-
 
 def is_num(x):
     try:
@@ -1321,19 +1140,9 @@ def word(args, i, line):
     return args[i]
 
 
-def styles_of(text, line):
-    if text == "all":
-        return list(STYLES)
-    out = [s.strip() for s in text.split(",")]
-    for s in out:
-        if s not in STYLES:
-            raise LevelError(f"line {line}: no style {s} (safe, speed, collector, all)")
-    return out
-
-
-OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "runup", "r", "height", "wall", "sag", "ahead2",
+OPTION_WORDS = ("up", "down", "side", "ahead", "depth", "turn", "tilt", "r", "height", "wall", "sag", "ahead2",
                 "side2", "up2", "thick", "long", "hole", "gap")
-FLAG_WORDS = ("obstacle", "nopilot", "ties", "shove", "lead", "nolamps", "plug")
+FLAG_WORDS = ("obstacle", "ties", "shove", "lead", "nolamps", "plug")
 
 
 def parse_line(text):
@@ -1341,8 +1150,6 @@ def parse_line(text):
     if not words:
         return None
     cmd, rest = words[0], words[1:]
-    if cmd == "pilot":
-        return cmd, rest, {}, set()
     args, opts, flags = [], {}, set()
     i = 0
     while i < len(rest):
@@ -1469,30 +1276,10 @@ def _compile_level(path, cuts, dry=False, lines=None, track=None, hook=None, ext
                          **(extra or {})})
     except ValueError as e:
         raise LevelError(f"{path}: {e}") from None
-    write_pilot(folder, t)
     lengths = [b - a for a, b in zip([0.0] + t.sector_ends, t.sector_ends)]
     print(f"{folder}: {len(t.b.nodes)} objects, {t.sector} sectors, the way {t.sector_ends[-1]:.0f} long "
           f"(sectors {', '.join(f'{x:.0f}' for x in lengths)}; moves and gaps included)")
     return list(t.new_cuts)
-
-
-def write_pilot(folder, t):
-    out = os.path.join(folder, "pilot")
-    os.makedirs(out, exist_ok=True)
-    for style in STYLES:
-        lines = [f"# {style}: written by leveldsl.py from level.lvl (do not edit; edit level.lvl)"]
-        for at, sector, steps in t.pilot.sectors:
-            chunk_at = at
-            todo = steps[style]
-            while todo:
-                part, todo = todo[:HINT_STEPS], todo[HINT_STEPS:]
-                lines.append(f"at {fmt(chunk_at)} r 5 sector {sector} : " + " ; ".join(part))
-                last = next((s for s in reversed(part) if s.split()[0] in ("goto", "via")), None)
-                if last:
-                    w = last.split()
-                    chunk_at = np.array([float(w[1]), float(w[2]) + 2.0, float(w[3])])
-        with open(os.path.join(out, f"{style}.txt"), "w") as f:
-            f.write("\n".join(lines) + "\n")
 
 
 def main(argv):

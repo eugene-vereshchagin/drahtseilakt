@@ -59,7 +59,7 @@ Drahtseilakt 由三部分组成，它们变化的速度不同，所以分开发�
 
 | 位置 | 内容 |
 |---|---|
-| `eugene-vereshchagin/drahtseilakt`（本仓库） | 游戏、引擎 crate（`crates/`：`nmo`、`level`、`gamedata`、物理 `ivp`、`script`、`game` 等）、`assets/`（基础数据）、`docs/`、`scripts/`、`tools/`、`hints/`（自动驾驶计划）、`tests/` |
+| `eugene-vereshchagin/drahtseilakt`（本仓库） | 游戏、引擎 crate（`crates/`：`nmo`、`level`、`gamedata`、物理 `ivp`、`script`、`game` 等）、`assets/`（基础数据）、`docs/`、`scripts/`、`tools/`、`tests/` |
 | `eugene-vereshchagin/drahtseilakt-toolbox` | toolbox，有自己的发布和 CI；它通过本仓库的 `crates/gamedata` 和 `crates/level` 读取关卡 |
 | `assets/` | 随游戏发布的内容：我们的部件、字体、声音、出厂模组、`levels/community/` 和 `levels/drahtseilakt/`（后者在 git 中只有精选地图的 `level.txt`，其文件是发布附件） |
 | `docs/drahtseilakt/` | 项目文档（路线图、决策、格式、菜单、模组）；每页在 `docs/ru/`、`docs/de/`、`docs/zh/` 中也有对应版本 |

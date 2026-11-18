@@ -250,11 +250,6 @@ following hold. State as of 2026-11-16: **done**, **partly**, **open**.
   and physics. **Done**; their looks are still being improved (resources.md).
 - **No copy needed**: the game starts and plays with no copy of the original at all; importing the original levels
   stays on offer through the toolbox. **Done.**
-- **Autopilot runs and videos** are of the original levels and of the modified sets (45° camera, invisible track),
-  the videos for YouTube (4K, each with its README). Autopilot passes of the shipped community maps are **not** a
-  release condition (owner, 2026-11-14). Runs: **done** for the 13 original levels (`hints/runs/`), the 45° set and
-  the invisible set (`hints/runs/modified/`); videos: **partly** (single levels recorded, the full series and the
-  upload open).
 - **Builds for every desktop platform**: Linux, Windows and macOS (BSD welcome), as installers and as a portable
   folder. **Partly**: the Linux portable build exists and is kept current; the Windows and macOS builds are prepared in
   CI (`.github/workflows/drahtseilakt-release.yml`, state 2026-11-18: Windows installer and portable zip, Linux portable archive and `.deb`/`.rpm`, macOS `.dmg` and portable archive, FreeBSD experimental; draft release on a version tag; what to download: [distribution.md](distribution.md)) and wait for the owner's command to tag and publish.

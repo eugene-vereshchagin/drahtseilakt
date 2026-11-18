@@ -531,28 +531,6 @@ limit). A program update then rebuilds only the binary packages. Release file na
 takes the newest release from the GitHub API (`releases/latest`). Which file is for whom: `docs/drahtseilakt/distribution.md`; the
 build and upload steps: `docs/drahtseilakt/release.md`.
 
-## Replays and the autopilot's data live in a separate autopilot store
+## Our replays and recorded runs are not in this repository
 
-*Owner's decision, 2026-11-18.* Our replays, the recorded runs and everything the autopilot reads (routes, plans, hints,
-zones, the learned table, the level-stats annotations) do not belong on GitHub, and they are easier to manage apart.
-They moved out of `hints/` and `tests/replays/` into a repository of their own, `drahtseilakt-tools/autopilot`, beside this
-one (private, never published). One resolver finds it: the environment variable `DRAHTSEILAKT_AUTOPILOT`, else
-`../drahtseilakt-tools/autopilot` from the repository root. Tests that need it skip with a message when it is absent (as
-without `OPENBALLANCE_DATA`), so CI, which has none, stays green; the game itself never reads it. What the game
-compiles in, the sectors' starting balls, moved to `crates/level/data/sector-balls.txt`. A level's own data
-(`assets/levels/*/pilot/`) stays with the level. The recorded runs the game's own tests play are not the autopilot's:
-they are in `drahtseilakt-tools/test-runs`, found through `DRAHTSEILAKT_TEST_RUNS` (owner, 2026-11-18: the autopilot
-moves out of the game entirely, so nothing of the game names it).
-
-## The autopilot leaves the game
-
-*Owner's decision, 2026-11-18.* The autopilot (the test player, the video tracking, the level statistics' runs) is our
-tool for the videos, not part of the game: it moves whole into the private `drahtseilakt-tools` repository, and the game
-keeps no reference to it. The game becomes a library (`crates/game/src/lib.rs`) with a thin binary; a tool drives it
-through the library's public API and a generic hook for an outside player of a run in the window
-(`control.rs`, `Controller`: it plays the ticks, takes its own keys, draws its own marks), which the game's own binary
-never fills. The live watch mode (`--watch`, taking over by hand, the zone marks) stays, on that hook. The dev logs stay
-in the game as generic diagnostics, and so does `scripts/video.sh`. The recorded runs the game's tests play are in
-`drahtseilakt-tools/test-runs` (`DRAHTSEILAKT_TEST_RUNS`). The autopilot's docs go to the tools repository, in English
-only. First stage: the autopilot's code sits apart in `crates/game/src/pilot/`, using only the public API; the next
-moves that tree out.
+*Owner's decision, 2026-11-18.* Our own replays, recorded runs and development tools live in a private repository of their own, never published. The recorded runs the game's own tests play are found through the environment variable `DRAHTSEILAKT_TEST_RUNS`; tests that need them skip with a message when it is absent.
