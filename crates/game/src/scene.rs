@@ -1,5 +1,7 @@
 // What to draw: the level's visible objects and the ball, from the simulation state, interpolated between the
 // last two ticks so motion is smooth at any display rate.
+// Reason for the allow: scene assembly from the validated level model and the module table.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::render::{Instance, View};
 use crate::sim::{BallKind, Sim};

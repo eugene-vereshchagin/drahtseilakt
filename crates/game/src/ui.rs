@@ -2,6 +2,8 @@
 // its texture font (Font_1 with the glyph table M_FontData_01, laid out as 2D Text does; docs/fonts.md). The 640×480
 // layout sits in the middle of the window at 4:3, its left and right parts anchored to the window's edges, so any
 // size and aspect ratio shows it whole.
+// Reason for the allow: UI text layout over strings and fixed fonts, indexes from their own scans.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::assets::Data;
 

@@ -89,7 +89,7 @@ fn build(dirs: &[PathBuf]) -> Tables {
                 None => {
                     codes.push(code);
                     tables.push(Table::new());
-                    codes.len() - 1
+                    codes.len().saturating_sub(1)
                 }
             };
             if let Some(t) = tables.get_mut(i) {
@@ -196,7 +196,7 @@ impl Strings {
         let column = COPY_LANGUAGES
             .iter()
             .position(|&l| l == language)
-            .map(|c| c + 1);
+            .map(|c| c.saturating_add(1));
         let cell = |row: &[nmo::scene::Cell], c: usize| match row.get(c) {
             Some(nmo::scene::Cell::String(b)) => Some(latin1(b)),
             _ => None,
@@ -327,7 +327,7 @@ impl Strings {
         ];
         let list: crate::highscore::List = NAMES
             .iter()
-            .zip((0..).map(|k| 3000 - 250 * k))
+            .zip((0..i64::MAX).map(|k: i64| 3000_i64.saturating_sub(250_i64.saturating_mul(k))))
             .map(|(n, p)| (n.as_bytes().to_vec(), p))
             .collect();
         self.highscores = vec![list; crate::menu::LEVELS as usize];

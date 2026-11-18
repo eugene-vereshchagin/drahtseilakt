@@ -287,7 +287,7 @@ impl Replay {
         let Some(version) = FORMATS.iter().position(|f| *f == head) else {
             return Err(format!("not a replay (expected \"{FORMAT}\")"));
         };
-        let version = version as u32 + 1;
+        let version = u32::try_from(version).map_or(u32::MAX, |v| v.saturating_add(1));
         let level = lines.next().ok_or("missing level line")?;
         let mut f = level.split_whitespace();
         if f.next() != Some("level") {
@@ -405,7 +405,7 @@ fn parse_frame_line<'a>(
                 _ => return None,
             };
             cur.set(u8::from_str_radix(hex, 16).ok()?, on);
-            n += 1;
+            n = 1;
         }
         if n == 0 {
             return None;
@@ -681,5 +681,43 @@ mod tests {
         assert!(old.pauses.is_empty());
         assert!(Replay::parse("drahtseilakt-replay 10\nlevel a 1\npause 1 1\nend 1").is_err());
         Ok(())
+    }
+
+    #[test]
+    fn broken_replay_lines_are_errors_never_panics() {
+        let head = "drahtseilakt-replay 11\nlevel a 1\n";
+        for bad in [
+            "keys",
+            "keys 5",
+            "keys 5 +",
+            "keys 5 +zz",
+            "keys 99999999999999999999999 +1",
+            "keys 5 +1ff",
+            "mouse 1 40000 0",
+            "mouse 1 x y",
+            "start 0 - -",
+            "start 18446744073709551616 - -",
+            "start 1 - 1,2",
+            "start 1 - nan,0,0",
+            "turn 18446744073709551615 359",
+            "pause 18446744073709551615 1 extra",
+            "1",
+            "ff",
+            "-1 00",
+            "end",
+            "end -1",
+            "\u{0}\u{1}\u{ffff}",
+        ] {
+            let _ = Replay::parse(&format!("{head}{bad}\nend 2"));
+        }
+        // a head cut anywhere
+        let full = Replay::new("a", 1).to_text();
+        for cut in 0..full.len() {
+            if let Some(part) = full.get(..cut) {
+                let _ = Replay::parse(part);
+            }
+        }
+        assert!(Replay::parse("").is_err());
+        assert!(Replay::parse("drahtseilakt-replay 18446744073709551615\n").is_err());
     }
 }

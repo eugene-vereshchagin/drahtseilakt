@@ -2,6 +2,8 @@
 // checkpoints to the end, then steers the ball along it by trying each arrow combination on copies of the run and
 // keeping the one that gets furthest without losing the ball. Its runs are ordinary replays, so they play back in the
 // game like the owner's.
+// Reason for the allow: a planner over the validated level model and sim state; reads only numbers it computed itself (env knobs are parsed with get/parse().ok()).
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::sim::{Sim, input};
 use glam::{Mat4, Vec3};

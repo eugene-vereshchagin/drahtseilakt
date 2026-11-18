@@ -135,7 +135,7 @@ pub fn next(by: i32) -> Look {
     let now = chosen();
     let at = i64::try_from(ok.iter().position(|&l| l == now).unwrap_or(0)).unwrap_or(0);
     let n = i64::try_from(ok.len().max(1)).unwrap_or(1);
-    usize::try_from((at + i64::from(by)).rem_euclid(n))
+    usize::try_from(at.saturating_add(i64::from(by)).rem_euclid(n))
         .ok()
         .and_then(|i| ok.get(i).copied())
         .unwrap_or(Look::Drahtseilakt)

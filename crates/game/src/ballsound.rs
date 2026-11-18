@@ -3,6 +3,8 @@
 // keeps touching one (Roll Wood/Stone, Roll Paper: PhysicsContinuousContact), its volume and pitch following the
 // ball's speed (MultiRollSoundControl). The sounds come from the BallSound table, by ball kind. This works out what
 // to play each tick; the window plays it (audio.rs), so runs without a window stay silent.
+// Reason for the allow: sound triggers from simulation state and fixed tables indexed by small enums.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::physics::BallSounds;
 use crate::sim::BallKind;

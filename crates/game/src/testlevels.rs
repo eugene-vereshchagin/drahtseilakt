@@ -2,6 +2,8 @@
 // showcase level 00-Showcase (docs/drahtseilakt/levels.md, "The level kit"). Railings and borders keep the
 // ball on, the floors have no seams, no two drawn faces flicker in one plane, no loose body starts inside a floor.
 // (The ten levels of our own these checks were first written for were removed on 2026-11-16, decisions.md.)
+// Reason for the allow: test-level builders over fixed tables.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

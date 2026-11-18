@@ -1,6 +1,8 @@
 // The renderer: uploads level models (meshes, materials, textures) once and draws a list of instances each
 // frame, to a window surface or to an offscreen texture (screenshots, later video). Any size and aspect ratio:
 // the projection always uses the real one.
+// Reason for the allow: GPU rendering over the validated scene and fixed tables; no file is parsed here.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::particles::Blend as PBlend;
 use glam::{Mat4, Vec3};

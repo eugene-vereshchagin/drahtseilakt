@@ -4,6 +4,8 @@
 // follows a moved parent), whether it is shown, its mesh and materials, its class and whether it is alive.
 // It is part of the run's state: it clones and rewinds with it, and a level without scripts never has one (the
 // renderer then takes the old path untouched).
+// Reason for the allow: scene rows built from the validated level model, nesting depth capped by MAX_DEPTH.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::{Mat4, Vec3};
 use level::Level;

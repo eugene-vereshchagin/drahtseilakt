@@ -4,6 +4,8 @@
 // run twice from the same start with the same input, once made of the copy's part and once of ours, and the ball's
 // ways and the parts' ways are compared (decisions.md, "The game plays out of the box": physics values unchanged,
 // collision shapes of the measured sizes, so the same input gives the same way within a tolerance).
+// Reason for the allow: a developer check over the validated level model.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

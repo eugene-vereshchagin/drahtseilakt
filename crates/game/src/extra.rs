@@ -2,6 +2,8 @@
 // six small balls orbit the pickup; when the ball comes within 3 they fly away for a second, then home in on the
 // ball one by one, each that reaches it counting as a hit. The pickup gives 100 points when it fires and 20 for each
 // hit (C game, level 1: an extra point moved onto the ball gave 100 at once and 220 in all).
+// Reason for the allow: extra-geometry builders over fixed tables and the validated level model.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::{Quat, Vec3};
 

@@ -5,6 +5,8 @@
 // from Noto Sans SC. The glyphs a text needs are rasterised once into an atlas the renderer takes as the named
 // texture `Noto_Fallback`, and laid out as 2D Text lays out the game's font (ui.rs): the same rectangles, alignment,
 // word wrap, colour and shadow, so a screen's layout is the same in either font.
+// Reason for the allow: glyph atlas packing over bitmaps rasterised by the font crate from size-capped font files (FONT_MAX); rectangles are bounded by SIDE.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::ui::{
     ALIGN_BOTTOM, ALIGN_LEFT, ALIGN_RIGHT, ALIGN_TOP, CONTEXT_H, Quad, Style, TEXT_SCREEN,

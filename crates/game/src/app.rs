@@ -1,6 +1,8 @@
 // Running the game: in a window (keyboard or a replay drives the simulation), or without one (replay checks and
 // screenshots). The simulation always advances in fixed 60 Hz ticks; the window draws at the display's rate and
 // interpolates between the last two ticks.
+// Reason for the allow: the game loop and its capture/replay drivers work on the validated level model and the parsed Replay (file reading and parsing are in replay.rs, hints.rs, userreplay.rs; the few outside values here are checked at the spot).
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::Options;
 use crate::assets::{Data, LoadedLevel};
@@ -166,7 +168,7 @@ fn start_of(o: &Options, level: &level::Level) -> Result<Option<crate::replay::S
         .sector
         .or_else(|| {
             at.and_then(|p| crate::sim::sector_near(level, glam::Vec3::from(p)))
-                .map(|n| n + 1)
+                .map(|n| n.saturating_add(1))
         })
         .unwrap_or(1);
     Ok(Some(crate::replay::Start {
@@ -178,7 +180,11 @@ fn start_of(o: &Options, level: &level::Level) -> Result<Option<crate::replay::S
 
 fn begin_at(sim: &mut Sim, st: &crate::replay::Start) {
     let kind = st.ball.as_deref().and_then(crate::sim::BallKind::from_name);
-    sim.start_from(st.sector - 1, kind, st.at.map(glam::Vec3::from));
+    sim.start_from(
+        st.sector.saturating_sub(1),
+        kind,
+        st.at.map(glam::Vec3::from),
+    );
 }
 
 impl Game {
@@ -836,7 +842,7 @@ impl Game {
             targets.push(r.clone());
         }
         let best = dir.join("best.replay");
-        let best_ticks = std::fs::read_to_string(&best)
+        let best_ticks = crate::hints::read_utf8(&best, crate::hints::MAX_REPLAY_FILE)
             .ok()
             .and_then(|t| Replay::parse(&t).ok())
             // a stale run (recorded under the old script rules) is no longer this level's best
@@ -2288,13 +2294,13 @@ struct Watched {
 /// not while a ball is being lost) is its way, the transformers it went into its gates, and it begins where the run
 /// began. Each --then run (one begun at a sector) is followed from its sector on instead.
 fn follow_run(o: &Options, data: &Data, follow: &Path) -> Result<(), String> {
-    let text = std::fs::read_to_string(follow).map_err(|e| format!("{}: {e}", follow.display()))?;
+    let text = crate::hints::read_utf8(follow, crate::hints::MAX_REPLAY_FILE)?;
     if text.starts_with(crate::locate::TRACK_HEAD) {
         return follow_track(o, data, &text);
     }
     let mut w = watch_run(o, data, follow, &text)?;
     for more in &o.then {
-        let text = std::fs::read_to_string(more).map_err(|e| format!("{}: {e}", more.display()))?;
+        let text = crate::hints::read_utf8(more, crate::hints::MAX_REPLAY_FILE)?;
         let m = watch_run(o, data, more, &text)?;
         let Some(from) = m.run.start.as_ref().map(|st| st.sector.saturating_sub(1)) else {
             return Err(format!(
@@ -2919,7 +2925,7 @@ fn read_plan(
     level: &level::Level,
     sector: usize,
 ) -> Result<Vec<(glam::Vec3, bool)>, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let text = crate::hints::read_utf8(path, crate::hints::MAX_FILE)?;
     let mut out = Vec::new();
     let begins = format!("PC_TwoFlames_{sector:02}");
     for line in text.lines() {
@@ -2939,8 +2945,10 @@ fn read_plan(
             .filter_map(|w| w.parse().ok())
             .filter(|v: &f32| v.is_finite())
             .collect();
-        if xyz.len() == 3 && name.split_whitespace().count() == 3 {
-            out.push((glam::Vec3::new(xyz[0], xyz[1], xyz[2]), false));
+        if let [x, y, z] = xyz[..]
+            && name.split_whitespace().count() == 3
+        {
+            out.push((glam::Vec3::new(x, y, z), false));
             continue;
         }
         let i = level
@@ -2953,7 +2961,10 @@ fn read_plan(
             continue;
         }
         let trafo = level.groups_of(i).any(|g| g.starts_with("P_Trafo"));
-        out.push((glam::Vec3::from(level.objects[i].position()), trafo));
+        out.push((
+            glam::Vec3::from(level.objects.get(i).map_or([0.0; 3], |o| o.position())),
+            trafo,
+        ));
     }
     Ok(out)
 }

@@ -61,9 +61,11 @@ impl Fullscreen {
 
     /// The next choice to the left (-1) or right (+1), round.
     pub fn next(self, by: i32) -> Fullscreen {
-        let i = Fullscreen::ALL.iter().position(|&f| f == self).unwrap_or(0) as i32;
-        let n = Fullscreen::ALL.len() as i32;
-        Fullscreen::ALL[(i + by).rem_euclid(n) as usize]
+        let all = Fullscreen::ALL;
+        let i = i64::try_from(all.iter().position(|&f| f == self).unwrap_or(0)).unwrap_or(0);
+        let n = i64::try_from(all.len()).unwrap_or(1).max(1);
+        let at = usize::try_from(i.saturating_add(i64::from(by)).rem_euclid(n)).unwrap_or(0);
+        all.get(at).copied().unwrap_or(self)
     }
 }
 
@@ -157,7 +159,8 @@ impl Graphics {
 
     /// The field of view moved by `by` steps, inside its range.
     pub fn fov_by(&self, by: i32) -> u32 {
-        let f = i64::from(self.fov) + i64::from(by) * i64::from(FOV_STEP);
+        let f =
+            i64::from(self.fov).saturating_add(i64::from(by).saturating_mul(i64::from(FOV_STEP)));
         let (lo, hi) = (i64::from(*FOV_RANGE.start()), i64::from(*FOV_RANGE.end()));
         u32::try_from(f.clamp(lo, hi)).unwrap_or(FOV_ORIGINAL)
     }
@@ -385,7 +388,7 @@ impl Bindings {
         self.keys
             .iter()
             .enumerate()
-            .all(|(i, k)| !self.keys.iter().skip(i + 1).any(|o| o == k))
+            .all(|(i, k)| !self.keys.iter().skip(i.saturating_add(1)).any(|o| o == k))
     }
 
     /// The settings' lines for them.

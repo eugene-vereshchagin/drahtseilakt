@@ -44,7 +44,9 @@ fn wrap(text: &str, max: usize) -> Vec<String> {
         for word in para.split(' ').filter(|w| !w.is_empty()) {
             let mut word = word.to_string();
             loop {
-                let need = cells(&cur) + usize::from(!cur.is_empty()) + cells(&word);
+                let need = cells(&cur)
+                    .saturating_add(usize::from(!cur.is_empty()))
+                    .saturating_add(cells(&word));
                 if need <= max {
                     if !cur.is_empty() {
                         cur.push(' ');

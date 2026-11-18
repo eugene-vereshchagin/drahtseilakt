@@ -1,5 +1,7 @@
 // The level's physical geometry: what the level's physical groups (floors, rails, modules) are made of, one mesh per
 // object as the original physicalizes them. The watch measures the ball's distance to their triangles.
+// Reason for the allow: collision maths over the validated level model's meshes.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::physics::Rot;
 use glam::Vec3;

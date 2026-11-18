@@ -40,8 +40,9 @@ impl Rng {
 pub fn pick(rng: &mut Rng, n: usize, last: Option<usize>) -> usize {
     match last {
         Some(l) if n > 1 && l < n => {
-            let k = ((rng.next() * (n - 1) as f64) as usize).min(n - 2);
-            if k >= l { k + 1 } else { k }
+            // n > 1 here, so n - 1 and n - 2 do not underflow
+            let k = ((rng.next() * n.saturating_sub(1) as f64) as usize).min(n.saturating_sub(2));
+            if k >= l { k.saturating_add(1) } else { k }
         }
         _ => ((rng.next() * n as f64) as usize).min(n.saturating_sub(1)),
     }

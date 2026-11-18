@@ -2,6 +2,8 @@
 // (`stage`, `textures_planned`, ...: global counters, so any part of the load can say what it is doing without
 // plumbing); the window's frames read them (`fraction`, `text`). What is seen is a picture traced by a shader
 // (titlescene.rs) with the screens' words over it (`Art`), drawn at the window's own size.
+// Reason for the allow: load-screen progress and layout from counters and capped texture sizes.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::lang::Strings;
 use crate::ui::{Quad, Screen};

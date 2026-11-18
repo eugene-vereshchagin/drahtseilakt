@@ -1,5 +1,7 @@
 // The pixel work of Blend Textures and Write In Texture on a per-run copy of a level texture (matstate.rs keeps the
 // copies). Pure functions over RGBA buffers; nothing here reads a file or the clock.
+// Reason for the allow: texture painting over images already decoded and size-capped by the image crate.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use std::sync::Arc;
 

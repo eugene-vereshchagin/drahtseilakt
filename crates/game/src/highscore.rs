@@ -67,9 +67,9 @@ impl Table {
     /// Puts `name` with `points` on level `level`'s list; its place, if it made the list.
     pub fn insert(&mut self, level: u32, name: &[u8], points: i64) -> Option<usize> {
         let at = self.place(level, points)?;
-        let i = (level - 1) as usize;
+        let i = usize::try_from(level.saturating_sub(1)).ok()?;
         if self.lists.len() <= i {
-            self.lists.resize(i + 1, Vec::new());
+            self.lists.resize(i.saturating_add(1), Vec::new());
         }
         let list = self.lists.get_mut(i)?;
         let name = name.get(..NAME_MAX).unwrap_or(name).to_vec();
@@ -92,7 +92,7 @@ impl Table {
         let mut out = Vec::new();
         for (i, list) in self.lists.iter().enumerate() {
             for (name, points) in list {
-                out.extend_from_slice(format!("{} {points} ", i + 1).as_bytes());
+                out.extend_from_slice(format!("{} {points} ", i.saturating_add(1)).as_bytes());
                 // the name in one line: Latin-1 bytes without line breaks
                 out.extend(
                     name.iter()
@@ -128,7 +128,7 @@ impl Table {
             if t.lists.len() < level {
                 t.lists.resize(level, Vec::new());
             }
-            if let Some(list) = t.lists.get_mut(level - 1)
+            if let Some(list) = t.lists.get_mut(level.saturating_sub(1))
                 && list.len() < PLACES
             {
                 list.push((name.get(..NAME_MAX).unwrap_or(name).to_vec(), points));
@@ -182,6 +182,20 @@ mod tests {
         t.insert(1, b"J\xfcrgen", 5000);
         let back = Table::merged(&defaults(), Table::parse(&t.to_text()));
         assert_eq!(back, t);
+    }
+
+    #[test]
+    fn absurd_lines_are_skipped() {
+        let mut text =
+            b"18446744073709551615 5 huge\n0 5 zero\n1 99999999999999999999 big\n".to_vec();
+        text.extend(b"\xff\xfe 5 raw\n1 -9223372036854775808 low\n\n \n1\n");
+        text.extend(std::iter::repeat_n(b'x', 1 << 20));
+        let t = Table::parse(&text);
+        assert!(t.list(1).len() <= PLACES);
+        assert!(t.list(u32::MAX).is_empty());
+        let mut t = Table::default();
+        assert_eq!(t.insert(0, b"x", 1), None);
+        assert_eq!(t.insert(u32::MAX, b"x", 1), None);
     }
 
     #[test]

@@ -105,8 +105,12 @@ pub fn parse_name(stem: &str) -> Name {
     let stem = stem.strip_prefix("反向").unwrap_or(stem);
     // the bracket at the end
     let (head, inner) = match (stem.rfind('('), stem.rfind(')')) {
-        (Some(a), Some(b)) if a < b && stem[b + 1..].trim().is_empty() => {
-            (&stem[..a], Some(&stem[a + 1..b]))
+        (Some(a), Some(b)) if a < b => {
+            let after = stem.get(b.saturating_add(1)..).unwrap_or("x");
+            match (stem.get(..a), stem.get(a.saturating_add(1)..b)) {
+                (Some(h), Some(i)) if after.trim().is_empty() => (h, Some(i)),
+                _ => (stem, None),
+            }
         }
         _ => (stem, None),
     };
@@ -129,7 +133,7 @@ pub fn parse_name(stem: &str) -> Name {
     // "Level" (any case), an optional "_" or space, and digits
     let lower = head.to_ascii_lowercase();
     let level = lower.find("level").and_then(|at| {
-        let after = head.get(at + 5..)?;
+        let after = head.get(at.saturating_add(5)..)?;
         let digits: String = after
             .trim_start_matches(['_', ' '])
             .chars()

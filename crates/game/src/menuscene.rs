@@ -2,6 +2,8 @@
 // camera (Cam_MenuLevel) carried round a closed TCB curve (I_MenuLevel_Curve) once every 44 seconds by Position On
 // Curve and looking at its target, the four flames of its start, and the stone ball rolling its recorded way (Record
 // Anim, played by Ball_Stone Script's Play Animation 3D Entity once every 59.246 seconds, looping).
+// Reason for the allow: the menu scene comes from nmo::scene values already bounds-checked by the nmo crate; the curve maths below work on its validated point lists.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::render::Instance;
 use glam::{Mat4, Vec3};

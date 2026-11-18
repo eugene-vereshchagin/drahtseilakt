@@ -2,6 +2,8 @@
 // Blend Modes, ...). The level's own materials stay as loaded; this is a small overlay on top, part of the run
 // state (it clones and rewinds with the run, and a new run starts without it). The renderer reads it each frame and
 // rebuilds only the materials whose overlay changed (render.rs, `sync_materials`).
+// Reason for the allow: material-state bookkeeping over textures already decoded and size-capped, with MAX_COPY_BYTES budget.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::texpaint::{self, Pix};
 use level::{Blend, Level, Material, TextureSource};

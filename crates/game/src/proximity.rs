@@ -3,6 +3,8 @@
 // minimum near to a maximum far, and Enter / In / Exit / Out range events. Ported from the C reference
 // (src/bb/bb_interface.c); the distances are compared squared, as the block does by default, so N is linear in the
 // squared distance, and only over the axes its setting names (the modules' wake-ups measure across, x and z).
+// Reason for the allow: distance-based gain maths over fixed constants and the simulation's ticks.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::Vec3;
 

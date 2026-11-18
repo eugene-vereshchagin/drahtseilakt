@@ -345,7 +345,7 @@ pub fn learn(
             .filter_map(|s| s.values.get(f).and_then(|v| v.as_deref()))
         {
             match counts.iter_mut().find(|c| c.0 == v) {
-                Some(c) => c.1 += 1,
+                Some(c) => c.1 = c.1.saturating_add(1),
                 None => counts.push((v, 1)),
             }
         }
@@ -405,6 +405,9 @@ pub fn append(path: &Path, r: &Rule) -> Result<bool, String> {
 }
 
 /// Today's date (UTC), for a rule's evidence.
+// The only input is the system clock: `days` is at most u64::MAX / 86400 (about 2e14), so every step below stays
+// within about 1e15, far from i64's limit; the date is not read from any file.
+#[allow(clippy::arithmetic_side_effects)]
 pub fn today() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

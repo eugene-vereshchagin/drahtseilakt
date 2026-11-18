@@ -2,6 +2,8 @@
 // a dark field with the lines Level Bonus, Time Points, Extra Lives and, under a rule, Score, in GameFont_04 with its
 // shadow; a yellow bar on the line being counted. The level bonus comes first, then the points left on the counter
 // move over to Time Points (one a frame, then five, then faster), then 200 for each life, one life at a time.
+// Reason for the allow: end-screen animation from simulation counters and fixed constants.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::sim::Sim;
 use crate::ui::{ALIGN_RIGHT, Anchor, Face, Quad, Screen, Style, TEXT_SCREEN, homogeneous, place};

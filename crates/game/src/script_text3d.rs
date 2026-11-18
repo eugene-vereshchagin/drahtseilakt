@@ -2,6 +2,8 @@
 // XY plane of the entity the block targets, with the entity's world matrix, so the text follows it when it moves. They
 // go to the renderer as particle batches: world-space vertices, depth-tested, alpha-blended, unlit. The layout is
 // pure and never touches the simulation.
+// Reason for the allow: 3D text layout over fixed font tables and values the script runtime has already clamped.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::fallback;
 use crate::particles::{Batch, Blend, Vertex};

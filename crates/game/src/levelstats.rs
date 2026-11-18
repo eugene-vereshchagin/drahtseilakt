@@ -9,6 +9,8 @@
 // sides and the width the sample gets one class of track, from easy to hard: a corridor (walls), a wide floor, a
 // trough, posts, curbs, an open floor, a narrow open path, rails, a single rail, rails ridden on their side; or the
 // ball is on a module's moving part, or in the air.
+// Reason for the allow: a developer analysis over the engine's own runs and the validated level model; reads no file itself.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::Options;
 use crate::assets::{Data, Source};

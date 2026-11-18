@@ -256,11 +256,13 @@ pub fn fill_meet(track: &mut Track, bodies: &[Vec<(usize, Vec3)>]) {
         if touch(track, bodies, j).is_some() {
             continue;
         }
-        let next = (j + 1..(j + TRACE_MEET).min(n)).find_map(|i| touch(track, bodies, i));
+        let next = (j.saturating_add(1)..j.saturating_add(TRACE_MEET).min(n))
+            .find_map(|i| touch(track, bodies, i));
         if let Some(object) = next
             && let Some(&(_, p)) = bodies.get(j).and_then(|b| b.iter().find(|b| b.0 == object))
+            && let Some(slot) = track.meet.get_mut(j)
         {
-            track.meet[j] = Some((object, p));
+            *slot = Some((object, p));
         }
     }
 }
@@ -278,7 +280,7 @@ fn meet_late(track: &Track, k: usize, sim: &Sim) -> i64 {
     };
     // the run's tick whose place of the body is nearest where it is now (ties to the nearest tick)
     let mut best = (k, f32::INFINITY);
-    for j in k.saturating_sub(TRACE_MEET)..(k + TRACE_MEET).min(track.meet.len()) {
+    for j in k.saturating_sub(TRACE_MEET)..k.saturating_add(TRACE_MEET).min(track.meet.len()) {
         if let Some(Some((o, p))) = track.meet.get(j)
             && o == object
         {
@@ -288,7 +290,7 @@ fn meet_late(track: &Track, k: usize, sim: &Sim) -> i64 {
             }
         }
     }
-    k as i64 - best.0 as i64
+    (k as i64).saturating_sub(best.0 as i64)
 }
 
 /// Where the run had the ball at tick `k`, and its speed, as they are now: relative to the body it rode, when that
@@ -389,9 +391,12 @@ pub fn match_tick(track: &Track, next: usize, ball: Vec3, wide: bool) -> usize {
     if n == 0 {
         return 0;
     }
-    let first = next.saturating_sub(1).min(n - 1);
-    let end = (next + if wide { TRACE_SEARCH } else { TRACE_WINDOW }).min(n - 1);
-    let mut best = (next.min(n - 1), f32::INFINITY);
+    let last = n.saturating_sub(1);
+    let first = next.saturating_sub(1).min(last);
+    let end = next
+        .saturating_add(if wide { TRACE_SEARCH } else { TRACE_WINDOW })
+        .min(last);
+    let mut best = (next.min(last), f32::INFINITY);
     for j in first..=end {
         let Some(p) = track.pos.get(j) else { break };
         let skip = (j as f32 - next as f32).abs() / 60.0;
@@ -996,6 +1001,12 @@ pub fn write_plain(path: &Path, text: &str) -> Result<(), String> {
     })
 }
 
+/// The text of a plain file, read up to `cap` bytes; an error when it is missing, too long, not UTF-8 or not a
+/// plain file.
+pub fn read_utf8(path: &Path, cap: u64) -> Result<String, String> {
+    String::from_utf8(read_plain(path, cap)?).map_err(|_| format!("{}: not UTF-8", path.display()))
+}
+
 /// The text of a plain file the watcher's keys add to (empty when there is none yet), read up to `cap` bytes.
 pub fn read_text(path: &Path, cap: u64) -> Result<String, String> {
     match std::fs::symlink_metadata(path) {
@@ -1259,7 +1270,7 @@ impl Runner {
         Some(format!(
             "hint line {} step {}/{}: {step}",
             h.line,
-            r.step + 1,
+            r.step.saturating_add(1),
             h.steps.len()
         ))
     }
@@ -1267,7 +1278,7 @@ impl Runner {
     /// The running hint's step is skipped (the watcher sees it will not do): on with the next one.
     pub fn skip_step(&mut self, sim: &Sim) {
         if let Some(r) = self.running.as_mut() {
-            r.step += 1;
+            r.step = r.step.saturating_add(1);
             self.begin(sim);
         }
     }
@@ -1316,7 +1327,7 @@ impl Runner {
         self.hints.iter().enumerate().position(|(i, h)| {
             (all || !self.fired.get(i).copied().unwrap_or(true))
                 && h.at.distance(pos) <= h.radius
-                && h.sector.is_none_or(|s| s == sim.sector + 1)
+                && h.sector.is_none_or(|s| s == sim.sector.saturating_add(1))
                 && h.kind.is_none_or(|k| k == sim.ball.kind)
         })
     }
@@ -1493,7 +1504,7 @@ impl Runner {
             // a retry mark: the run is saved here (by the test player, `take_mark`), and on at once
             if let Step::Retry(n, width) = *step {
                 self.mark = Some((run.hint, n, width));
-                run.step += 1;
+                run.step = run.step.saturating_add(1);
                 self.begin(sim);
                 continue;
             }
@@ -1519,7 +1530,7 @@ impl Runner {
                     self.failed = Some(hint);
                     return None;
                 }
-                run.step += 1;
+                run.step = run.step.saturating_add(1);
                 self.begin(sim);
                 continue;
             }
@@ -1546,7 +1557,7 @@ impl Runner {
                     self.failed = Some(hint);
                     return None;
                 }
-                run.step += 1;
+                run.step = run.step.saturating_add(1);
                 self.begin(sim);
                 continue;
             }
@@ -1580,7 +1591,7 @@ impl Runner {
                     eprintln!(
                         "    t {} step {} input {i:02x} ({:.1} {:.1} {:.1}) v ({:.1} {:.1} {:.1})",
                         sim.tick,
-                        run.step + 1,
+                        run.step.saturating_add(1),
                         p.x,
                         p.y,
                         p.z,
@@ -1591,7 +1602,7 @@ impl Runner {
                 }
                 return Some(i);
             }
-            run.step += 1;
+            run.step = run.step.saturating_add(1);
             let p = sim.ball.position;
             let below = step_point(&step).is_some_and(|q| q.y - p.y > OFF_COURSE_DROP);
             if !self.quiet {
@@ -1670,7 +1681,7 @@ impl Runner {
         let mut s = sim.clone();
         let lives = s.lives;
         let gone = |s: &Sim| s.lives < lives || s.is_dying() || s.game_over;
-        let mut coast = 0;
+        let mut coast = 0u64;
         for _ in 0..FLOW_CHECK + FLOW_COAST {
             let i = if r.running.is_some() {
                 r.input(&s).unwrap_or(0)
@@ -1678,7 +1689,7 @@ impl Runner {
                 0
             };
             if r.running.is_none() {
-                coast += 1;
+                coast = coast.saturating_add(1);
                 if coast > FLOW_COAST {
                     break;
                 }
@@ -1697,7 +1708,9 @@ impl Runner {
 
 /// The running step's number (from 1), for the log.
 fn run_step(r: &Runner) -> usize {
-    r.running.as_ref().map_or(0, |run| run.step + 1)
+    r.running
+        .as_ref()
+        .map_or(0, |run| run.step.saturating_add(1))
 }
 
 /// Whether a step drives at a speed of its own (the raw speedrun takes it as a minimum when flowed).
@@ -1787,13 +1800,16 @@ fn cross_plan(sim: &Sim, dir: Vec3, to: Vec3, r: f32) -> Vec<Vec3> {
                 let lives = s.lives;
                 let mut plan: Vec<Vec3> = vec![Vec3::ZERO; usize::try_from(wait).unwrap_or(0)];
                 let mut lost = false;
-                for k in 0..push + coast + CROSS_OFF + CROSS_SETTLE {
-                    let p = if k < push || (k >= push + coast && k < push + coast + CROSS_OFF) {
+                // all four are small constants: the sums cannot overflow, saturating keeps them checked
+                let pushed_to = push.saturating_add(coast);
+                let off_to = pushed_to.saturating_add(CROSS_OFF);
+                for k in 0..off_to.saturating_add(CROSS_SETTLE) {
+                    let p = if k < push || (k >= pushed_to && k < off_to) {
                         dir
                     } else {
                         Vec3::ZERO
                     };
-                    if k < push + coast + CROSS_OFF {
+                    if k < off_to {
                         plan.push(p);
                     }
                     s.step(arrows(p, quarter));
@@ -1860,9 +1876,9 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 run.nearest_at = sim.tick;
             }
             // no nearer for a second and a half: back off for a run-up, then charge
-            if sim.tick > run.nearest_at + 90 {
-                run.back_until = sim.tick + 40;
-                run.nearest_at = sim.tick + 40;
+            if sim.tick > run.nearest_at.saturating_add(90) {
+                run.back_until = sim.tick.saturating_add(40);
+                run.nearest_at = sim.tick.saturating_add(40);
                 run.nearest = f32::INFINITY;
             }
             if sim.tick < run.back_until {
@@ -1991,7 +2007,9 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
                 run.back_until = sim.tick;
             }
             // done after its ticks, or stopped against it (the body will go no further)
-            if charge >= *n || (charge > PRESS_SETTLE && sim.tick > run.back_until + PRESS_SETTLE) {
+            if charge >= *n
+                || (charge > PRESS_SETTLE && sim.tick > run.back_until.saturating_add(PRESS_SETTLE))
+            {
                 return None;
             }
             // across: to the line through the body's middle, damped; along: on while slower than the speed
@@ -2082,7 +2100,7 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             if t >= *n
                 || flat(*p - ball.position).length() < 1.0
                 || rel.dot(along) >= line.length()
-                || (run.flown && sim.tick > run.nearest_at + PRESS_SETTLE)
+                || (run.flown && sim.tick > run.nearest_at.saturating_add(PRESS_SETTLE))
             {
                 return None;
             }
@@ -2223,10 +2241,10 @@ fn drive(step: &Step, run: &mut Running, sim: &Sim) -> Option<u8> {
             run.prev = bits;
             if bits & input::SHIFT != 0 {
                 if pressed & input::LEFT != 0 {
-                    run.quarter.quarter -= 1;
+                    run.quarter.quarter = run.quarter.quarter.saturating_sub(1);
                 }
                 if pressed & input::RIGHT != 0 {
-                    run.quarter.quarter += 1;
+                    run.quarter.quarter = run.quarter.quarter.saturating_add(1);
                 }
             }
             Some(arrows(world_push(bits, run.quarter), quarter) | (bits & input::LIFT))
@@ -2294,7 +2312,7 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
     let n = track.pos.len();
     let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
     let ball = &sim.ball;
-    if n == 0 || run.k >= n || t > n as u64 + TRACE_GIVE_UP * 2 {
+    if n == 0 || run.k >= n || t > (n as u64).saturating_add(TRACE_GIVE_UP.saturating_mul(2)) {
         return None;
     }
     let lost = run.lost_since.is_some();
@@ -2302,7 +2320,7 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
     // the body that touches the ball next (knocks it on, carries it) comes later than in the run: wait at this tick
     let lag = if lost { 0 } else { meet_late(track, k, sim) };
     let late = lag > MEET_LATE;
-    run.k = if late { k } else { k + 1 };
+    run.k = if late { k } else { k.saturating_add(1) };
     let (at, v_at) = reference(track, k, sim)?;
     let off = at.distance(ball.position);
     if std::env::var_os("TRACE_LOG").is_some() && t.is_multiple_of(30) {
@@ -2348,11 +2366,13 @@ fn trace(track: &Track, run: &mut Running, sim: &Sim, t: u64) -> Option<u8> {
             );
         }
         let since = *run.lost_since.get_or_insert(sim.tick);
-        if sim.tick > since + TRACE_GIVE_UP {
+        if sim.tick > since.saturating_add(TRACE_GIVE_UP) {
             return None;
         }
         run.residual = Vec3::ZERO;
-        let q = *track.pos.get((k + TRACE_AHEAD).min(n - 1))?;
+        let q = *track
+            .pos
+            .get(k.saturating_add(TRACE_AHEAD).min(n.saturating_sub(1)))?;
         let want = flat(q - ball.position).clamp_length_max(6.0) / 6.0 - 0.15 * flat(ball.velocity);
         return Some(nearest_arrows(want, fwd, right).0 | lift);
     }

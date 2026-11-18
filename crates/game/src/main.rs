@@ -4,9 +4,9 @@
 // A release build on Windows is a windowed program: no console window opens beside the game. Its messages then go to
 // a log file (log_without_console); a debug build stays a console program.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
-// Hostile input is parsed only by the `nmo` crate; this crate works on validated models, and geometry code
-// reads better with plain arithmetic and indexing of fixed-size arrays.
-#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
+// Tests run on fixed fixtures they write themselves, never on hostile input; plain indexing and arithmetic keep
+// their assertions readable. The shipped code gets no such allow: each module that reads outside data is fixed.
+#![cfg_attr(test, allow(clippy::arithmetic_side_effects, clippy::indexing_slicing))]
 
 mod app;
 mod audit;

@@ -2,6 +2,8 @@
 // ball moving far faster than it ever does in play, and the ball sinking into the floor (the start of a fall through it). A finding is a fact about one tick, not a judgement about the
 // level. The game writes each finding to the level's watch log and saves the replay up to that tick, so the case
 // replays exactly with --headless.
+// Reason for the allow: watcher counters over simulation state.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::sim::{TICK, input};
 use glam::Vec3;

@@ -58,8 +58,11 @@ impl Mode {
 
     /// The next choice to the left (-1) or right (+1), round.
     pub fn next(self, by: i32) -> Mode {
-        let i = Mode::ALL.iter().position(|&m| m == self).unwrap_or(0) as i32;
-        Mode::ALL[(i + by).rem_euclid(Mode::ALL.len() as i32) as usize]
+        let all = Mode::ALL;
+        let i = i64::try_from(all.iter().position(|&m| m == self).unwrap_or(0)).unwrap_or(0);
+        let n = i64::try_from(all.len()).unwrap_or(1).max(1);
+        let at = usize::try_from(i.saturating_add(i64::from(by)).rem_euclid(n)).unwrap_or(0);
+        all.get(at).copied().unwrap_or(self)
     }
 }
 
@@ -438,12 +441,13 @@ pub fn default_dir() -> PathBuf {
 
 /// The folders the Replays screen lists: the default one, and the player's own when the settings name one.
 pub fn dirs(get: impl Fn(&str) -> Option<String>) -> Vec<PathBuf> {
-    let mut v = vec![default_dir()];
+    let first = default_dir();
+    let mut v = vec![first.clone()];
     if let Some(p) = get(FOLDER_SETTING)
         .map(|p| p.trim().to_owned())
         .filter(|p| !p.is_empty())
         .map(PathBuf::from)
-        .filter(|p| p.is_absolute() && *p != v[0])
+        .filter(|p| p.is_absolute() && *p != first)
     {
         v.push(p);
     }

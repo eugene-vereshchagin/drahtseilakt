@@ -7,6 +7,8 @@
 // - The new ball's light (Ball_Lightning_PointLight in Balls.nmo): a point light 9 units above the ball, reaching
 //   20 units and falling off as 1/d, that goes from black to blue over 2.5 s and then from black to white over
 //   1.5 s, and is hidden.
+// Reason for the allow: light flicker timing from simulation ticks and fixed constants.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::Vec3;
 

@@ -5,6 +5,8 @@
 // Language page. Chosen with the arrows and Enter, or with the mouse (the cursor, a click, the wheel, on the very
 // rectangles drawn); drawn with the interface's textures (our own, or the copy's) and its face (ui.rs), or with the
 // prototype's font when there is neither.
+// Reason for the allow: menu layout and drawing over fixed tables and parsed settings; the files it lists are parsed in userreplay.rs, lang.rs and levels.rs.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::assets::Data;
 use crate::features::{FEATURES, Feature, Features};
@@ -3905,7 +3907,11 @@ fn runs_dir(number: u32) -> PathBuf {
 
 /// The best finished run of an original level, from its saved best replay.
 fn best_ticks(number: u32) -> Option<u64> {
-    let text = std::fs::read_to_string(runs_dir(number).join("best.replay")).ok()?;
+    let text = crate::hints::read_utf8(
+        &runs_dir(number).join("best.replay"),
+        crate::hints::MAX_REPLAY_FILE,
+    )
+    .ok()?;
     crate::replay::Replay::parse(&text).ok().map(|r| r.end)
 }
 

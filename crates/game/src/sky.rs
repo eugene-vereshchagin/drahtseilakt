@@ -1,6 +1,8 @@
 // The sky: a box of textures around the camera, named by the level (`Sky_<name>_<Face>`). Ballance's skies have
 // five faces and no top (the zenith is the clear colour, taken from the top edge of the front texture); a sky that
 // brings a sixth, `Top`, face (our photographic skies) is drawn closed.
+// Reason for the allow: sky geometry from fixed tables.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 

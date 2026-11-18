@@ -3,6 +3,8 @@
 // objects as a fixed body of its own, as the original physicalizes them, the boxes as convex surfaces, the balls as spheres, with the original game's material values
 // (docs/physics.md, sections 3 and 4). A tick is one step of 1/60 s, which the physics runs as its own time steps of
 // 1/66 s.
+// Reason for the allow: physics glue over the validated level model and fixed tables.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::collide::StaticMesh;
 use glam::{Quat, Vec3};

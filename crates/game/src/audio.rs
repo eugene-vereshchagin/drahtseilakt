@@ -27,7 +27,12 @@ impl Drop for Audio {
                 .flat_map(|s| ((s * 32767.0) as i16).to_le_bytes())
                 .collect();
             let mut out = b"RIFF".to_vec();
-            out.extend((36 + data.len() as u32).to_le_bytes());
+            out.extend(
+                u32::try_from(data.len())
+                    .unwrap_or(u32::MAX - 36)
+                    .saturating_add(36)
+                    .to_le_bytes(),
+            );
             out.extend(b"WAVEfmt ");
             out.extend(16u32.to_le_bytes());
             out.extend(1u16.to_le_bytes());
@@ -163,6 +168,9 @@ pub fn parse_ogg(bytes: &[u8]) -> Result<Sound, String> {
 }
 
 /// The largest WAV file read (the game's longest music part is about 4 MB).
+/// The most samples one `pass` mixes into a file output (a minute of stereo at the file rate).
+const FILE_PASS_MAX: usize = 48_000 * 2 * 60;
+
 const MAX_WAV_BYTES: usize = 64 << 20;
 
 /// Reads an uncompressed PCM WAV file (8 or 16 bit, mono or stereo). The file is the player's, so every read is
@@ -188,14 +196,12 @@ pub fn parse_wav(bytes: &[u8]) -> Result<Sound, String> {
         return Err("too large".into());
     }
     let u16_at = |at: usize| {
-        bytes
-            .get(at..at + 2)
-            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+        let b = bytes.get(at..at.checked_add(2)?)?;
+        Some(u16::from_le_bytes(*b.first_chunk::<2>()?))
     };
     let u32_at = |at: usize| {
-        bytes
-            .get(at..at + 4)
-            .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        let b = bytes.get(at..at.checked_add(4)?)?;
+        Some(u32::from_le_bytes(*b.first_chunk::<4>()?))
     };
     if bytes.get(0..4) != Some(b"RIFF") || bytes.get(8..12) != Some(b"WAVE") {
         return Err("not a RIFF WAVE file".into());
@@ -203,23 +209,28 @@ pub fn parse_wav(bytes: &[u8]) -> Result<Sound, String> {
     let mut at = 12usize;
     let mut format: Option<(u16, u16, u32, u16)> = None;
     let mut data: Option<&[u8]> = None;
-    while let (Some(id), Some(len)) = (bytes.get(at..at + 4), u32_at(at + 4)) {
+    while let (Some(id), Some(len)) = (
+        at.checked_add(4).and_then(|e| bytes.get(at..e)),
+        at.checked_add(4).and_then(u32_at),
+    ) {
         let body = at.checked_add(8).ok_or("bad chunk")?;
-        let end = body.checked_add(len as usize).ok_or("bad chunk")?;
+        let len = usize::try_from(len).map_err(|_| "bad chunk")?;
+        let end = body.checked_add(len).ok_or("bad chunk")?;
         let chunk = bytes.get(body..end.min(bytes.len())).ok_or("bad chunk")?;
         match id {
             b"fmt " => {
                 let tag = u16_at(body).ok_or("short fmt")?;
-                let channels = u16_at(body + 2).ok_or("short fmt")?;
-                let rate = u32_at(body + 4).ok_or("short fmt")?;
-                let bits = u16_at(body + 14).ok_or("short fmt")?;
+                let field16 = |o: usize| body.checked_add(o).and_then(u16_at).ok_or("short fmt");
+                let channels = field16(2)?;
+                let rate = body.checked_add(4).and_then(u32_at).ok_or("short fmt")?;
+                let bits = field16(14)?;
                 format = Some((tag, channels, rate, bits));
             }
             b"data" => data = Some(chunk),
             _ => {}
         }
         // chunks are padded to an even length
-        at = end.checked_add(len as usize & 1).ok_or("bad chunk")?;
+        at = end.checked_add(len & 1).ok_or("bad chunk")?;
     }
     let (tag, channels, rate, bits) = format.ok_or("no fmt chunk")?;
     let data = data.ok_or("no data chunk")?;
@@ -240,7 +251,7 @@ pub fn parse_wav(bytes: &[u8]) -> Result<Sound, String> {
         }
     };
     let width = usize::from(bits / 8);
-    let frame = width * usize::from(channels);
+    let frame = width.saturating_mul(usize::from(channels)).max(1);
     let frames = data
         .chunks_exact(frame)
         .map(|f| {
@@ -305,7 +316,7 @@ impl Mixer {
         let dt = 1.0 / f64::from(self.rate.max(1));
         let volumes = self.volumes;
         for v in &mut self.voices {
-            let base = v.volume * volumes[usize::from(v.music)];
+            let base = v.volume * volumes.get(usize::from(v.music)).copied().unwrap_or(1.0);
             let step = f64::from(v.sound.rate) * dt * f64::from(v.pitch.max(0.0));
             for frame in out.chunks_mut(channels.max(1)) {
                 if v.wait > 0.0 {
@@ -343,7 +354,7 @@ impl Mixer {
                 let b = v
                     .sound
                     .frames
-                    .get(i + 1)
+                    .get(i.saturating_add(1))
                     .or(if v.looping {
                         v.sound.frames.first()
                     } else {
@@ -353,7 +364,7 @@ impl Mixer {
                     .unwrap_or(a);
                 let s = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
                 for (c, o) in frame.iter_mut().enumerate() {
-                    *o += s[c.min(1)] * gain;
+                    *o += s.get(c.min(1)).copied().unwrap_or(0.0) * gain;
                 }
                 v.pos += step;
             }
@@ -542,7 +553,7 @@ impl Audio {
     pub fn pass(&mut self, seconds: f64) {
         if let Output::File { samples, .. } = &mut self.output {
             let frames = (seconds * f64::from(FILE_RATE)).round() as usize;
-            let mut buf = vec![0.0f32; frames * 2];
+            let mut buf = vec![0.0f32; frames.saturating_mul(2).min(FILE_PASS_MAX)];
             if let Ok(mut m) = self.mixer.lock() {
                 m.fill(&mut buf, 2);
             }
@@ -721,7 +732,7 @@ impl Audio {
             _ => self.sound(data, name)?,
         };
         let id = self.next;
-        self.next += 1;
+        self.next = self.next.wrapping_add(1);
         let mut m = self.mixer.lock().ok()?;
         m.voices.push(Voice {
             id,
@@ -906,6 +917,63 @@ mod tests {
         // a file cut short is read as far as it goes or refused, and never panics
         let _ = parse_ogg(&good[..good.len() / 3]);
         assert!(parse_ogg(&[]).is_err());
+    }
+
+    #[test]
+    fn a_malformed_wav_is_refused_never_a_panic() {
+        // a valid minimal file: mono, 8 kHz-ish, 8 bit, two frames
+        let mut good = b"RIFF".to_vec();
+        good.extend(38u32.to_le_bytes());
+        good.extend(b"WAVEfmt ");
+        good.extend(16u32.to_le_bytes());
+        for v in [1u16, 1] {
+            good.extend(v.to_le_bytes());
+        }
+        good.extend(8000u32.to_le_bytes());
+        good.extend(8000u32.to_le_bytes());
+        good.extend(1u16.to_le_bytes());
+        good.extend(8u16.to_le_bytes());
+        good.extend(b"data");
+        good.extend(2u32.to_le_bytes());
+        good.extend([128u8, 255]);
+        assert_eq!(parse_wav(&good).map(|s| s.frames.len()), Ok(2));
+        // every truncation is an error or a shorter sound, never a panic
+        for cut in 0..good.len() {
+            let _ = parse_wav(&good[..cut]);
+        }
+        // absurd chunk sizes: claimed far past the file, and past the address space
+        for size in [u32::MAX, u32::MAX - 1, 0x7fff_ffff, 1 << 31] {
+            let mut bad = good.clone();
+            bad.splice(16..20, size.to_le_bytes());
+            let _ = parse_wav(&bad);
+            let mut bad = good.clone();
+            bad.splice(40..44, size.to_le_bytes());
+            let _ = parse_wav(&bad);
+        }
+        // zero channels, a rate of 0, 12 bits
+        for (at, v) in [(22usize, 0u16), (34, 12), (22, 3)] {
+            let mut bad = good.clone();
+            bad.splice(at..at + 2, v.to_le_bytes());
+            assert!(parse_wav(&bad).is_err(), "field at {at} = {v}");
+        }
+        let mut bad = good.clone();
+        bad.splice(24..28, 0u32.to_le_bytes());
+        assert!(parse_wav(&bad).is_err());
+        assert!(parse_wav(&[]).is_err());
+        assert!(parse_wav(b"RIFF").is_err());
+        assert!(parse_wav(&vec![0u8; MAX_WAV_BYTES + 1]).is_err());
+    }
+
+    #[test]
+    fn a_truncated_ogg_header_is_refused() {
+        let good = std::fs::read(own().join("Sounds/Extra_Hit.ogg")).unwrap_or_default();
+        for cut in [0, 1, 4, 27, 28, 40, 58, 100] {
+            if let Some(head) = good.get(..cut) {
+                assert!(parse_ogg(head).is_err(), "cut at {cut}");
+            }
+        }
+        assert!(parse_ogg(&vec![0xffu8; 4096]).is_err());
+        assert!(parse_ogg(&vec![0u8; MAX_WAV_BYTES + 1]).is_err());
     }
 
     #[test]

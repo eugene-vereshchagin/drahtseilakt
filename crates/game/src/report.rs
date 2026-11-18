@@ -256,7 +256,7 @@ pub fn run(
                 &f.join(gamedata::package::REPORT_FILE),
                 &file_text(&issues),
             )?;
-            written += 1;
+            written = written.saturating_add(1);
         }
     }
     println!(

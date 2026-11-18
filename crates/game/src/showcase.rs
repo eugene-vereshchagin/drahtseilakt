@@ -4,6 +4,8 @@
 // the game's physics (the level's checks.txt: short runs with the arrows through each element, a ball of the right
 // kind and of the wrong one). The built level is not in git (.gitignore: levels stay on disk until the release);
 // where it has not been built the checks say so and pass.
+// Reason for the allow: a developer test harness over our own showcase data, never run on strangers' files.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

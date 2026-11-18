@@ -2,6 +2,8 @@
 // (titlescene.wgsl: the ball on a steel rail over a sea of clouds, under a sky in the mood of the level's). It needs
 // no model, only the ball's own wooden texture (read and cut to mips when the pipeline is made, on its thread), and
 // costs the load nothing. The very first frames show a still of it instead (splashpic.rs).
+// Reason for the allow: title-scene mip maths over images already decoded and size-capped by the image crate.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 /// A sky's colours (linear): the mood of the screen.
 #[derive(Clone, Copy, Debug, PartialEq)]

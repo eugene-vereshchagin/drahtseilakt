@@ -4,6 +4,8 @@
 //
 // The physics is IVP's (physics.rs); the rules around it (pushing, transformers, falling off, respawning) follow
 // what the C game does, measured in its C reference build.
+// Reason for the allow: the physics/script simulation over the validated level model; file data reaches it only through the parsed level, Replay and script values.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::collide::{StaticMesh, Triangle};
 use crate::physics::{GROUP_BALL, GROUP_FLOOR, Material, Rot, World};

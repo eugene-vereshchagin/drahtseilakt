@@ -518,7 +518,7 @@ impl SimHost<'_> {
                     .collect(),
             )
         };
-        self.s.made_static += 1;
+        self.s.made_static = self.s.made_static.saturating_add(1);
         self.s.statics.insert(
             i,
             StaticSlot {
@@ -854,7 +854,7 @@ impl Host for SimHost<'_> {
                 group: spec.group.clone(),
             }
         };
-        self.s.made += 1;
+        self.s.made = self.s.made.saturating_add(1);
         self.s.bodies.insert(i, None);
         self.s.queue.push(cmd);
     }
@@ -2046,7 +2046,11 @@ mod body_tests {
                     .collect();
                 // the face's corners in a ring: sorted by angle around its centre is overkill; the 4 corners'
                 // two diagonals are (0,3) and (1,2) of the sorted list
-                for tri in [[face[0], face[1], face[3]], [face[0], face[3], face[2]]] {
+                // the face has exactly four corners: one bit fixed of three, the other two free (2 x 2 of 8)
+                let [f0, f1, f2, f3] = face[..] else {
+                    continue;
+                };
+                for tri in [[f0, f1, f3], [f0, f3, f2]] {
                     let (a, b, c) = (v(tri[0]), v(tri[1]), v(tri[2]));
                     let n = (b - a).cross(c - a);
                     let want = if side == 1 { 1.0 } else { -1.0 };

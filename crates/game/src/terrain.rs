@@ -9,6 +9,8 @@
 // on a lowered slope corrected as the sun would light it), and faded by distance into the sky's haze just under its
 // horizon, which the sky's faces show beyond it. The physics never sees it, so replays are unchanged; the original's
 // levels and every sky without these files have none.
+// Reason for the allow: the land file is validated in `load` (file size and decoded sides capped, extent/heights ranges checked, grid 2..=MAX_GRID square); everything below works on that validated grid and the level model.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;

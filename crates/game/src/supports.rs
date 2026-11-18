@@ -15,6 +15,8 @@
 // already placed. Nothing of that is known for one level or one map: it is measured on the level's own geometry,
 // with the pieces' own meshes. Where no candidate is clear the sack hangs as the original's does: when in doubt,
 // no support.
+// Reason for the allow: geometry derived from the validated level model.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::collide::closest_point;
 use crate::scene::{FIRST_MODULE_MODEL, Modules, Placement};

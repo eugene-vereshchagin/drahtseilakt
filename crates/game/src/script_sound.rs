@@ -31,7 +31,7 @@ impl Voices {
     fn count(&mut self, audio: &Audio) -> usize {
         self.instances.retain(|&id| audio.is_playing(id));
         self.players.retain(|_, &mut id| audio.is_playing(id));
-        self.players.len() + self.instances.len()
+        self.players.len().saturating_add(self.instances.len())
     }
 
     fn stop_all(&mut self, audio: &mut Audio) {

@@ -42,8 +42,14 @@ pub fn build(spec: &SkySpec) -> Option<Mesh> {
             mesh.uvs.push(*uv);
         }
         let k = quad.len() as u32;
-        let tris: Vec<u32> = (1..k - 1)
-            .flat_map(|i| [base, base + i, base + i + 1])
+        let tris: Vec<u32> = (1..k.saturating_sub(1))
+            .flat_map(|i| {
+                [
+                    base,
+                    base.saturating_add(i),
+                    base.saturating_add(i).saturating_add(1),
+                ]
+            })
             .collect();
         match mesh.parts.iter_mut().find(|p| p.material == Some(material)) {
             Some(p) => p.indices.extend(tris),

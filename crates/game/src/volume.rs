@@ -1,6 +1,8 @@
 // Oriented boxes and their overlap test, as the original's "Collision Box" checks use them: the ball has left the
 // level when the box of its mesh overlaps one of the level's depth-test cubes (docs/gameplay_bbs.md, the box tests
 // and their use in BallManager).
+// Reason for the allow: geometry/volume maths over the validated level model.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 #[cfg(test)]
 use glam::Mat3;

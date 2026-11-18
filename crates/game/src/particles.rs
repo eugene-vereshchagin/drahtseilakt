@@ -3,6 +3,8 @@
 // line in world space while its colour and size change linearly over its life; they are drawn as camera-facing
 // quads, triangles, streaks or lines, blended, unlit and without writing depth. The game's emitters and their values
 // are the scripts' (the table below, from the module files); this is only for the eye and never touches the run.
+// Reason for the allow: particle maths over fixed emitter specs and the simulation's own random numbers.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::{Mat4, Vec3};
 

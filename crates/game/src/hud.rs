@@ -2,6 +2,8 @@
 // them: the Gameplay scripts' 2D frames over Button01_special, the points in the game font), the "ball lost" message
 // in the game font as its other texts (`ball_lost`), and the prototype's messages in a 5×7 pixel font written for
 // this project (level complete and game over without the game's font; the debug line).
+// Reason for the allow: HUD layout from the simulation's counters and fixed constants.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::sim::Sim;
 

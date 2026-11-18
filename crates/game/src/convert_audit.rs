@@ -5,6 +5,8 @@
 // rules' state, the objects the scripts move, the loose bodies, the modules' parts). Original and converted copies of
 // the same level double as a test of the converter (decisions.md): a map that differs is a loss of the converter.
 // One tab-separated line a map (`convert-audit` first), the first difference named; the export is removed after.
+// Reason for the allow: a developer audit comparing two validated level models; reads no file itself.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::assets::{Data, Source};
 use level::Level;

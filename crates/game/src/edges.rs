@@ -1,6 +1,8 @@
 // For the test player (autopilot.rs), not part of the game: where the level's floors end. A floor's edge is where
 // it drops away or meets a wall; the way's search and the steering keep the ball off them, as a player keeps to the
 // middle of a track, and a run is summed up by how near them its ball rolled.
+// Reason for the allow: edge geometry over the validated level model and fixed-size triangles.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::Vec3;
 use std::collections::HashMap;

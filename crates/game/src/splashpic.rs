@@ -3,6 +3,8 @@
 // shader, building the card's pipelines and uploading the menu, which keeps the window empty or frozen for a while;
 // this takes a decode, one tiny pipeline and one textured triangle, and goes up before anything of that is made. The
 // live scene fades in over it (titlescene.rs), then it is dropped.
+// Reason for the allow: splash picture upload over an image already decoded and size-capped.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]

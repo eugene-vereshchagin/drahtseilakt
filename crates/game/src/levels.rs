@@ -446,8 +446,11 @@ fn import_disc_folder(disc: &Path) -> Result<usize, String> {
         let cap = cdimage::image::READ_MAX as u64;
         let mut bytes = Vec::new();
         let file = std::fs::File::open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        std::io::Read::read_to_end(&mut std::io::Read::take(file, cap + 1), &mut bytes)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+        std::io::Read::read_to_end(
+            &mut std::io::Read::take(file, cap.saturating_add(1)),
+            &mut bytes,
+        )
+        .map_err(|e| format!("{}: {e}", path.display()))?;
         if bytes.len() as u64 > cap {
             return Err(format!(
                 "{}: too big for a file of the game's CD",
@@ -513,7 +516,7 @@ fn import_archive(read: &mut DiscReader<'_>, disc: &Path) -> Result<usize, Strin
             std::fs::remove_file(&dst).map_err(|e| format!("{}: {e}", dst.display()))?;
         }
         std::fs::write(&dst, bytes).map_err(|e| format!("{}: {e}", dst.display()))?;
-        written += 1;
+        written = written.saturating_add(1);
     }
     if written == 0 {
         return Err(format!("{}: no game files in its archive", image.display()));
@@ -547,10 +550,16 @@ fn copy(
         let mut entries: Vec<_> = std::fs::read_dir(src).map_err(err)?.flatten().collect();
         entries.sort_by_key(|e| e.file_name());
         for e in entries {
-            copy(&e.path(), &dst.join(e.file_name()), depth + 1, seen, copied)?;
+            copy(
+                &e.path(),
+                &dst.join(e.file_name()),
+                depth.saturating_add(1),
+                seen,
+                copied,
+            )?;
         }
     } else if meta.is_file() {
-        *seen += 1;
+        *seen = seen.saturating_add(1);
         if *seen > MAX_FILES {
             return Err(format!(
                 "more than {MAX_FILES} files: not a Ballance folder"
@@ -576,7 +585,7 @@ fn copy(
             }
             std::fs::copy(src, dst)
                 .map_err(|e| format!("{} -> {}: {e}", src.display(), dst.display()))?;
-            *copied += 1;
+            *copied = copied.saturating_add(1);
         }
     }
     Ok(())

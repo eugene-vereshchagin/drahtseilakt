@@ -4,6 +4,8 @@
 // their coarse grey levels) are taken. The search starts at the level start and keeps several likely ways at
 // once, each going on near where it was heading; the view's quarter is searched too (the player turns it), so the
 // turns are found along with the way. For testing only; it reads the player's own frames and never goes online.
+// Reason for the allow: a developer tool over the screen frames the engine itself captures (sizes come from the capture, not from a file).
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use crate::render::{Renderer, View};
 use glam::Vec3;

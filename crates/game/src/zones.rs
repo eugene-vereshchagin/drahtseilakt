@@ -104,7 +104,7 @@ impl Zone {
             [a] => p.distance(*a),
             pts => pts
                 .windows(2)
-                .map(|w| to_segment(p, w[0], w[1]))
+                .filter_map(|w| Some(to_segment(p, *w.first()?, *w.get(1)?)))
                 .fold(f32::INFINITY, f32::min),
         }
     }

@@ -3,6 +3,8 @@
 // after the opaque scene, reading its depth, so the columns and supports that reach down sink into it; the blended
 // scene and the particles come after it. Only drawn: the physics never sees it. Levels without a cloud layer in their
 // settings (the original's) never draw it.
+// Reason for the allow: cloud rendering over fixed tables and computed noise.
+#![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 
 use glam::{Mat4, Vec3};
 

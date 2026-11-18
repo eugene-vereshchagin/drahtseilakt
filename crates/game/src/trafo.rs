@@ -125,7 +125,7 @@ fn bars_lift(age: f32) -> f32 {
     }
     let t = (age - BARS_FROM) / 3.0;
     let i = t.floor() as usize;
-    match (BARS_LIFT.get(i), BARS_LIFT.get(i + 1)) {
+    match (BARS_LIFT.get(i), BARS_LIFT.get(i.saturating_add(1))) {
         (Some(a), Some(b)) => a + (b - a) * t.fract(),
         _ => 0.0,
     }
