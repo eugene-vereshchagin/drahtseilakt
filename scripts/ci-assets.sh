@@ -9,16 +9,24 @@ set -euo pipefail
 die() { echo "ci-assets: $*" >&2; echo "::error::ci-assets: $*"; exit 1; }
 cd "$(dirname "$0")/.."
 
-sha_of() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1
-           elif command -v shasum >/dev/null; then shasum -a 256 "$1" | cut -d' ' -f1
-           else sha256 -q "$1"; fi; }
+# from stdin: given a Windows path (backslashes), sha256sum escapes its line and the hash gains a leading "\"
+sha_of() { if command -v sha256sum >/dev/null; then sha256sum <"$1" | cut -d' ' -f1
+           elif command -v shasum >/dev/null; then shasum -a 256 <"$1" | cut -d' ' -f1
+           else sha256 -q <"$1"; fi; }
 
 [ -f "assets/own/3D Entities/MenuLevel/level.bin" ] && ls assets/levels/*/*/level.bin >/dev/null 2>&1 \
     || die "assets/ lacks the base data: is this a complete checkout of the repository?"
 
 if [ ! -f assets/manual/index.html ]; then
     py=python3; command -v python3 >/dev/null || py=python
-    "$py" -I -c 'import markdown' 2>/dev/null || "$py" -m pip install --quiet --disable-pip-version-check "markdown==3.7"
+    if ! "$py" -I -c 'import markdown' 2>/dev/null; then
+        # python-markdown into a throw-away venv: a user-site install is invisible to -I, and Homebrew's Python refuses a
+        # system one (PEP 668)
+        venv="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/manual-venv"
+        "$py" -m venv "$venv"
+        py="$venv/bin/python"; [ -x "$py" ] || py="$venv/Scripts/python.exe"
+        "$py" -m pip install --quiet --disable-pip-version-check "markdown==3.7"
+    fi
     "$py" -I tools/make_manual.py
 fi
 [ -f assets/manual/index.html ] || die "no manual after tools/make_manual.py"

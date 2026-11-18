@@ -13,9 +13,10 @@ here=$(pwd)
 : "${OS_KIND:?}" "${ARCH:?}" "${VERSION:?}" "${GAME_BIN:?}"
 DEV=${DEV:-0} TOOLBOX=${TOOLBOX:-1}
 [ "$DEV" = 0 ] || [ "$OS_KIND" = linux ] || die "dev builds are Linux only"
-sha_of() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1
-           elif command -v shasum >/dev/null; then shasum -a 256 "$1" | cut -d' ' -f1
-           else sha256 -q "$1"; fi; }
+# from stdin: given a Windows path (backslashes), sha256sum escapes its line and the hash gains a leading "\"
+sha_of() { if command -v sha256sum >/dev/null; then sha256sum <"$1" | cut -d' ' -f1
+           elif command -v shasum >/dev/null; then shasum -a 256 <"$1" | cut -d' ' -f1
+           else sha256 -q <"$1"; fi; }
 
 flavour=""; [ "$DEV" = 0 ] || flavour="-dev"
 name="drahtseilakt-$OS_KIND-$ARCH$flavour"
