@@ -5,9 +5,6 @@ hero:
   name: Drahtseilakt
   text: Ballance，再次滚动
   tagline: 用 Rust 编写的全新原生 Ballance（2004）引擎。它读取你自己那份游戏的数据和自制地图，支持 Linux、Windows 和 macOS。最初是 OpenBallance（emdzej）的分支，GPL-3.0。
-  image:
-    src: /screenshots/level01.jpg
-    alt: 木球滚过第 1 关
   actions:
     - theme: brand
       text: 路线图

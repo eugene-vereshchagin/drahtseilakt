@@ -172,7 +172,6 @@ export default defineConfig({
         link: "/internals/",
         activeMatch: "/(internals|ck-runtime|gameplay_bbs|fonts|sky|animation|particles|physics|ivp_)",
       },
-      { text: "Gallery", link: "/gallery" },
     ],
 
     sidebar: {

@@ -1,0 +1,56 @@
+# README downloads: when a release is published, writes the download table of the four READMEs (between
+# <!-- downloads:start --> and <!-- downloads:end -->) from the newest published release, with direct links to its files,
+# and commits it to main. A site takes its download links from that table (scripts/update-download-table.py).
+#
+# Triggers: a published release (never a push), or Actions -> "README downloads" -> Run workflow. Drafts and
+# pre-releases are not "latest", so the table shows only what the owner has published. Actions pinned by full SHA.
+name: README downloads
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readme-downloads
+  cancel-in-progress: false
+
+jobs:
+  table:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - name: the newest published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # 404 when nothing is published yet: the table then says so
+          if gh api "repos/$REPO/releases/latest" > "$RUNNER_TEMP/release.json" 2>/dev/null; then
+            echo "RELEASE=$RUNNER_TEMP/release.json" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE=none" >> "$GITHUB_ENV"
+          fi
+      - name: write and commit the table
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 -I scripts/update-download-table.py "$RELEASE" "$REPO"
+          if git diff --quiet -- README.md README.ru.md README.de.md README.zh.md; then
+            echo "the table is current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "README: download table for the newest release" -- README.md README.ru.md README.de.md README.zh.md
+          git push origin HEAD:main

@@ -32,6 +32,12 @@ Drahtseilakt — новый движок для **Ballance** (Cyparade / Atari, 
 файл кому нужен и почему загрузки разделены: [distribution.md](docs/ru/drahtseilakt/distribution.md); точный список и
 строки установки: [release.md](docs/ru/drahtseilakt/release.md).
 
+<!-- downloads:start -->
+Релиз ещё не опубликован. Сборки появятся здесь, когда выйдет первый.
+
+13 избранных карт скачиваются отдельно (около 1,1 ГБ, по zip на карту, распаковать в `assets/levels/drahtseilakt/` игры): [data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117).
+<!-- downloads:end -->
+
 ## Сборка и игра
 
 Rust (stable, 1.89 или новее) и cargo; в Linux — драйвер Vulkan и заголовки udev для геймпадов (`libudev-dev` в

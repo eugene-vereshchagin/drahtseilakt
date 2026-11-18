@@ -46,7 +46,7 @@ Ordnern ([levels.md](levels.md)).
 
 ## Ich will X: lade Y herunter
 
-Das neueste Release findet man über die GitHub-API, nicht über einen festen Link: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, dann aus `assets[]` die Datei wählen, deren `name` zu einem Muster wie `drahtseilakt-*-windows-x86_64-setup.exe` passt, und ihre `browser_download_url` verwenden. Die Seite <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> zeigt immer das neueste Release. Die Dateinamen behalten die Version (unten `<version>`; `<data-version>` bei den Datenpaketen), damit man sie lesen kann. Prüfen Sie einen Download gegen `SHA256SUMS` aus demselben Release.
+Am einfachsten nimmt man die Links aus der Download-Tabelle der README.md (und ihrer Übersetzungen): Ein Workflow (`readme-downloads.yml`) schreibt sie bei jedem veröffentlichten Release mit direkten Links auf die Dateien des neuesten veröffentlichten Releases neu. Das neueste Release findet man außerdem über die GitHub-API, nicht über einen festen Link: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, dann aus `assets[]` die Datei wählen, deren `name` zu einem Muster wie `drahtseilakt-*-windows-x86_64-setup.exe` passt, und ihre `browser_download_url` verwenden. Die Seite <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> zeigt immer das neueste Release. Die Dateinamen behalten die Version (unten `<version>`; `<data-version>` bei den Datenpaketen), damit man sie lesen kann. Prüfen Sie einen Download gegen `SHA256SUMS` aus demselben Release.
 
 | Ich will | Herunterladen |
 |---|---|

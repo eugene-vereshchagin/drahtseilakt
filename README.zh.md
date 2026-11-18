@@ -26,6 +26,12 @@ Drahtseilakt 是 **Ballance**（Cyparade / Atari，2004）的一个新引擎，�
 很少变化。文件名保留版本号。最新发布：`https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest`；脚本通过 API 获取（`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`，再在 `assets[]` 中选 `name` 符合如 `drahtseilakt-*-windows-x86_64-setup.exe` 的文件，用它的 `browser_download_url`）。哪个文件给谁用、为什么这样拆分下载：[distribution.md](docs/zh/drahtseilakt/distribution.md)；
 确切的文件列表和安装命令：[release.md](docs/zh/drahtseilakt/release.md)。
 
+<!-- downloads:start -->
+尚未发布任何版本。第一个版本发布后，构建会出现在这里。
+
+13 张精选地图需单独下载（约 1.1 GB，每张一个 zip，解压到游戏的 `assets/levels/drahtseilakt/`）：[data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117)。
+<!-- downloads:end -->
+
 ## 构建与游玩
 
 需要 Rust（stable，1.89 或更新版本）和 cargo；在 Linux 上需要 Vulkan 驱动，以及手柄所需的 udev 头文件（Debian/Ubuntu 上为

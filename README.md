@@ -32,6 +32,12 @@ portable archives and installers. The 13 picked maps are a separate download tha
 Which file is for whom, and why the downloads are split like this: [distribution.md](docs/drahtseilakt/distribution.md);
 the exact list and install lines: [release.md](docs/drahtseilakt/release.md).
 
+<!-- downloads:start -->
+No release is published yet. The builds appear here once the first one is.
+
+The 13 picked maps, a separate download (about 1.1 GB, one zip each, unpack into the game's `assets/levels/drahtseilakt/`): [data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117).
+<!-- downloads:end -->
+
 ## Building and playing
 
 Rust (stable, 1.89 or newer) and cargo; on Linux a Vulkan driver, and udev's headers for the gamepads (`libudev-dev`

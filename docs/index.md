@@ -5,9 +5,6 @@ hero:
   name: Drahtseilakt
   text: Ballance, rolling again
   tagline: A new native engine for Ballance (2004), written in Rust. It plays the data of your own copy of the game and community maps, on Linux, Windows and macOS. Started as a fork of OpenBallance (emdzej), GPL-3.0.
-  image:
-    src: /screenshots/level01.jpg
-    alt: The wooden ball rolling through level 1
   actions:
     - theme: brand
       text: Roadmap

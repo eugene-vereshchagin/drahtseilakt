@@ -5,9 +5,6 @@ hero:
   name: Drahtseilakt
   text: Ballance снова катится
   tagline: Новый нативный движок для Ballance (2004) на Rust. Играет данные вашей собственной копии игры и любительские карты в Linux, Windows и macOS. Начинался как форк OpenBallance (emdzej), GPL-3.0.
-  image:
-    src: /screenshots/level01.jpg
-    alt: Деревянный шар катится по первому уровню
   actions:
     - theme: brand
       text: План работ

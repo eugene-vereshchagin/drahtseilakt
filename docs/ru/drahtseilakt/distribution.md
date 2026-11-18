@@ -44,7 +44,7 @@ Drahtseilakt состоит из трёх частей, которые меня�
 
 ## Я хочу X: скачать Y
 
-Самый свежий релиз находят через GitHub API, а не по фиксированной ссылке: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, затем в `assets[]` берут файл, чьё `name` подходит под шаблон, например `drahtseilakt-*-windows-x86_64-setup.exe`, и используют его `browser_download_url`. Страница <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> всегда показывает самый свежий релиз. В именах файлов версия остаётся (ниже `<version>`; `<data-version>` у пакетов данных), чтобы её было видно. Сверяйте загрузку с `SHA256SUMS` из того же релиза.
+Проще всего брать ссылки из таблицы скачивания в README.md (и его переводах): workflow `readme-downloads.yml` при каждой публикации релиза переписывает её прямыми ссылками на файлы самого свежего опубликованного релиза. Ещё самый свежий релиз находят через GitHub API, а не по фиксированной ссылке: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, затем в `assets[]` берут файл, чьё `name` подходит под шаблон, например `drahtseilakt-*-windows-x86_64-setup.exe`, и используют его `browser_download_url`. Страница <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> всегда показывает самый свежий релиз. В именах файлов версия остаётся (ниже `<version>`; `<data-version>` у пакетов данных), чтобы её было видно. Сверяйте загрузку с `SHA256SUMS` из того же релиза.
 
 | Я хочу | Скачать |
 |---|---|

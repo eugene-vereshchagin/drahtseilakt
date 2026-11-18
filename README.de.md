@@ -33,6 +33,12 @@ Archiven und Installern. Die 13 ausgewählten Karten sind ein eigener Download, 
 [distribution.md](docs/de/drahtseilakt/distribution.md); die genaue Liste und die Installationszeilen:
 [release.md](docs/de/drahtseilakt/release.md).
 
+<!-- downloads:start -->
+Noch ist kein Release veröffentlicht. Die Builds erscheinen hier mit dem ersten.
+
+Die 13 ausgewählten Karten, ein eigener Download (etwa 1,1 GB, je Karte ein Zip, entpacken nach `assets/levels/drahtseilakt/` des Spiels): [data-20261117](https://github.com/eugene-vereshchagin/drahtseilakt/releases/tag/data-20261117).
+<!-- downloads:end -->
+
 ## Bauen und Spielen
 
 Rust (stable, 1.89 oder neuer) und cargo; unter Linux ein Vulkan-Treiber und die udev-Header für die Gamepads

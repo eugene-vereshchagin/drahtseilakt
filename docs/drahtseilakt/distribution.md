@@ -42,7 +42,7 @@ The only level bound to the game in code is the showcase `00-Showcase`; all othe
 
 ## I want X: download Y
 
-The newest release is found through the GitHub API, not by a fixed link: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, then pick from `assets[]` the file whose `name` matches a pattern such as `drahtseilakt-*-windows-x86_64-setup.exe` and use its `browser_download_url`. The release page <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> always shows the newest. File names keep the version (`<version>` below; `<data-version>` for the data packages), so people can read it. Check a download against `SHA256SUMS` from the same release.
+The simplest source is the download table of README.md (and its translations): a workflow (`readme-downloads.yml`) rewrites it with direct links to the newest published release's files whenever a release is published. The newest release is also found through the GitHub API, not by a fixed link: `GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`, then pick from `assets[]` the file whose `name` matches a pattern such as `drahtseilakt-*-windows-x86_64-setup.exe` and use its `browser_download_url`. The release page <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> always shows the newest. File names keep the version (`<version>` below; `<data-version>` for the data packages), so people can read it. Check a download against `SHA256SUMS` from the same release.
 
 | I want | Download |
 |---|---|

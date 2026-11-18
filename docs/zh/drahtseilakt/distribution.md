@@ -36,7 +36,7 @@ Drahtseilakt 由三部分组成，它们变化的速度不同，所以分开发�
 
 ## 我想要 X：下载 Y
 
-最新发布通过 GitHub API 查找，而不是固定链接：`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`，然后在 `assets[]` 中选出 `name` 符合模式（如 `drahtseilakt-*-windows-x86_64-setup.exe`）的文件，使用它的 `browser_download_url`。页面 <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> 始终显示最新发布。文件名保留版本号（下文 `<version>`；数据包用 `<data-version>`），方便阅读。请用同一发布中的 `SHA256SUMS` 校验下载。
+最简单的来源是 README.md（及其译本）中的下载表：每次发布版本时，工作流 `readme-downloads.yml` 都会用最新已发布版本文件的直接链接重写它。最新发布也可以通过 GitHub API 查找，而不是固定链接：`GET https://api.github.com/repos/eugene-vereshchagin/drahtseilakt/releases/latest`，然后在 `assets[]` 中选出 `name` 符合模式（如 `drahtseilakt-*-windows-x86_64-setup.exe`）的文件，使用它的 `browser_download_url`。页面 <https://github.com/eugene-vereshchagin/drahtseilakt/releases/latest> 始终显示最新发布。文件名保留版本号（下文 `<version>`；数据包用 `<data-version>`），方便阅读。请用同一发布中的 `SHA256SUMS` 校验下载。
 
 | 我想要 | 下载 |
 |---|---|
