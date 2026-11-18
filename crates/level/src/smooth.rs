@@ -29,11 +29,11 @@ const MAX_BOW: f32 = 0.35;
 /// Gives each curved mesh of the level its refined look (made from the mesh itself; an older look is replaced or
 /// dropped). Returns how many meshes have one.
 pub fn looks(level: &mut Level) -> usize {
-    let mut n = 0;
+    let mut n = 0usize;
     for m in &mut level.meshes {
         m.look = None;
         m.look = mesh(m).map(Box::new);
-        n += usize::from(m.look.is_some());
+        n = n.saturating_add(usize::from(m.look.is_some()));
     }
     n
 }
@@ -52,7 +52,7 @@ pub fn add_looks(level: &mut Level) -> usize {
     }
     let made = looks_of(&level.meshes);
     let mut total = 0usize;
-    let mut n = 0;
+    let mut n = 0usize;
     for (m, look) in level.meshes.iter_mut().zip(made) {
         if let Some(look) = look {
             total = total.saturating_add(look.positions.len());
@@ -60,7 +60,7 @@ pub fn add_looks(level: &mut Level) -> usize {
                 break;
             }
             m.look = Some(Box::new(look));
-            n += 1;
+            n = n.saturating_add(1);
         }
     }
     n
@@ -112,35 +112,37 @@ pub fn add_looks_cached(level: &mut Level) -> usize {
     };
     let sources: Vec<Option<Mesh>> = level.meshes.iter().map(source).collect();
     let sigs: Vec<u64> = sources.iter().map(|s| s.as_ref().map_or(0, sig)).collect();
-    let wanted = |i: usize| sources[i].is_some();
+    let wanted = |i: usize| sources.get(i).is_some_and(Option::is_some);
     let missing: Vec<usize> = {
         let Ok(c) = cache.lock() else { return 0 };
         (0..sigs.len())
-            .filter(|&i| wanted(i) && !c.contains_key(&sigs[i]))
+            .filter(|&i| wanted(i) && sigs.get(i).is_some_and(|s| !c.contains_key(s)))
             .collect()
     };
     if !missing.is_empty() {
-        let todo: Vec<Mesh> = missing.iter().filter_map(|&i| sources[i].clone()).collect();
+        let todo: Vec<Mesh> = missing
+            .iter()
+            .filter_map(|&i| sources.get(i).cloned().flatten())
+            .collect();
         let made = looks_of(&todo);
         if let Ok(mut c) = cache.lock() {
             for (&i, look) in missing.iter().zip(made) {
-                c.insert(sigs[i], look);
+                if let Some(&s) = sigs.get(i) {
+                    c.insert(s, look);
+                }
             }
         }
     }
     let Ok(c) = cache.lock() else { return 0 };
-    let mut n = 0;
+    let mut n = 0usize;
     for (i, m) in level.meshes.iter_mut().enumerate() {
         if !wanted(i) {
             continue;
         }
-        match c.get(&sigs[i]) {
-            Some(Some(look)) => {
-                m.look = Some(Box::new(look.clone()));
-                n += 1;
-            }
-            // nothing to round: a look that is only the mesh again is dropped (it draws the same)
-            _ => {}
+        // nothing to round: a look that is only the mesh again is dropped (it draws the same)
+        if let Some(Some(look)) = sigs.get(i).and_then(|s| c.get(s)) {
+            m.look = Some(Box::new(look.clone()));
+            n = n.saturating_add(1);
         }
     }
     n
@@ -246,7 +248,11 @@ fn corner_normals(m: &Mesh, tris: &[[u32; 3]]) -> Option<Vec<[Vec3; 3]>> {
         let p = [pos(t[0])?, pos(t[1])?, pos(t[2])?];
         faces.push((p[1] - p[0]).cross(p[2] - p[0]).normalize_or_zero());
         for c in 0..3 {
-            let (a, b, o) = (p[c], p[(c + 1) % 3], p[(c + 2) % 3]);
+            let (a, b, o) = match c {
+                0 => (p[0], p[1], p[2]),
+                1 => (p[1], p[2], p[0]),
+                _ => (p[2], p[0], p[1]),
+            };
             let angle = (b - a).angle_between(o - a);
             around
                 .entry(key(a))
@@ -322,6 +328,9 @@ fn cubic(a: Vec3, b: Vec3, c: Vec3, d: Vec3, t: f32) -> Vec3 {
 }
 
 /// The mesh refined, or None when it has no curved edge (or would grow too large).
+// The integer arithmetic here is bounded: `cuts` is at most MAX_CUTS, the loops run over 0..=cuts, and the vertex count
+// (tris * per_tri) is checked against MAX_VERTICES before any index is made, so no u32 term can overflow.
+#[allow(clippy::arithmetic_side_effects)]
 pub fn mesh(m: &Mesh) -> Option<Mesh> {
     let pos = |i: u32| m.positions.get(i as usize).map(|&p| Vec3::from(p));
     let tris: Vec<[u32; 3]> = m
@@ -554,7 +563,62 @@ pub fn mesh(m: &Mesh) -> Option<Mesh> {
     Some(out)
 }
 
+/// The mesh the game draws for `m`: its look when it has one, else itself.
+pub fn drawn(m: &Mesh) -> &Mesh {
+    m.look.as_deref().unwrap_or(m)
+}
+
+/// How faceted a mesh is shaded: the widest angle, in degrees, between the normals at the two ends of one of its edges
+/// (a sphere of 8 segments is about 45, a well rounded one a few degrees; a flat-shaded mesh has its corners' normals
+/// agree within each face, so it is measured by the faces it meets across the shared corners instead).
+pub fn facets(m: &Mesh) -> f32 {
+    let mut widest = 0f32;
+    let normal = |i: usize| m.normals.get(i).map_or(Vec3::ZERO, |n| Vec3::from(*n));
+    let mut by_corner: HashMap<[i64; 3], Vec<Vec3>> = HashMap::new();
+    for part in &m.parts {
+        for t in part.indices.as_chunks::<3>().0 {
+            for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                let (a, b) = (a as usize, b as usize);
+                if a >= m.positions.len() || b >= m.positions.len() {
+                    continue;
+                }
+                widest = widest.max(
+                    normal(a)
+                        .normalize_or_zero()
+                        .dot(normal(b).normalize_or_zero())
+                        .clamp(-1.0, 1.0)
+                        .acos(),
+                );
+            }
+            for &i in t {
+                if let Some(p) = m.positions.get(i as usize) {
+                    let n = normal(i as usize).normalize_or_zero();
+                    let v = by_corner.entry(key(Vec3::from(*p))).or_default();
+                    if !v.iter().any(|o| o.dot(n) > 0.9999) {
+                        v.push(n);
+                    }
+                }
+            }
+        }
+    }
+    // a corner whose copies disagree is a crease: a ball has none
+    for v in by_corner.values() {
+        for a in v {
+            for b in v {
+                widest = widest.max(a.dot(*b).clamp(-1.0, 1.0).acos());
+            }
+        }
+    }
+    widest.to_degrees()
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 mod tests {
     use super::*;
 
@@ -661,7 +725,7 @@ mod tests {
         };
         for part in &c.parts {
             let mut indices = Vec::new();
-            for t in part.indices.chunks_exact(3) {
+            for t in part.indices.as_chunks::<3>().0 {
                 let p: Vec<Vec3> = t
                     .iter()
                     .map(|&i| Vec3::from(c.positions[i as usize]))
@@ -696,68 +760,21 @@ mod tests {
 
     #[test]
     fn flat_shaded_meshes_stay_as_they_are() {
-        let mut box_face = Mesh::default();
-        box_face.positions = vec![
-            [0.0, 0.0, 0.0],
-            [1.0, 0.0, 0.0],
-            [1.0, 0.0, 1.0],
-            [0.0, 0.0, 1.0],
-        ];
-        box_face.normals = vec![[0.0, 1.0, 0.0]; 4];
-        box_face.uvs = vec![[0.0; 2]; 4];
-        box_face.parts = vec![Part {
-            material: None,
-            indices: vec![0, 2, 1, 0, 3, 2],
-        }];
+        let box_face = Mesh {
+            positions: vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0],
+            ],
+            normals: vec![[0.0, 1.0, 0.0]; 4],
+            uvs: vec![[0.0; 2]; 4],
+            parts: vec![Part {
+                material: None,
+                indices: vec![0, 2, 1, 0, 3, 2],
+            }],
+            ..Mesh::default()
+        };
         assert!(mesh(&box_face).is_none());
     }
-}
-
-/// The mesh the game draws for `m`: its look when it has one, else itself.
-pub fn drawn(m: &Mesh) -> &Mesh {
-    m.look.as_deref().unwrap_or(m)
-}
-
-/// How faceted a mesh is shaded: the widest angle, in degrees, between the normals at the two ends of one of its edges
-/// (a sphere of 8 segments is about 45, a well rounded one a few degrees; a flat-shaded mesh has its corners' normals
-/// agree within each face, so it is measured by the faces it meets across the shared corners instead).
-pub fn facets(m: &Mesh) -> f32 {
-    let mut widest = 0f32;
-    let normal = |i: usize| m.normals.get(i).map_or(Vec3::ZERO, |n| Vec3::from(*n));
-    let mut by_corner: HashMap<[i64; 3], Vec<Vec3>> = HashMap::new();
-    for part in &m.parts {
-        for t in part.indices.chunks_exact(3) {
-            for k in 0..3 {
-                let (a, b) = (t[k] as usize, t[(k + 1) % 3] as usize);
-                if a >= m.positions.len() || b >= m.positions.len() {
-                    continue;
-                }
-                widest = widest.max(
-                    normal(a)
-                        .normalize_or_zero()
-                        .dot(normal(b).normalize_or_zero())
-                        .clamp(-1.0, 1.0)
-                        .acos(),
-                );
-            }
-            for &i in t {
-                if let Some(p) = m.positions.get(i as usize) {
-                    let n = normal(i as usize).normalize_or_zero();
-                    let v = by_corner.entry(key(Vec3::from(*p))).or_default();
-                    if !v.iter().any(|o| o.dot(n) > 0.9999) {
-                        v.push(n);
-                    }
-                }
-            }
-        }
-    }
-    // a corner whose copies disagree is a crease: a ball has none
-    for v in by_corner.values() {
-        for a in v {
-            for b in v {
-                widest = widest.max(a.dot(*b).clamp(-1.0, 1.0).acos());
-            }
-        }
-    }
-    widest.to_degrees()
 }

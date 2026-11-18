@@ -571,6 +571,12 @@ pub fn from_json(j: &J, counts: [usize; 5]) -> Result<Graph, String> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
 mod tests {
     use super::*;
 

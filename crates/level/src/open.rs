@@ -641,7 +641,7 @@ fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Opt
         .flat_map(|p| [p[0], p[1], -p[2]])
         .collect();
     let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
-    for p in pos.chunks_exact(3) {
+    for p in pos.as_chunks::<3>().0 {
         for k in 0..3 {
             let v = p.get(k).copied().unwrap_or(0.0);
             if let (Some(l), Some(h)) = (lo.get_mut(k), hi.get_mut(k)) {
@@ -694,7 +694,9 @@ fn mesh_json(m: &Mesh, push: &mut impl FnMut(&[u8], u64, Value) -> usize) -> Opt
         // Mirroring Z reverses the winding; swap two corners to keep faces facing the same way.
         let idx: Vec<u32> = p
             .indices
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .flat_map(|t| [t[0], t[2], t[1]])
             .collect();
         let bytes: Vec<u8> = idx.iter().flat_map(|i| i.to_le_bytes()).collect();
@@ -849,9 +851,9 @@ impl Reader<'_> {
         let mut out = Vec::with_capacity(count);
         for chunk in bytes.chunks_exact(width.max(1)) {
             let mut v = [0.0f32; N];
-            for (k, f) in chunk.chunks_exact(4).enumerate() {
-                if let (Some(slot), Ok(b)) = (v.get_mut(k), <[u8; 4]>::try_from(f)) {
-                    *slot = f32::from_le_bytes(b);
+            for (k, f) in chunk.as_chunks::<4>().0.iter().enumerate() {
+                if let Some(slot) = v.get_mut(k) {
+                    *slot = f32::from_le_bytes(*f);
                 }
             }
             out.push(v);
@@ -1239,14 +1241,18 @@ fn import_from(
                 return Err("index count is not a multiple of three".into());
             }
             let idx: Vec<u32> = bytes
-                .chunks_exact(4)
-                .map(|b| <[u8; 4]>::try_from(b).map(u32::from_le_bytes).unwrap_or(0))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|b| u32::from_le_bytes(*b))
                 .collect();
             if idx.iter().any(|&i| i as usize >= positions.len()) {
                 return Err("index out of range".into());
             }
             let indices = idx
-                .chunks_exact(3)
+                .as_chunks::<3>()
+                .0
+                .iter()
                 .flat_map(|t| [t[0], t[2], t[1]])
                 .collect();
             let material = p["material"]

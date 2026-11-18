@@ -84,7 +84,7 @@ fn hostile_meshes_never_panic() {
         uvs: vec![],
         parts: vec![Part {
             material: None,
-            indices: vec![0, 1, 2].repeat(level::smooth::MAX_SOURCE_TRIANGLES + 1),
+            indices: [0, 1, 2].repeat(level::smooth::MAX_SOURCE_TRIANGLES + 1),
         }],
         channels: vec![],
         look: None,

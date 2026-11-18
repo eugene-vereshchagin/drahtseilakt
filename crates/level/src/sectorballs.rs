@@ -24,12 +24,15 @@ pub fn original(level: u32) -> Vec<Option<String>> {
         if v.len() < s {
             v.resize(s, None);
         }
-        v[s - 1] = Some(b.to_owned());
+        if let Some(slot) = s.checked_sub(1).and_then(|i| v.get_mut(i)) {
+            *slot = Some(b.to_owned());
+        }
     }
     v
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 mod tests {
     #[test]
     fn table_reads() {

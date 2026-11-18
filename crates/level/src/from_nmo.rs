@@ -204,8 +204,9 @@ fn build(doc: &Document) -> Loaded {
     for (child, p) in parents {
         if let Some(&par) = objects.get(&p)
             && par != child
+            && let Some(o) = level.objects.get_mut(child)
         {
-            level.objects[child].parent = Some(par);
+            o.parent = Some(par);
         }
     }
     let mut parent_of: Vec<Option<usize>> = level.objects.iter().map(|o| o.parent).collect();
@@ -452,24 +453,30 @@ pub(crate) fn break_parent_loops(parent: &mut [Option<usize>]) {
     let mut state = vec![0u8; n];
     let mut path: Vec<usize> = Vec::new();
     for start in 0..n {
-        if state[start] != 0 {
+        if state.get(start).copied() != Some(0) {
             continue;
         }
         path.clear();
         let mut at = start;
         loop {
-            state[at] = 1;
+            if let Some(s) = state.get_mut(at) {
+                *s = 1;
+            }
             path.push(at);
-            let Some(p) = parent[at].filter(|&p| p < n) else {
-                parent[at] = None;
+            let Some(p) = parent.get(at).copied().flatten().filter(|&p| p < n) else {
+                if let Some(slot) = parent.get_mut(at) {
+                    *slot = None;
+                }
                 break;
             };
-            match state[p] {
-                2 => break,
-                1 => {
+            match state.get(p).copied() {
+                Some(2) => break,
+                Some(1) => {
                     let from = path.iter().position(|&x| x == p).unwrap_or(0);
-                    if let Some(&lowest) = path[from..].iter().min() {
-                        parent[lowest] = None;
+                    if let Some(&lowest) = path.get(from..).and_then(|s| s.iter().min())
+                        && let Some(slot) = parent.get_mut(lowest)
+                    {
+                        *slot = None;
                     }
                     break;
                 }
@@ -477,12 +484,15 @@ pub(crate) fn break_parent_loops(parent: &mut [Option<usize>]) {
             }
         }
         for &x in &path {
-            state[x] = 2;
+            if let Some(s) = state.get_mut(x) {
+                *s = 2;
+            }
         }
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 mod loop_tests {
     use super::break_parent_loops;
 

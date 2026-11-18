@@ -341,7 +341,9 @@ pub fn run_nmo_patch(input: &[u8]) {
         for (slot, p) in slots.enumerate() {
             if let Some((w, h, mut rgba)) = p {
                 // colours turned over, alpha kept (a picture without an alpha plane reads opaque and stays so)
-                rgba.chunks_exact_mut(4)
+                rgba.as_chunks_mut::<4>()
+                    .0
+                    .iter_mut()
                     .for_each(|px| px[..3].iter_mut().for_each(|v| *v = !*v));
                 found.push((i, slot, w, h, rgba));
             }

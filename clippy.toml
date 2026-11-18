@@ -1,0 +1,7 @@
+# Float vector/matrix types cannot overflow: like plain f32 arithmetic, their operators are not flagged by
+# clippy::arithmetic_side_effects. Integer arithmetic stays checked.
+arithmetic-side-effects-allowed = [
+    "glam::Vec2", "glam::Vec3", "glam::Vec4", "glam::Quat",
+    "glam::Mat2", "glam::Mat3", "glam::Mat4",
+    "glam::DVec2", "glam::DVec3", "glam::DVec4", "glam::DQuat", "glam::DMat3", "glam::DMat4",
+]
