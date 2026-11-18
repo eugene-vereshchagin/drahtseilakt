@@ -98,7 +98,7 @@ pub fn mesh(chunk: &Chunk) -> Result<Mesh> {
             }
             let vec3s = |w: &mut crate::chunk::Words<'_>| -> Result<Vec<[f32; 3]>> {
                 let words = w.take(count.checked_mul(3).ok_or(malformed("vertex data"))?)?;
-                Ok(words.chunks_exact(3).map(xyz).collect())
+                Ok(words.as_chunks::<3>().0.iter().map(xyz).collect())
             };
             mesh.positions = if flags & vertex_flags::NO_POSITION == 0 {
                 vec3s(&mut w)?
@@ -112,11 +112,11 @@ pub fn mesh(chunk: &Chunk) -> Result<Mesh> {
                 mesh.normals = vec3s(&mut w)?;
             }
             mesh.uvs = if flags & vertex_flags::SINGLE_UV != 0 {
-                let uv = w.take(2)?;
+                let uv = w.take(2)?.first_chunk::<2>().ok_or(malformed("uv"))?;
                 vec![uv2(uv); count]
             } else {
                 let words = w.take(count.checked_mul(2).ok_or(malformed("uv data"))?)?;
-                words.chunks_exact(2).map(uv2).collect()
+                words.as_chunks::<2>().0.iter().map(uv2).collect()
             };
         }
     }
@@ -127,11 +127,7 @@ pub fn mesh(chunk: &Chunk) -> Result<Mesh> {
             return Err(malformed("face count"));
         }
         let words = w.take(count.checked_mul(2).ok_or(malformed("face data"))?)?;
-        for f in words.chunks_exact(2) {
-            let (a, b) = match f {
-                [a, b] => (*a, *b),
-                _ => return Err(malformed("face")),
-            };
+        for &[a, b] in words.as_chunks::<2>().0 {
             let idx = [a as u16, (a >> 16) as u16, b as u16];
             if idx.iter().any(|&i| usize::from(i) >= mesh.positions.len()) {
                 return Err(malformed("face index"));
@@ -162,7 +158,7 @@ pub fn mesh_channels(chunk: &Chunk, vertices: usize) -> Result<Vec<Channel>> {
                 return Err(malformed("channel uv count"));
             }
             let words = w.take(count.checked_mul(2).ok_or(malformed("channel uv data"))?)?;
-            let uvs = words.as_chunks::<2>().0.iter().map(|c| uv2(c)).collect();
+            let uvs = words.as_chunks::<2>().0.iter().map(uv2).collect();
             out.push(Channel {
                 material,
                 flags,
@@ -175,14 +171,12 @@ pub fn mesh_channels(chunk: &Chunk, vertices: usize) -> Result<Vec<Channel>> {
     Ok(out)
 }
 
-fn xyz(c: &[u32]) -> [f32; 3] {
-    let f = |i: usize| c.get(i).copied().map(f32::from_bits).unwrap_or(0.0);
-    [f(0), f(1), f(2)]
+fn xyz(&[x, y, z]: &[u32; 3]) -> [f32; 3] {
+    [x, y, z].map(f32::from_bits)
 }
 
-fn uv2(c: &[u32]) -> [f32; 2] {
-    let f = |i: usize| c.get(i).copied().map(f32::from_bits).unwrap_or(0.0);
-    [f(0), f(1)]
+fn uv2(&[u, v]: &[u32; 2]) -> [f32; 2] {
+    [u, v].map(f32::from_bits)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -350,7 +344,7 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
             let Some(rgba) = unpack_planes(&mut w, width as usize, pixels) else {
                 break;
             };
-            budget -= rgba.len();
+            budget = budget.saturating_sub(rgba.len());
             pictures.push(Some((width, height, rgba)));
         }
     }
@@ -362,7 +356,7 @@ pub fn texture(chunk: &Chunk) -> Result<Texture> {
         let (file_name, embedded) = (names.next().flatten(), pictures.next().flatten());
         if file_name.is_none() && embedded.is_none() {
             // a slot with neither is kept only when a later one has something (the slot numbers stay)
-            let later = names.len() + pictures.len();
+            let later = names.len().saturating_add(pictures.len());
             if later == 0 {
                 break;
             }
@@ -448,7 +442,7 @@ pub fn entity(chunk: &Chunk) -> Result<Entity> {
     let mut w = chunk.section(0x0010_0000).ok_or(missing("entity matrix"))?;
     let first = w.u32()?;
     let flags = w.u32()?;
-    let m: Vec<[f32; 3]> = w.take(12)?.chunks_exact(3).map(xyz).collect();
+    let m: Vec<[f32; 3]> = w.take(12)?.as_chunks::<3>().0.iter().map(xyz).collect();
     let row = |i: usize| m.get(i).copied().unwrap_or_default();
     // after the matrix: 0x10000 an object to skip, 0x20000 the parent (CKRenderObject's save order)
     // (a short chunk simply has none: a missing word is no parent, never a lost object)

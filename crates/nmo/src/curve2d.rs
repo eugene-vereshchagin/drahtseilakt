@@ -103,30 +103,35 @@ impl Curve2d {
             return;
         }
         let pos: Vec<[f32; 2]> = self.points.iter().map(|p| p.pos).collect();
+        let diff = |a: Option<&[f32; 2]>, b: Option<&[f32; 2]>| match (a, b) {
+            (Some(a), Some(b)) => [b[0] - a[0], b[1] - a[1]],
+            _ => [0.0f32; 2],
+        };
         for (i, p) in self.points.iter_mut().enumerate() {
-            let mut dp = [0.0f32; 2];
-            let mut dn = [0.0f32; 2];
-            if i > 0 {
-                dp = [pos[i][0] - pos[i - 1][0], pos[i][1] - pos[i - 1][1]];
-            }
-            if i + 1 < n {
-                dn = [pos[i + 1][0] - pos[i][0], pos[i + 1][1] - pos[i][1]];
-            }
+            let (cur, next) = (pos.get(i), i.checked_add(1).and_then(|j| pos.get(j)));
+            let prev = i.checked_sub(1).and_then(|j| pos.get(j));
+            let (first, last) = (prev.is_none(), next.is_none());
+            let dp = diff(prev, cur);
+            let dn = diff(cur, next);
             if p.flags & FLAG_USER_TANGENTS == 0 {
                 let (t, c, b) = (p.tension, p.continuity, p.bias);
                 let oa = (1.0 + c) * (1.0 + b) * (1.0 - t);
                 let ob = (1.0 - t) * (1.0 - c) * (1.0 - b);
                 let ia = (1.0 + b) * (1.0 - t) * (1.0 - c);
                 let ib = (1.0 + c) * (1.0 - t) * (1.0 - b);
-                for k in 0..2 {
-                    p.tan_out[k] = (oa * dp[k] + ob * dn[k]) * 0.5;
-                    p.tan_in[k] = (ia * dp[k] + ib * dn[k]) * 0.5;
-                }
+                p.tan_out = [
+                    (oa * dp[0] + ob * dn[0]) * 0.5,
+                    (oa * dp[1] + ob * dn[1]) * 0.5,
+                ];
+                p.tan_in = [
+                    (ia * dp[0] + ib * dn[0]) * 0.5,
+                    (ia * dp[1] + ib * dn[1]) * 0.5,
+                ];
             }
             let xp = if dp[0] == 0.0 { 1e-4 } else { dp[0] };
             let xn = if dn[0] == 0.0 { 1e-4 } else { dn[0] };
-            rescale(&mut p.tan_in, if i == 0 { 1e-4 } else { xp });
-            rescale(&mut p.tan_out, if i + 1 == n { 1e-3 } else { xn });
+            rescale(&mut p.tan_in, if first { 1e-4 } else { xp });
+            rescale(&mut p.tan_out, if last { 1e-3 } else { xn });
         }
     }
 
@@ -150,13 +155,13 @@ impl Curve2d {
             let mut s = (x - a.pos[0]) / (b.pos[0] - a.pos[0]);
             let (mut lo, mut hi) = (0.0f32, 1.0f32);
             let mut y = 0.0f32;
-            let mut it = 0;
+            let mut it = 0u32;
             loop {
                 if it > 999 {
                     // the original leaves its loop here with the values of the last pass
                     break;
                 }
-                it += 1;
+                it = it.saturating_add(1);
                 let h3 = (s - 2.0) * s + 1.0;
                 let h2 = 3.0 - (s + s);
                 let h1 = ((s + s) - 3.0) * s * s + 1.0;
@@ -200,7 +205,8 @@ mod tests {
     #![allow(
         clippy::unwrap_used,
         clippy::indexing_slicing,
-        clippy::arithmetic_side_effects
+        clippy::arithmetic_side_effects,
+        clippy::panic
     )]
     use super::*;
     use crate::behavior::{Saved, parameter};
@@ -221,8 +227,11 @@ mod tests {
         x.to_bits()
     }
 
+    /// A test point: flags, position, in tangent, out tangent.
+    type TestPoint = (u32, [f32; 2], [f32; 2], [f32; 2]);
+
     /// The curve chunk's words: two unused words per point, the fitting, then each point's flags and 11 floats.
-    fn curve_words(points: &[(u32, [f32; 2], [f32; 2], [f32; 2])]) -> Vec<u32> {
+    fn curve_words(points: &[TestPoint]) -> Vec<u32> {
         let mut w = vec![0x100, 0, points.len() as u32];
         w.extend(points.iter().map(|_| 0));
         w.push(f(0.0));

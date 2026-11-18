@@ -274,7 +274,9 @@ fn what_cannot_be_patched_exactly_is_refused() {
     let opaque = pixels(2, 3, 9, true);
     let transparent = pixels(2, 3, 9, false);
     let short = vec![0u8; 3 * 2 * 4 - 1];
-    let cases: Vec<(usize, usize, (u32, u32), &[u8], &str)> = vec![
+    // (object, slot, size, pixels, why it is refused)
+    type Case<'a> = (usize, usize, (u32, u32), &'a [u8], &'a str);
+    let cases: Vec<Case> = vec![
         (0, 0, (3, 2), &ok, "a material"),
         (2, 0, (3, 2), &ok, "a texture with no saved picture"),
         (1, 2, (3, 2), &ok, "a slot past the saved ones"),

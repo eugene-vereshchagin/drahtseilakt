@@ -5,6 +5,22 @@
 // The solver works on indices it creates itself (slots of its own arenas, dimensions of 3-vectors); its inputs come
 // from the level model, not from files, so the input-hardening lints of the workspace do not apply here.
 #![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+// The port keeps the upstream code's shape so a reader can follow it line by line and the results stay bit-exact
+// (replays depend on them): its index loops, argument lists, branches, constants written to more digits than f32
+// holds, and `!(a < b)` tests, which differ from `a >= b` when a value is NaN. Clippy's style advice on these would
+// change the code away from the reference, so it is off for this crate only.
+#![allow(
+    clippy::needless_range_loop,
+    clippy::too_many_arguments,
+    clippy::neg_cmp_op_on_partial_ord,
+    clippy::collapsible_if,
+    clippy::neg_multiply,
+    clippy::excessive_precision,
+    clippy::assign_op_pattern,
+    clippy::needless_late_init,
+    clippy::if_same_then_else,
+    clippy::manual_clamp
+)]
 
 pub mod body;
 pub mod collision;
