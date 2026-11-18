@@ -16,7 +16,7 @@
 // number of rules and conditions and every number are capped, the values are from fixed lists (a module's name:
 // letters, digits and `_`), and a malformed line is left out with a note naming it.
 
-use crate::zones::{Effect, Kind};
+use crate::pilot::zones::{Effect, Kind};
 use std::path::Path;
 
 const MAX_FILE: u64 = 64 * 1024;
@@ -102,7 +102,8 @@ impl Rule {
     }
 
     pub fn cap(&self) -> Option<f32> {
-        (self.kind == Kind::Careful).then(|| self.speed.unwrap_or(crate::zones::CAREFUL_SPEED))
+        (self.kind == Kind::Careful)
+            .then(|| self.speed.unwrap_or(crate::pilot::zones::CAREFUL_SPEED))
     }
 
     /// The rule as the watcher reads it: `rail, rail-end ahead → don't dawdle`.
@@ -619,7 +620,7 @@ mod tests {
         assert_eq!(load(&path).0.rules.len(), 2);
         // undone by id: the first, though it is not the last line
         assert!(
-            crate::zones::remove_mark(&path, "11112222")
+            crate::pilot::zones::remove_mark(&path, "11112222")
                 .unwrap()
                 .is_some()
         );

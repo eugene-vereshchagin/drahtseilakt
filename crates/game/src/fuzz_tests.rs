@@ -32,7 +32,7 @@ fn repo() -> PathBuf {
 
 /// The autopilot store's hints folder as a seed root (none without the store: the fuzzer then has the built-in seeds).
 fn store_hints() -> Vec<PathBuf> {
-    crate::pilotdata::for_test("the fuzz seeds from hints/")
+    crate::pilot::pilotdata::for_test("the fuzz seeds from hints/")
         .map(|d| d.join("hints"))
         .into_iter()
         .collect()
@@ -92,7 +92,7 @@ fn run_hints(input: &[u8]) {
     let Ok(text) = std::str::from_utf8(input) else {
         return;
     };
-    let _ = crate::hints::parse(text);
+    let _ = crate::pilot::hints::parse(text);
 }
 
 fn hint_seeds() -> Vec<Vec<u8>> {
@@ -115,10 +115,10 @@ fn run_zones(input: &[u8]) {
     let Ok(text) = std::str::from_utf8(input) else {
         return;
     };
-    let (zones, _) = crate::zones::parse(text);
+    let (zones, _) = crate::pilot::zones::parse(text);
     // every zone written back reads the same
     for z in &zones.zones {
-        let (again, notes) = crate::zones::parse(&z.line());
+        let (again, notes) = crate::pilot::zones::parse(&z.line());
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(again.zones.len(), 1);
         let _ = zones.at(z.points[0], z.sector.saturating_sub(1));
@@ -144,13 +144,13 @@ fn run_learned(input: &[u8]) {
     let Ok(text) = std::str::from_utf8(input) else {
         return;
     };
-    let (learned, _) = crate::learned::parse(text);
+    let (learned, _) = crate::pilot::learned::parse(text);
     // every rule written back reads the same, and holds where its features are
     for r in &learned.rules {
-        let (again, notes) = crate::learned::parse(&r.line());
+        let (again, notes) = crate::pilot::learned::parse(&r.line());
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(again.rules.first(), Some(r));
-        let mut s = crate::learned::Situation::default();
+        let mut s = crate::pilot::learned::Situation::default();
         for (f, v) in &r.when {
             s.values[*f] = Some(v.clone());
         }

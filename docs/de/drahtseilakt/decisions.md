@@ -497,3 +497,17 @@ grün bleibt; das Spiel selbst liest es nie. Was das Spiel einkompiliert (die St
 `crates/level/data/sector-balls.txt`. Die eigenen Daten eines Levels (`assets/levels/*/pilot/`) bleiben beim Level. Die aufgezeichneten Läufe, die die eigenen Tests des Spiels spielen,
 gehören nicht dem Autopiloten: sie liegen in `drahtseilakt-tools/test-runs`, gefunden über `DRAHTSEILAKT_TEST_RUNS`
 (Besitzer, 2026-11-18: der Autopilot zieht ganz aus dem Spiel aus, also nennt ihn nichts im Spiel).
+
+## Der Autopilot verlässt das Spiel
+
+*Entscheidung des Besitzers, 2026-11-18.* Der Autopilot (der Testspieler, die Videoverfolgung, die Läufe der
+Level-Statistik) ist unser Werkzeug für die Videos, kein Teil des Spiels: er zieht ganz in das private Repository
+`drahtseilakt-tools` um, und das Spiel behält keinen Verweis auf ihn. Das Spiel wird eine Bibliothek
+(`crates/game/src/lib.rs`) mit einer dünnen Binärdatei; ein Werkzeug steuert es über die öffentliche API der Bibliothek
+und einen allgemeinen Haken für einen äußeren Spieler eines Laufs im Fenster (`control.rs`, `Controller`: er spielt die
+Takte, nimmt eigene Tasten, zeichnet eigene Markierungen), den die Binärdatei des Spiels selbst nie belegt. Der
+Live-Beobachtungsmodus (`--watch`, Übernahme von Hand, Zonenmarkierungen) bleibt, auf diesem Haken. Die
+Entwicklerprotokolle bleiben als allgemeine Diagnose im Spiel, ebenso `scripts/video.sh`. Die aufgezeichneten Läufe, die
+die Tests des Spiels spielen, liegen in `drahtseilakt-tools/test-runs` (`DRAHTSEILAKT_TEST_RUNS`). Die Docs des
+Autopiloten gehen ins Werkzeug-Repository, nur auf Englisch. Erste Stufe: der Code des Autopiloten liegt abgesondert in
+`crates/game/src/pilot/` und nutzt nur die öffentliche API; die nächste verlegt diesen Baum hinaus.

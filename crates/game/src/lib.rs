@@ -5,36 +5,31 @@
 // their assertions readable. The shipped code gets no such allow: each module that reads outside data is fixed.
 #![cfg_attr(test, allow(clippy::arithmetic_side_effects, clippy::indexing_slicing))]
 
-mod app;
+pub mod app;
 mod audio;
 mod audit;
-mod autopilot;
 mod ballsound;
 mod clouds;
-mod collide;
+pub mod collide;
+pub mod control;
 mod convert_audit;
 mod dik;
-mod edges;
 mod endscreen;
 mod entities;
 mod extra;
 mod facade;
 mod fallback;
 mod features;
-mod files;
+pub mod files;
 mod freecam;
 #[cfg(test)]
 mod fuzz_tests;
 mod highscore;
-mod hints;
-mod hud;
-mod lang;
-mod learned;
-mod levels;
-mod levelstats;
+pub mod hud;
+pub mod lang;
+pub mod levels;
 mod lights;
 mod loading;
-mod locate;
 mod look;
 mod manual;
 mod matstate;
@@ -49,37 +44,37 @@ mod partcheck;
 mod particles;
 mod physics;
 mod pieces;
-mod pilotdata;
+pub mod pilot;
 mod playtime;
 mod proximity;
-mod render;
-mod replay;
+pub mod render;
+pub mod replay;
 mod report;
 mod retro;
-mod scene;
+pub mod runway;
+pub mod scene;
 mod script_sound;
 mod script_text;
 mod script_text3d;
 mod scripting;
 mod scriptsky;
 mod showcase;
-mod sim;
+pub mod sim;
 mod sky;
 mod splashpic;
-mod supports;
+pub mod supports;
 mod terrain;
 mod testlevels;
 mod texpaint;
 mod titlescene;
 mod trafo;
-mod ui;
+pub mod ui;
 mod userreplay;
 mod volume;
 mod watch;
-mod zones;
-use gamedata::assets;
+pub use gamedata::assets;
 
-pub use autopilot::Style as PilotStyle;
+pub use pilot::autopilot::Style as PilotStyle;
 pub use sky::{set_override as set_sky_override, valid_name as valid_sky_name};
 
 use assets::{Data, Source};
@@ -119,7 +114,7 @@ pub struct Options {
     /// The test player's hint file, instead of the level's in the data folder.
     pub hints: Option<PathBuf>,
     /// How the test player rides (calm or speedrun).
-    pub style: crate::autopilot::Style,
+    pub style: crate::pilot::autopilot::Style,
     /// Where the test player's stuck reports go.
     pub report: Option<PathBuf>,
     /// The test player gives up when its ball has not moved for this many seconds (or its way has not got on for
@@ -195,7 +190,7 @@ pub fn default_options() -> Options {
         then: Vec::new(),
         plan: None,
         hints: None,
-        style: crate::autopilot::Style::Calm,
+        style: crate::pilot::autopilot::Style::Calm,
         report: None,
         give_up: 30,
         rewinds: 600,
@@ -263,6 +258,9 @@ pub fn run(o: Options) -> Result<(), String> {
         } else {
             Source::Nmo(first.level)
         };
+    }
+    if pilot::wanted(&o) {
+        return pilot::run(o, data);
     }
     app::run(o, data)
 }

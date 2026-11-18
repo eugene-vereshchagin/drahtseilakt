@@ -20,35 +20,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::Path;
 
-/// One tick of a replayed run.
-#[derive(Clone, Copy, Debug)]
-pub struct TickRec {
-    pub pos: Vec3,
-    pub ground: bool,
-    /// As the game shows it (1 is the first).
-    pub sector: usize,
-    pub kind: BallKind,
-    pub updraft: bool,
-    pub held: bool,
-    pub dying: bool,
-}
-
-/// A level as a run loads it, and the ball's way through it (app::stats_run).
-pub struct Run {
-    pub level: level::Level,
-    pub modules: crate::scene::Modules,
-    pub ticks: Vec<TickRec>,
-    /// Each event with its tick and the sector it came in.
-    pub events: Vec<(u64, Event, usize)>,
-    /// The loose things (boxes, balls) and how far each got from where it began.
-    pub moved: Vec<(String, f32)>,
-    pub finished: bool,
-    pub begun_elsewhere: bool,
-    /// The test player's way through a plan's objects (floor points), when there is no run.
-    pub route: Option<Vec<Vec3>>,
-    /// The checkpoints, then the end.
-    pub checkpoints: Vec<Vec3>,
-}
+pub use crate::runway::{Run, TickRec};
 
 /// The way is sampled this often (units).
 const STEP: f32 = 0.5;
@@ -883,7 +855,7 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
         let mut times: Vec<String> = Vec::new();
         for r in crate::supports::replays(hints, n) {
             lo.replay = Some(r.clone());
-            match crate::app::stats_run(&lo, &data, None) {
+            match crate::pilot::run::stats_run(&lo, &data, None) {
                 Ok(run) => {
                     let name = r
                         .file_name()
@@ -916,7 +888,7 @@ pub fn run(o: &Options, data: &Data, out: &Path, hints: &Path) -> Result<(), Str
         let plan = hints.join(format!("Level_{n:02}.plan"));
         if plan.is_file() {
             lo.replay = None;
-            match crate::app::stats_run(&lo, &data, Some(&plan)) {
+            match crate::pilot::run::stats_run(&lo, &data, Some(&plan)) {
                 Ok(run) => sources.push(("plan".to_owned(), run)),
                 Err(e) => println!("level {n}: {}: {e}", plan.display()),
             }

@@ -307,3 +307,7 @@ Community picks、My maps），而是按含义，在经典和扩展模式下相�
 ## 回放和自动驾驶数据放在单独的自动驾驶数据库
 
 *所有者的决定，2026-11-18。* 我们的回放、录制的运行记录以及自动驾驶读取的一切（路线、计划、提示、区域、学习表、关卡统计的手工标注）不属于 GitHub，分开管理也更容易。它们已从 `hints/` 和 `tests/replays/` 迁到与本仓库并列的独立仓库 `drahtseilakt-tools/autopilot`（私有，从不公开）。由一个解析器统一查找：环境变量 `DRAHTSEILAKT_AUTOPILOT`，否则为仓库根目录的 `../drahtseilakt-tools/autopilot`。需要它的测试在缺失时会带提示跳过（与没有 `OPENBALLANCE_DATA` 时相同），因此没有它的 CI 保持绿色；游戏本身从不读取它。游戏编译进去的内容（各区段的起始球）移到了 `crates/level/data/sector-balls.txt`。关卡自带的数据（`assets/levels/*/pilot/`）仍属于关卡。游戏自身测试所播放的录制运行不属于自动驾驶：它们在 `drahtseilakt-tools/test-runs` 中，通过 `DRAHTSEILAKT_TEST_RUNS` 查找（所有者，2026-11-18：自动驾驶完全移出游戏，因此游戏中没有任何东西提到它）。
+
+## 自动驾驶离开游戏
+
+*所有者的决定，2026-11-18。* 自动驾驶（测试玩家、视频跟踪、关卡统计的运行）是我们制作视频的工具，不是游戏的一部分：它整体迁入私有仓库 `drahtseilakt-tools`，游戏中不再保留任何对它的引用。游戏成为一个库（`crates/game/src/lib.rs`）加一个精简的可执行文件；工具通过库的公共 API 和一个通用钩子来驱动游戏，该钩子用于窗口中一局运行的外部玩家（`control.rs`，`Controller`：它播放各 tick、接收自己的按键、绘制自己的标记），游戏自身的可执行文件从不提供它。实时观看模式（`--watch`、手动接管、区域标记）保留，基于这个钩子。开发日志作为通用诊断留在游戏中，`scripts/video.sh` 也保留。游戏测试所播放的录制运行在 `drahtseilakt-tools/test-runs`（`DRAHTSEILAKT_TEST_RUNS`）。自动驾驶的文档移到工具仓库，只有英文版。第一阶段：自动驾驶的代码单独放在 `crates/game/src/pilot/`，只使用公共 API；下一阶段把这棵目录树移出去。

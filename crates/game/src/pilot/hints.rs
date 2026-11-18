@@ -1089,7 +1089,7 @@ pub struct Runner {
     /// The tick the last hint began.
     pub began: u64,
     /// What the watcher's zones ask where the ball is now (set by the test player each tick).
-    pub zone: crate::zones::Effect,
+    pub zone: crate::pilot::zones::Effect,
     /// The raw speedrun (autopilot.rs, `Style::Raw`, set by the test player): every step is flowed where a copy of
     /// the run keeps the ball, and a flowed step's speed is a minimum (`Running::least`).
     pub raw: bool,
@@ -1567,7 +1567,7 @@ impl Runner {
     /// copy of the run (as written from there on: one step at a time is flowed).
     fn flow_keeps_ball(&self, sim: &Sim) -> bool {
         let mut r = self.clone();
-        r.zone = crate::zones::Effect::default();
+        r.zone = crate::pilot::zones::Effect::default();
         r.quiet = true;
         let Some(run) = r.running.as_mut() else {
             return false;

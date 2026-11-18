@@ -543,3 +543,16 @@ compiles in, the sectors' starting balls, moved to `crates/level/data/sector-bal
 (`assets/levels/*/pilot/`) stays with the level. The recorded runs the game's own tests play are not the autopilot's:
 they are in `drahtseilakt-tools/test-runs`, found through `DRAHTSEILAKT_TEST_RUNS` (owner, 2026-11-18: the autopilot
 moves out of the game entirely, so nothing of the game names it).
+
+## The autopilot leaves the game
+
+*Owner's decision, 2026-11-18.* The autopilot (the test player, the video tracking, the level statistics' runs) is our
+tool for the videos, not part of the game: it moves whole into the private `drahtseilakt-tools` repository, and the game
+keeps no reference to it. The game becomes a library (`crates/game/src/lib.rs`) with a thin binary; a tool drives it
+through the library's public API and a generic hook for an outside player of a run in the window
+(`control.rs`, `Controller`: it plays the ticks, takes its own keys, draws its own marks), which the game's own binary
+never fills. The live watch mode (`--watch`, taking over by hand, the zone marks) stays, on that hook. The dev logs stay
+in the game as generic diagnostics, and so does `scripts/video.sh`. The recorded runs the game's tests play are in
+`drahtseilakt-tools/test-runs` (`DRAHTSEILAKT_TEST_RUNS`). The autopilot's docs go to the tools repository, in English
+only. First stage: the autopilot's code sits apart in `crates/game/src/pilot/`, using only the public API; the next
+moves that tree out.

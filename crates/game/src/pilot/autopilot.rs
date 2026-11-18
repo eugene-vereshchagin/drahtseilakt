@@ -91,7 +91,7 @@ pub struct Route {
     pts: Vec<Vec3>,
     grid: HashMap<(i32, i32), Vec<usize>>,
     /// The edges of the level's floors.
-    pub edges: std::sync::Arc<crate::edges::Edges>,
+    pub edges: std::sync::Arc<crate::pilot::edges::Edges>,
 }
 
 /// A floor point as the steering reads it: how far it is from the nearest floor point without floor on every side
@@ -307,7 +307,7 @@ impl Route {
         steep: bool,
     ) -> Route {
         let (tris, own) = floor_triangles(level, modules);
-        let floor_edges = crate::edges::Edges::of(&tris, own);
+        let floor_edges = crate::pilot::edges::Edges::of(&tris, own);
         // (a way found for the test player alone, not along a player's, takes steeper floors: the waves of a wavy log)
         let found = floor_points(
             &tris,
@@ -1240,7 +1240,7 @@ pub struct DemoTick {
     /// The keys as the player pressed them, and the view's quarter then: in the same view they are given as they
     /// were (turns of the view too, and pushes while the view turns, which no world direction gives exactly).
     pub bits: u8,
-    pub quarter: crate::hints::Facing,
+    pub quarter: crate::pilot::hints::Facing,
     /// In the player's last seconds before losing a ball (not `alive`): how many ticks before the loss. The line is
     /// kept to there but for the last second: what the player did then may be what the level needs (a bridge
     /// knocked down as the ball fell with it).
@@ -1295,7 +1295,7 @@ fn idle_skip(d: &Demo, k: usize, sim: &Sim) -> Option<usize> {
     for t in 0..IDLE_CHECK {
         let j = end + t as usize;
         let tick = d.ticks.get(j)?;
-        s.step(d.input(j, crate::hints::Facing::of(&s.camera)));
+        s.step(d.input(j, crate::pilot::hints::Facing::of(&s.camera)));
         if s.lives < lives || s.is_dying() || s.game_over {
             return None;
         }
@@ -1417,12 +1417,12 @@ impl Demo {
 
     /// The player's input of tick `k` for a view at `quarter`: the very keys when the view is the player's, else the
     /// push as arrows of this view.
-    fn input(&self, k: usize, quarter: crate::hints::Facing) -> u8 {
+    fn input(&self, k: usize, quarter: crate::pilot::hints::Facing) -> u8 {
         self.ticks.get(k).map_or(0, |t| {
             if t.quarter == quarter {
                 t.bits
             } else {
-                crate::hints::arrows(t.push, quarter)
+                crate::pilot::hints::arrows(t.push, quarter)
             }
         })
     }
@@ -1470,7 +1470,7 @@ pub struct Pilot {
     /// floors.
     field: Option<(usize, HashMap<usize, f32>)>,
     /// The hints for places it cannot pass alone (hints.rs): while one runs, it drives.
-    pub hints: crate::hints::Runner,
+    pub hints: crate::pilot::hints::Runner,
     /// The player's run it follows, if any; the player's tick it matched last; and, when the player's pushes were
     /// the choice, from which of the player's ticks and from which tick of ours.
     pub demo: Option<std::sync::Arc<Demo>>,
@@ -1495,11 +1495,11 @@ pub struct Pilot {
     /// What steers now, for whoever watches (`status`).
     mode: &'static str,
     /// The watcher's zones (zones.rs): where not to dawdle, where to keep slow and on the middle.
-    pub zones: std::sync::Arc<crate::zones::Zones>,
+    pub zones: std::sync::Arc<crate::pilot::zones::Zones>,
     /// What they ask where the ball is now.
-    zone: crate::zones::Effect,
+    zone: crate::pilot::zones::Effect,
     /// What it learned from the watcher's marks on every level (learned.rs), and the rule holding now.
-    pub learned: std::sync::Arc<crate::learned::Learned>,
+    pub learned: std::sync::Arc<crate::pilot::learned::Learned>,
     learned_now: Option<String>,
     /// What the zones and rules asked when AUTOPILOT_SITUATION last said it (it says each change).
     zone_said: String,
@@ -1573,7 +1573,7 @@ impl Pilot {
             plan: Vec::new(),
             seed: 0x2545_F491,
             field: None,
-            hints: crate::hints::Runner::default(),
+            hints: crate::pilot::hints::Runner::default(),
             demo: None,
             demo_at: None,
             demo_run: None,
@@ -1587,7 +1587,7 @@ impl Pilot {
             doomed_at: None,
             mode: "way search",
             zones: std::sync::Arc::default(),
-            zone: crate::zones::Effect::default(),
+            zone: crate::pilot::zones::Effect::default(),
             learned: std::sync::Arc::default(),
             learned_now: None,
             zone_said: String::new(),
@@ -1711,10 +1711,11 @@ impl Pilot {
         if d.ticks.get(k).is_some_and(|t| t.doomed_in.is_some()) {
             self.doomed_at = Some(sim.tick);
         }
-        let q = crate::hints::Facing::of(&sim.camera);
+        let q = crate::pilot::hints::Facing::of(&sim.camera);
         let lives = sim.lives;
         // the player's keys from tick `k + t`, in our view (as a copy's view turns with them, each tick's own)
-        let theirs = |s: &Sim, t: u64| d.input(k + t as usize, crate::hints::Facing::of(&s.camera));
+        let theirs =
+            |s: &Sim, t: u64| d.input(k + t as usize, crate::pilot::hints::Facing::of(&s.camera));
         let route = self.route.clone();
         let raw = self.ride == Style::Raw;
         let cost_of = |first: Option<u8>| -> (f32, Vec<u8>) {
@@ -1880,16 +1881,16 @@ impl Pilot {
                 .map(|(at, _)| (at, k))
         });
         if let Some((at, k)) = fetch {
-            self.hints.add(crate::hints::Hint {
+            self.hints.add(crate::pilot::hints::Hint {
                 at: sim.ball.position,
                 radius: 6.0,
                 sector: Some(sim.sector + 1),
                 kind: Some(sim.ball.kind),
                 // and back to the reset point, where the way (and a followed run) goes on from
                 steps: vec![
-                    crate::hints::Step::Via(at, 900),
-                    crate::hints::Step::Become(k),
-                    crate::hints::Step::Goto(sim.ball.position, 900),
+                    crate::pilot::hints::Step::Via(at, 900),
+                    crate::pilot::hints::Step::Become(k),
+                    crate::pilot::hints::Step::Goto(sim.ball.position, 900),
                 ],
                 full: Vec::new(),
                 line: 0,
@@ -1947,7 +1948,7 @@ impl Pilot {
     /// A hint of its own from the followed run, when stuck near the player's line: roll to a place before this one
     /// where the player stood still (in this sector, as this ball, within reach), then give the player's keys from
     /// there on, past this place. Each place the player stood is tried twice at most.
-    fn run_up(&mut self, sim: &Sim, here: f32) -> Option<crate::hints::Hint> {
+    fn run_up(&mut self, sim: &Sim, here: f32) -> Option<crate::pilot::hints::Hint> {
         let d = self.demo.as_ref()?;
         let near = d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim))?;
         let b = &sim.ball;
@@ -1967,21 +1968,21 @@ impl Pilot {
         let keys: Vec<u8> = (rest..rest + RUN_UP_KEYS)
             .map_while(|k| d.ticks.get(k).filter(|t| t.alive).map(|t| t.bits))
             .collect();
-        let hint = crate::hints::Hint {
+        let hint = crate::pilot::hints::Hint {
             at: b.position,
             radius: 3.0,
             sector: Some(sim.sector + 1),
             kind: Some(b.kind),
             steps: vec![
-                crate::hints::Step::Goto(t.pos, 600),
-                crate::hints::Step::Inputs(t.quarter, keys),
+                crate::pilot::hints::Step::Goto(t.pos, 600),
+                crate::pilot::hints::Step::Inputs(t.quarter, keys),
             ],
             full: Vec::new(),
             line: 0,
             retry: 0,
         };
         // tried on a copy: it must keep the ball and end further along the way
-        let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+        let mut trial = crate::pilot::hints::Runner::new(vec![hint.clone()]);
         let mut s = sim.clone();
         let lives = s.lives;
         for _ in 0..(600 + RUN_UP_KEYS) {
@@ -1999,7 +2000,7 @@ impl Pilot {
 
     /// A charge at a drawbridge near (within `BRIDGE_NEAR`) that the way ahead passes over: through it to the first
     /// point of the way well past it. Each bridge is charged `BRIDGE_CHARGES` times at most.
-    fn charge(&mut self, sim: &Sim) -> Option<crate::hints::Hint> {
+    fn charge(&mut self, sim: &Sim) -> Option<crate::pilot::hints::Hint> {
         let b = sim.ball.position;
         let flat = |p: Vec3, q: Vec3| Vec3::new(p.x - q.x, 0.0, p.z - q.z).length();
         let (k, &bridge) = self.bridges.iter().enumerate().find(|(k, g)| {
@@ -2022,7 +2023,7 @@ impl Pilot {
             .find(|p| flat(**p, b) > flat(bridge, b) + 8.0)?;
         self.charged.push(k);
         let lift = Vec3::Y * crate::sim::BALL_RADIUS;
-        let via = crate::hints::Step::Via(*past + lift, 600);
+        let via = crate::pilot::hints::Step::Via(*past + lift, 600);
         // the charges: straight through; or a ram from a run-up along the way, braking at once after it so as not to
         // follow a plank that falls into the gap, a wait while it settles, then across
         let foot = ahead.get(over).copied().unwrap_or(bridge);
@@ -2047,17 +2048,17 @@ impl Pilot {
             }
             for run in [30u64, 50, 80] {
                 charges.push(vec![
-                    crate::hints::Step::Goto(from + lift, 400),
-                    crate::hints::Step::Push(dir, run),
-                    crate::hints::Step::Push(-dir, 45),
-                    crate::hints::Step::Wait(120),
+                    crate::pilot::hints::Step::Goto(from + lift, 400),
+                    crate::pilot::hints::Step::Push(dir, run),
+                    crate::pilot::hints::Step::Push(-dir, 45),
+                    crate::pilot::hints::Step::Wait(120),
                     via.clone(),
                 ]);
             }
         }
         let here = self.progress(sim.ball.position);
         for steps in charges {
-            let hint = crate::hints::Hint {
+            let hint = crate::pilot::hints::Hint {
                 at: b,
                 radius: 6.0,
                 sector: Some(sim.sector + 1),
@@ -2069,7 +2070,7 @@ impl Pilot {
             };
             // tried on a copy first: some bridges are lowered by a lever, not knocked over, and a charge at them
             // throws the ball off; it must keep the ball and get on
-            let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+            let mut trial = crate::pilot::hints::Runner::new(vec![hint.clone()]);
             let mut s = sim.clone();
             let lives = s.lives;
             let mut lost = false;
@@ -2100,7 +2101,7 @@ impl Pilot {
     /// A leap over a gap the way crosses just ahead (two of its points further apart than a gap the ball rolls over):
     /// back from its edge for a run-up, then pushing across until the ball has flown and landed. The run-ups are
     /// tried on a copy of the run, the shortest that keeps the ball and gets on is taken.
-    fn leap(&mut self, sim: &Sim) -> Option<crate::hints::Hint> {
+    fn leap(&mut self, sim: &Sim) -> Option<crate::pilot::hints::Hint> {
         // (not on a followed player's line: a gap in it is where the player flew, and the player's keys take it)
         if self.demo.as_ref().is_some_and(|d| {
             d.find(sim, RUN_UP_NEAR, None, self.demo_expected(sim))
@@ -2125,20 +2126,20 @@ impl Pilot {
             if self.route.clearance(from + lift) <= 0.0 {
                 continue;
             }
-            let hint = crate::hints::Hint {
+            let hint = crate::pilot::hints::Hint {
                 at: sim.ball.position,
                 radius: 6.0,
                 sector: Some(sim.sector + 1),
                 kind: Some(sim.ball.kind),
                 steps: vec![
-                    crate::hints::Step::Goto(from + lift, 400),
-                    crate::hints::Step::Air(dir, 300),
+                    crate::pilot::hints::Step::Goto(from + lift, 400),
+                    crate::pilot::hints::Step::Air(dir, 300),
                 ],
                 full: Vec::new(),
                 line: 0,
                 retry: 0,
             };
-            let mut trial = crate::hints::Runner::new(vec![hint.clone()]);
+            let mut trial = crate::pilot::hints::Runner::new(vec![hint.clone()]);
             let mut s = sim.clone();
             let lives = s.lives;
             let mut lost = false;
@@ -2162,7 +2163,7 @@ impl Pilot {
     }
 
     /// Into the next transformer, near it (its rim holds the ball off): through it, backing off for a run-up.
-    fn gate_hint(&self, sim: &Sim) -> Option<crate::hints::Hint> {
+    fn gate_hint(&self, sim: &Sim) -> Option<crate::pilot::hints::Hint> {
         let &(_, g, k) = self.gates.get(self.gate)?;
         if sim.ball.kind == k || g.distance(sim.ball.position) >= GATE_STUCK {
             return None;
@@ -2171,14 +2172,14 @@ impl Pilot {
             .trafos()
             .filter(|(_, kind)| *kind == k)
             .min_by(|a, b| a.0.distance(g).total_cmp(&b.0.distance(g)))?;
-        Some(crate::hints::Hint {
+        Some(crate::pilot::hints::Hint {
             at: sim.ball.position,
             radius: 6.0,
             sector: Some(sim.sector + 1),
             kind: Some(sim.ball.kind),
             steps: vec![
-                crate::hints::Step::Via(t, 900),
-                crate::hints::Step::Become(k),
+                crate::pilot::hints::Step::Via(t, 900),
+                crate::pilot::hints::Step::Become(k),
             ],
             full: Vec::new(),
             line: 0,
@@ -2188,7 +2189,7 @@ impl Pilot {
 
     /// Held up where the way goes off a rail onto a floor, or up a little step (a sill): a short run-up back along the
     /// way and on over it at speed, as a player keeps the momentum there.
-    fn over_sill(&self, sim: &Sim) -> Option<crate::hints::Hint> {
+    fn over_sill(&self, sim: &Sim) -> Option<crate::pilot::hints::Hint> {
         let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
         let pts = &self.route.points;
         let end = (self.at + SILL_AHEAD).min(pts.len().saturating_sub(1));
@@ -2206,14 +2207,14 @@ impl Pilot {
         if dir == Vec3::ZERO || self.route.clearance(sim.ball.position - dir * SILL_NEAR) <= 0.0 {
             return None;
         }
-        Some(crate::hints::Hint {
+        Some(crate::pilot::hints::Hint {
             at: sim.ball.position,
             radius: 6.0,
             sector: Some(sim.sector + 1),
             kind: Some(sim.ball.kind),
             steps: vec![
-                crate::hints::Step::Push(-dir, SILL_BACK),
-                crate::hints::Step::Via(past + Vec3::Y * crate::sim::BALL_RADIUS, 240),
+                crate::pilot::hints::Step::Push(-dir, SILL_BACK),
+                crate::pilot::hints::Step::Via(past + Vec3::Y * crate::sim::BALL_RADIUS, 240),
             ],
             full: Vec::new(),
             line: 0,
@@ -2320,7 +2321,7 @@ impl Pilot {
             for k in starts {
                 for len in DEMO_STRETCHES {
                     // as held choices, a tick each (the copy's view does not turn: the arrows are for this one)
-                    let q = crate::hints::Facing::of(&sim.camera);
+                    let q = crate::pilot::hints::Facing::of(&sim.camera);
                     let mut plan: Vec<(u64, u8)> = Vec::new();
                     for i in 0..len {
                         let c = d.input(k + i as usize, q);
@@ -2663,12 +2664,12 @@ impl Pilot {
         p: Vec3,
         at: usize,
         kind: crate::sim::BallKind,
-    ) -> crate::learned::Situation {
+    ) -> crate::pilot::learned::Situation {
         let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
         let foot = p - Vec3::Y * crate::sim::BALL_RADIUS;
         let mut v: [Option<String>; 8] = Default::default();
         let set = |v: &mut [Option<String>; 8], f: &str, val: &str| {
-            if let Some(k) = crate::learned::FEATURES.iter().position(|x| *x == f)
+            if let Some(k) = crate::pilot::learned::FEATURES.iter().position(|x| *x == f)
                 && let Some(slot) = v.get_mut(k)
             {
                 *slot = Some(val.to_owned());
@@ -2777,7 +2778,7 @@ impl Pilot {
             .map_or("none", |m| m.1.as_str());
         set(&mut v, "module", module);
         set(&mut v, "kind", &format!("{kind:?}").to_ascii_lowercase());
-        crate::learned::Situation { values: v }
+        crate::pilot::learned::Situation { values: v }
     }
 
     /// What the way's link from point `k` to the next is, if anything special: a gap, a drop, a rail's end or start,
@@ -2845,9 +2846,12 @@ impl Pilot {
             .unwrap_or(self.at);
         let end = (at + MOMENTUM_AHEAD).min(pts.len() - 1);
         // (a flow zone: the climb the ball takes at a careful zone's pace)
-        let steep = steepest_climb(sim.ball.kind, cap.unwrap_or(crate::zones::CAREFUL_SPEED))
-            .to_radians()
-            .tan();
+        let steep = steepest_climb(
+            sim.ball.kind,
+            cap.unwrap_or(crate::pilot::zones::CAREFUL_SPEED),
+        )
+        .to_radians()
+        .tan();
         for k in at..end {
             match self.link(k) {
                 Some("gap") => return Some("a gap to cross ahead"),
@@ -2960,10 +2964,10 @@ impl Pilot {
         let mut hint_flow = false;
         if self.ride == Style::Raw {
             hint_flow = self.zone.flow;
-            self.zone = crate::zones::Effect::default();
+            self.zone = crate::pilot::zones::Effect::default();
         } else if self.ride == Style::Speedrun {
             self.zone.cap = None;
-        } else if self.zone == crate::zones::Effect::default() && !self.learned.is_empty() {
+        } else if self.zone == crate::pilot::zones::Effect::default() && !self.learned.is_empty() {
             let here = self.situation(sim.ball.position, self.at, sim.ball.kind);
             if let Some((e, label)) = self.learned.at(&here) {
                 self.zone = e;
@@ -3021,7 +3025,7 @@ impl Pilot {
 
     /// What the zones ask of the ball's speed and of the hints now: their effect, without the careful limit and the
     /// flow where the ball needs its momentum (`momentum`): there a run-up's back-off and stop are no dawdling.
-    fn limit(&self) -> crate::zones::Effect {
+    fn limit(&self) -> crate::pilot::zones::Effect {
         let mut e = self.zone;
         if self.momentum.is_some() {
             e.cap = None;
@@ -3078,7 +3082,10 @@ impl Pilot {
         if !sim.tick.is_multiple_of(PERIOD) {
             if let (Some((k, from)), Some(d)) = (self.demo_run, &self.demo) {
                 let t = usize::try_from(sim.tick.saturating_sub(from)).unwrap_or(usize::MAX);
-                return d.input(k.saturating_add(t), crate::hints::Facing::of(&sim.camera));
+                return d.input(
+                    k.saturating_add(t),
+                    crate::pilot::hints::Facing::of(&sim.camera),
+                );
             }
             return self.choice;
         }
@@ -3370,10 +3377,9 @@ impl Pilot {
         if demo_won && let Some(k) = matched {
             self.demo_run = Some((k, sim.tick));
             self.choice = 0;
-            return self
-                .demo
-                .as_ref()
-                .map_or(0, |d| d.input(k, crate::hints::Facing::of(&sim.camera)));
+            return self.demo.as_ref().map_or(0, |d| {
+                d.input(k, crate::pilot::hints::Facing::of(&sim.camera))
+            });
         }
         self.choice = best.1;
         self.choice
@@ -3408,7 +3414,7 @@ fn rollouts(
         for t in 0..hold + COAST {
             let input = match demo {
                 Some((k, d)) if c == DEMO_CHOICE => {
-                    d.input(k + t as usize, crate::hints::Facing::of(&s.camera))
+                    d.input(k + t as usize, crate::pilot::hints::Facing::of(&s.camera))
                 }
                 _ if t < hold => c,
                 _ => 0,
@@ -3508,14 +3514,14 @@ fn under_cap(i: u8, sim: &Sim, cap: f32) -> u8 {
     if i & input::SHIFT != 0 || speed <= cap {
         return i;
     }
-    let q = crate::hints::Facing::of(&sim.camera);
+    let q = crate::pilot::hints::Facing::of(&sim.camera);
     if speed > cap * CAREFUL_BRAKE {
-        return (i & !ARROWS) | crate::hints::arrows(-v, q);
+        return (i & !ARROWS) | crate::pilot::hints::arrows(-v, q);
     }
     let dir = v / speed;
     let mut out = i & !ARROWS;
     for bit in [input::UP, input::DOWN, input::LEFT, input::RIGHT] {
-        if i & bit != 0 && crate::hints::world_push(bit, q).dot(dir) <= 0.2 {
+        if i & bit != 0 && crate::pilot::hints::world_push(bit, q).dot(dir) <= 0.2 {
             out |= bit;
         }
     }
@@ -3819,7 +3825,7 @@ mod tests {
             floor: HashMap::new(),
             pts: Vec::new(),
             grid: HashMap::new(),
-            edges: crate::edges::Edges::of(&[], 0),
+            edges: crate::pilot::edges::Edges::of(&[], 0),
         };
         let up = Vec3::Y * crate::sim::BALL_RADIUS;
         let a = r.progress(Vec3::new(3.0, 0.0, 0.0) + up, 0, usize::MAX);
@@ -3851,11 +3857,12 @@ mod tests {
             floor: HashMap::new(),
             pts: Vec::new(),
             grid: HashMap::new(),
-            edges: crate::edges::Edges::of(&[], 0),
+            edges: crate::pilot::edges::Edges::of(&[], 0),
         };
         let mut p = Pilot::new(r, Vec::new());
-        p.hints = crate::hints::Runner::new(crate::hints::parse(hints).expect("hints"));
-        let (z, notes) = crate::zones::parse(zones);
+        p.hints =
+            crate::pilot::hints::Runner::new(crate::pilot::hints::parse(hints).expect("hints"));
+        let (z, notes) = crate::pilot::zones::parse(zones);
         assert!(notes.is_empty(), "{notes:?}");
         p.zones = std::sync::Arc::new(z);
         (p, sim)
@@ -4059,9 +4066,9 @@ mod tests {
             }
             let mut sim = Sim::new(&level, kind);
             for _ in 0..600 {
-                sim.step(crate::hints::arrows(
+                sim.step(crate::pilot::hints::arrows(
                     Vec3::X,
-                    crate::hints::Facing::of(&sim.camera),
+                    crate::pilot::hints::Facing::of(&sim.camera),
                 ));
             }
             sim.ball.velocity.x
@@ -4108,7 +4115,7 @@ mod tests {
             floor,
             pts: Vec::new(),
             grid: HashMap::new(),
-            edges: crate::edges::Edges::of(&[], 0),
+            edges: crate::pilot::edges::Edges::of(&[], 0),
         }
     }
 
@@ -4130,14 +4137,18 @@ mod tests {
                 pa.situation(p, pa.nearest_point(p), BallKind::Wood)
             })
             .collect();
-        let rule =
-            crate::learned::learn(&samples, crate::zones::Kind::Flow, None, "level A".into())
-                .expect("a rule from the rail's end");
+        let rule = crate::pilot::learned::learn(
+            &samples,
+            crate::pilot::zones::Kind::Flow,
+            None,
+            "level A".into(),
+        )
+        .expect("a rule from the rail's end");
         assert_eq!(
             rule.line(),
             "flow when surface=rail ahead=rail-end kind=wood   # level A"
         );
-        let table = std::sync::Arc::new(crate::learned::Learned { rules: vec![rule] });
+        let table = std::sync::Arc::new(crate::pilot::learned::Learned { rules: vec![rule] });
         // level B: other rails, north through the start, ending a few points on; a hint waits there
         let b = || {
             railed_route(
@@ -4147,11 +4158,12 @@ mod tests {
                 |k| k < 10,
             )
         };
-        let hint = crate::hints::parse("at 0 2 0 r 10 : wait 120 ; push 0 1 60").expect("hint");
-        let run = |learned: Option<std::sync::Arc<crate::learned::Learned>>| {
+        let hint =
+            crate::pilot::hints::parse("at 0 2 0 r 10 : wait 120 ; push 0 1 60").expect("hint");
+        let run = |learned: Option<std::sync::Arc<crate::pilot::learned::Learned>>| {
             let mut sim = Sim::new(&crate::sim::tests::flat_level(), BallKind::Wood);
             let mut p = Pilot::new(b(), Vec::new());
-            p.hints = crate::hints::Runner::new(hint.clone());
+            p.hints = crate::pilot::hints::Runner::new(hint.clone());
             p.take_up(&sim);
             if let Some(l) = learned {
                 p.learned = l;
@@ -4176,10 +4188,11 @@ mod tests {
         // a level's own zone comes first: a careful zone there and no flow from the table
         let mut sim = Sim::new(&crate::sim::tests::flat_level(), BallKind::Wood);
         let mut p = Pilot::new(b(), Vec::new());
-        p.hints = crate::hints::Runner::new(hint.clone());
+        p.hints = crate::pilot::hints::Runner::new(hint.clone());
         p.take_up(&sim);
         p.learned = table;
-        p.zones = std::sync::Arc::new(crate::zones::parse("careful sector 1 r 10 : 0 2 0").0);
+        p.zones =
+            std::sync::Arc::new(crate::pilot::zones::parse("careful sector 1 r 10 : 0 2 0").0);
         let (own, _) = drive(&mut p, &mut sim, 30, 0);
         assert!(
             own.iter().all(|&i| i == 0),

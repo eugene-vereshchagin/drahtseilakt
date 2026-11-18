@@ -1636,7 +1636,7 @@ pub fn run(
             let mut lo = o.clone();
             lo.source = source.clone();
             lo.replay = Some(r);
-            if let Ok(run) = crate::app::stats_run(&lo, &data, None) {
+            if let Ok(run) = crate::runway::play(&lo, &data) {
                 way.extend(run.ticks.iter().map(|t| t.pos));
                 runs = runs.saturating_add(1);
             }
@@ -1770,7 +1770,7 @@ pub fn run(
 }
 
 /// The sector (from 1) of a level object: its `Sector_NN` group, else the sector of the nearest object in one.
-pub(crate) fn sector_of(level: &level::Level, i: usize) -> usize {
+pub fn sector_of(level: &level::Level, i: usize) -> usize {
     for g in level.groups_of(i) {
         if let Some(n) = g
             .strip_prefix("Sector_")
@@ -1788,7 +1788,7 @@ pub(crate) fn sector_of(level: &level::Level, i: usize) -> usize {
 
 /// The recorded runs of original level `n` in a folder of runs: `DIR/runs/Level_NN*.replay` first, then
 /// `DIR/Level_NN-owner.replay`.
-pub(crate) fn replays(dir: &std::path::Path, n: u32) -> Vec<std::path::PathBuf> {
+pub fn replays(dir: &std::path::Path, n: u32) -> Vec<std::path::PathBuf> {
     let stem = format!("Level_{n:02}");
     let mut out: Vec<std::path::PathBuf> = std::fs::read_dir(dir.join("runs"))
         .into_iter()
