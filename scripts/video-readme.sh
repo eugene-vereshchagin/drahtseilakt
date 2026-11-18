@@ -6,6 +6,7 @@
 #
 #   scripts/video-readme.sh LEVEL REPLAY OUT.mp4 [WxH]
 #
+# VIDEO_PLAYED_BY says who played the replay (default: "the replay"; e.g. "a tool of ours, replay").
 # VIDEO_MODE names the run's style: test (the default: test runs and early tries), calm, speedrun or collector, or remaster (a remastered original level).
 set -eu
 level=$1; replay=$2; out=$3; size=${4:-1920x1080}
@@ -92,7 +93,7 @@ Sounds: $sounds
 Interface: $interface
 Models: $models
 Mode: $mode_line
-Played by: the Drahtseilakt test player (autopilot), replay $(basename "$replay")
+Played by: ${VIDEO_PLAYED_BY:-the replay} $(basename "$replay")
 Video: $size, 60 fps, H.264 with AAC sound$( [ "${VIDEO_SS:-1}" -gt 1 ] && echo ", every frame drawn at ${VIDEO_SS}x the size and scaled down (supersampling)"), made $(date -u +%Y-%m-%d)
 $about
 Drahtseilakt needs the player's own copy of Ballance for the original levels and never ships Ballance's data.

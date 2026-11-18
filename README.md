@@ -69,8 +69,8 @@ from source, clone the toolbox beside this repository (it reads levels through t
 The docs are in English, Russian, German and Simplified Chinese (`docs/`, `docs/ru/`, `docs/de/`, `docs/zh/`), also
 as a site built with VitePress (`docs/.vitepress`). Start with the [roadmap](docs/drahtseilakt/roadmap.md) (the plan and
 what "done" means) and the [decisions](docs/drahtseilakt/decisions.md) (why). Players' manual: `docs/manual/<lang>/`,
-shipped with the game. For testing there are a headless replay check, a test player (`--autopilot`,
-[the test player](docs/drahtseilakt/autopilot.md)) and fuzzing of every parser ([fuzzing](docs/drahtseilakt/fuzzing.md)).
+shipped with the game. For testing there are a headless replay check, recorded runs played
+by the tests and fuzzing of every parser ([fuzzing](docs/drahtseilakt/fuzzing.md)).
 Contributors: the rules are in [distribution.md](docs/drahtseilakt/distribution.md) and `CLAUDE.md`.
 
 ## Who made it

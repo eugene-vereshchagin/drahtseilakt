@@ -23,7 +23,7 @@ pub struct Force {
 /// The game's listeners (`phys_set_listeners`). The impact event is the post-collision event of an impact; a listener
 /// may change its normal in place, and the change stays with the contact. The contact events come as a friction
 /// contact is created (`begin`) and as it is deleted.
-/// (Send: a world is copied into threads to try the test player's choices side by side.)
+/// (Send: a world is copied into threads to try a program's choices side by side.)
 pub trait Listener: Send + Sync {
     fn impact(&mut self, ev: &mut ImpactEvent);
     fn contact(&mut self, a: usize, b: usize, begin: bool);

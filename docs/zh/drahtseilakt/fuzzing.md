@@ -18,7 +18,7 @@ FUZZ_SECS=60 cargo test --release --offline -p level --test fuzz fuzz_nmo_file -
 ```
 
 目标：`nmo_file`、`nmo_chunk`、`nmo_patch`、`open_level`、`script_json`（crate `level`）；`image`、`gputex`、`gputex_data`、`level_txt`、`theme_txt`、`pack_txt`、`sound_table`
-（`gamedata`）；`disc_image`、`cue_sheet`、`iscab`（`cdimage`）；`replay`、`hints`、`zones`、`learned`、`wav`、`ogg`、`highscore`、
+（`gamedata`）；`disc_image`、`cue_sheet`、`iscab`（`cdimage`）；`replay`、`wav`、`ogg`、`highscore`、
 `settings`、`level_sim`——加载关卡并运行一秒，让陌生人的地图越过读取器进入物理与规则——以及
 `module_sim`——用一个模块文件替换原版关卡所用的模块（关卡文件夹可自带模块），需要玩家的游戏副本（游戏本身，
 `crates/game/src/fuzz_tests.rs`）。
@@ -42,5 +42,5 @@ FUZZ_DUMP_CORPUS=1 cargo test --release --offline -p level --test fuzz fuzz_nmo_
 cd fuzz && cargo +nightly fuzz run nmo_file corpus/nmo_file
 ```
 
-游戏是二进制 crate，因此它自己的解析器中只有 `replay`（独立成文件）有 cargo-fuzz 目标；其余（`hints`、`zones`、`learned`、`wav`、
+游戏是二进制 crate，因此它自己的解析器中只有 `replay`（独立成文件）有 cargo-fuzz 目标；其余（`wav`、
 `ogg`、`highscore`、`settings`、`level_sim`、`module_sim`）由稳定版模糊器运行。

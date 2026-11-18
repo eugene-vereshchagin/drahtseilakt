@@ -1,9 +1,6 @@
 // Fuzz targets of the files the game itself reads (docs/drahtseilakt/fuzzing.md), on the stable fuzzer in
 // crates/fuzzkit. They live in the binary crate's tests because the parsers are its modules:
 //   replay     a replay file (replay.rs), read and written back;
-//   hints      a hint file of the test player (hints.rs);
-//   zones      a zones file of the test player (zones.rs);
-//   learned    the test player's learned table (learned.rs);
 //   wav, ogg   a sound or music file as audio.rs decodes it;
 //   highscore  the saved highscore table;
 //   settings   the settings file as every reader of it takes its values (graphics, keys, extended mode's additions,
@@ -13,7 +10,7 @@
 //   module_sim a module file (a level folder may bring its own) in place of one an original level of the player's
 //              copy uses, and that level played for a second (needs the copy).
 // #[ignore]: `FUZZ_SECS=600 cargo test --release --offline -p drahtseilakt fuzz_tests -- --ignored`. Seeds: synthetic
-// inputs, the repository's own hints and replays and shipped sounds, and the player's files when present.
+// inputs, the recorded test runs and shipped sounds, and the player's files when present.
 
 #![allow(
     clippy::panic,
@@ -30,12 +27,14 @@ fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The autopilot store's hints folder as a seed root (none without the store: the fuzzer then has the built-in seeds).
-fn store_hints() -> Vec<PathBuf> {
-    crate::pilot::pilotdata::for_test("the fuzz seeds from hints/")
-        .map(|d| d.join("hints"))
-        .into_iter()
-        .collect()
+/// The recorded test runs (DRAHTSEILAKT_TEST_RUNS, else drahtseilakt-tools/test-runs beside the repository) as a seed
+/// root; none without them: the fuzzer then has the built-in seeds.
+fn test_runs() -> Vec<PathBuf> {
+    let dir = std::env::var_os("DRAHTSEILAKT_TEST_RUNS").map_or_else(
+        || repo().join("../drahtseilakt-tools/test-runs"),
+        PathBuf::from,
+    );
+    dir.is_dir().then_some(dir).into_iter().collect()
 }
 
 fn profile(sub: &str) -> Vec<PathBuf> {
@@ -49,7 +48,7 @@ fn profile(sub: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-// --- replays and hints -------------------------------------------------------------------------------------------
+// --- replays ----------------------------------------------------------------------------------------------------
 
 fn run_replay(input: &[u8]) {
     let Ok(text) = std::str::from_utf8(input) else {
@@ -69,7 +68,7 @@ fn replay_seeds() -> Vec<Vec<u8>> {
             .to_vec(),
         b"# c\ndrahtseilakt-replay 1\nlevel x 0\nstart 1 - -\nend 0\n".to_vec(),
     ];
-    let mut roots: Vec<PathBuf> = store_hints();
+    let mut roots: Vec<PathBuf> = test_runs();
     roots.extend(profile("replays"));
     out.extend(fuzzkit::read_all(&fuzzkit::files_under(
         &roots,
@@ -86,120 +85,6 @@ fn fuzz_replay() {
     let mut t = Target::new("replay", test_name!("fuzz_replay"), Kind::Text);
     t.dict = &["drahtseilakt-replay", "level", "start", "end", "-", ","];
     fuzzkit::fuzz(t, replay_seeds, run_replay);
-}
-
-fn run_hints(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else {
-        return;
-    };
-    let _ = crate::pilot::hints::parse(text);
-}
-
-fn hint_seeds() -> Vec<Vec<u8>> {
-    let mut out = vec![
-        b"at 1 2 3 r 4 sector 2 kind wood : goto 1 2 3 600 ; via 4 5 6 ; push 1 0 30 ; air 0 1 20 ; wait 5 ; turn -1 ; become stone ; replay Level_01-owner.replay 10 20\n"
-            .to_vec(),
-    ];
-    let mut roots: Vec<PathBuf> = store_hints();
-    roots.extend(profile("hints"));
-    out.extend(fuzzkit::read_all(&fuzzkit::files_under(
-        &roots,
-        &["txt"],
-        40,
-        64 * 1024,
-    )));
-    out
-}
-
-fn run_zones(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else {
-        return;
-    };
-    let (zones, _) = crate::pilot::zones::parse(text);
-    // every zone written back reads the same
-    for z in &zones.zones {
-        let (again, notes) = crate::pilot::zones::parse(&z.line());
-        assert!(notes.is_empty(), "{notes:?}");
-        assert_eq!(again.zones.len(), 1);
-        let _ = zones.at(z.points[0], z.sector.saturating_sub(1));
-    }
-}
-
-fn zone_seeds() -> Vec<Vec<u8>> {
-    let mut out = vec![
-        b"flow sector 1 r 4 : 1 2 3 ; 4 5 6\ncareful sector 2 r 3.5 speed 4 : 0 0 0 # c\n".to_vec(),
-    ];
-    let mut roots: Vec<PathBuf> = store_hints();
-    roots.extend(profile("hints"));
-    out.extend(fuzzkit::read_all(&fuzzkit::files_under(
-        &roots,
-        &["zones"],
-        40,
-        64 * 1024,
-    )));
-    out
-}
-
-fn run_learned(input: &[u8]) {
-    let Ok(text) = std::str::from_utf8(input) else {
-        return;
-    };
-    let (learned, _) = crate::pilot::learned::parse(text);
-    // every rule written back reads the same, and holds where its features are
-    for r in &learned.rules {
-        let (again, notes) = crate::pilot::learned::parse(&r.line());
-        assert!(notes.is_empty(), "{notes:?}");
-        assert_eq!(again.rules.first(), Some(r));
-        let mut s = crate::pilot::learned::Situation::default();
-        for (f, v) in &r.when {
-            s.values[*f] = Some(v.clone());
-        }
-        assert!(learned.at(&s).is_some());
-    }
-}
-
-fn learned_seeds() -> Vec<Vec<u8>> {
-    let mut out = vec![
-        b"flow when surface=rail ahead=rail-end kind=wood   # Level_01\ncareful speed 3 when surface=floor width=narrow curve=sharp module=P_Modul_25\n".to_vec(),
-    ];
-    let mut roots: Vec<PathBuf> = store_hints();
-    roots.extend(profile("hints"));
-    out.extend(
-        fuzzkit::read_all(&fuzzkit::files_under(&roots, &["txt"], 40, 64 * 1024))
-            .into_iter()
-            .filter(|b| b.starts_with(b"# What the test player learned")),
-    );
-    out
-}
-
-#[test]
-#[ignore]
-fn fuzz_learned() {
-    let mut t = Target::new("learned", test_name!("fuzz_learned"), Kind::Text);
-    t.dict = &[
-        "flow", "careful", "speed", "when", "surface=", "width=", "border=", "curve=", "slope=",
-        "ahead=", "module=", "kind=", "rail", "floor", "rail-end", "narrow", "#",
-    ];
-    fuzzkit::fuzz(t, learned_seeds, run_learned);
-}
-
-#[test]
-#[ignore]
-fn fuzz_zones() {
-    let mut t = Target::new("zones", test_name!("fuzz_zones"), Kind::Text);
-    t.dict = &["flow", "careful", "sector", "r", "speed", ":", ";", "#"];
-    fuzzkit::fuzz(t, zone_seeds, run_zones);
-}
-
-#[test]
-#[ignore]
-fn fuzz_hints() {
-    let mut t = Target::new("hints", test_name!("fuzz_hints"), Kind::Text);
-    t.dict = &[
-        "at", "r", "sector", "kind", "wood", "stone", "paper", ":", ";", "goto", "via", "push",
-        "air", "wait", "turn", "swing", "become", "replay", "#",
-    ];
-    fuzzkit::fuzz(t, hint_seeds, run_hints);
 }
 
 // --- sounds ------------------------------------------------------------------------------------------------------
@@ -607,9 +492,6 @@ fn fuzz_module_sim() {
 #[test]
 fn fuzz_regressions() {
     fuzzkit::regressions("replay", run_replay);
-    fuzzkit::regressions("hints", run_hints);
-    fuzzkit::regressions("zones", run_zones);
-    fuzzkit::regressions("learned", run_learned);
     fuzzkit::regressions("wav", run_wav);
     fuzzkit::regressions("ogg", run_ogg);
     fuzzkit::regressions("highscore", run_highscore);

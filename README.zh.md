@@ -58,8 +58,8 @@ Options → Controls 可绑定其他按键。菜单、模式和选项：[菜单]
 
 文档有英文、俄文、德文和简体中文版本（`docs/`、`docs/ru/`、`docs/de/`、`docs/zh/`），也有用 VitePress 构建的网站（`docs/.vitepress`）。
 请从[路线图](docs/zh/drahtseilakt/roadmap.md)（计划，以及“完成”的含义）和[决策](docs/zh/drahtseilakt/decisions.md)（为什么）读起。
-玩家手册在 `docs/manual/<语言>/`，随游戏发布。测试方面有无窗口的回放检查、测试玩家（`--autopilot`，
-[测试玩家](docs/zh/drahtseilakt/autopilot.md)）和对每个解析器的模糊测试（[模糊测试](docs/zh/drahtseilakt/fuzzing.md)）。
+玩家手册在 `docs/manual/<语言>/`，随游戏发布。测试方面有无窗口的回放检查、由测试播放的录制通关
+和对每个解析器的模糊测试（[模糊测试](docs/zh/drahtseilakt/fuzzing.md)）。
 贡献者须知见 [distribution.md](docs/zh/drahtseilakt/distribution.md) 和 `CLAUDE.md`。
 
 ## 谁做的

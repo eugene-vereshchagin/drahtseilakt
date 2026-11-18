@@ -6,6 +6,7 @@
 #![cfg_attr(test, allow(clippy::arithmetic_side_effects, clippy::indexing_slicing))]
 
 pub mod app;
+pub mod args;
 mod audio;
 mod audit;
 mod ballsound;
@@ -44,7 +45,6 @@ mod partcheck;
 mod particles;
 mod physics;
 mod pieces;
-pub mod pilot;
 mod playtime;
 mod proximity;
 pub mod render;
@@ -74,7 +74,6 @@ mod volume;
 mod watch;
 pub use gamedata::assets;
 
-pub use pilot::autopilot::Style as PilotStyle;
 pub use sky::{set_override as set_sky_override, valid_name as valid_sky_name};
 
 use assets::{Data, Source};
@@ -100,34 +99,9 @@ pub struct Options {
     pub sounds: Option<String>,
     pub replay: Option<PathBuf>,
     pub headless: bool,
-    /// Play the level by the test player (autopilot.rs), headless; the run is saved like a recording.
-    pub autopilot: bool,
-    /// The test player plays in the window, for watching it and taking over by hand.
-    pub watch: bool,
-    /// The test player follows the ball's way in this replay (a player's run) or `--locate` track instead of finding
-    /// one.
-    pub follow: Option<PathBuf>,
-    /// Runs begun at a sector: the followed way is theirs from that sector on (in order).
-    pub then: Vec<PathBuf>,
-    /// The test player's way goes through these level objects in order (a file of names).
-    pub plan: Option<PathBuf>,
-    /// The test player's hint file, instead of the level's in the data folder.
-    pub hints: Option<PathBuf>,
-    /// How the test player rides (calm or speedrun).
-    pub style: crate::pilot::autopilot::Style,
-    /// Where the test player's stuck reports go.
-    pub report: Option<PathBuf>,
-    /// The test player gives up when its ball has not moved for this many seconds (or its way has not got on for
-    /// four times as long): the run is dead, its report is written and it stops.
-    pub give_up: u64,
-    /// How often the test player may go back to a saved state when its ball is lost or its way stands still.
-    pub rewinds: u32,
-    /// Find the ball's way in the frames (s0001.jpg, `locate::RATE` a second) of a video of the original; the track is
-    /// written to --record.
-    pub locate: Option<PathBuf>,
-    /// Draw frames of the replay (`locate::RATE` a second) into this folder, with the ball's true places (to check
-    /// --locate).
-    pub frames: Option<PathBuf>,
+    /// A program built on the library drives the run (control.rs, or a run of its own without a window): the run is
+    /// unattended, as a replay's (a plain run, with the development logs, no menu at the start).
+    pub driven: bool,
     /// Record the replay as a video: raw RGB frames, one a tick at --size, into this file (or pipe).
     pub video: Option<PathBuf>,
     pub screenshot: Option<PathBuf>,
@@ -144,8 +118,6 @@ pub struct Options {
     pub at: Option<String>,
     pub ball: Option<String>,
     pub look: Option<[f32; 6]>,
-    /// Measure the original levels into this folder (levelstats.rs) and stop.
-    pub level_stats: Option<PathBuf>,
     /// Measure the sacks' supports of every original level and shipped map, then stop; with a folder of recorded
     /// runs (`runs DIR`) also against the ball's way in them.
     pub supports_check: Option<Option<PathBuf>>,
@@ -184,18 +156,7 @@ pub fn default_options() -> Options {
         models: None,
         replay: None,
         headless: false,
-        autopilot: false,
-        watch: false,
-        follow: None,
-        then: Vec::new(),
-        plan: None,
-        hints: None,
-        style: crate::pilot::autopilot::Style::Calm,
-        report: None,
-        give_up: 30,
-        rewinds: 600,
-        locate: None,
-        frames: None,
+        driven: false,
         video: None,
         screenshot: None,
         ticks: None,
@@ -208,7 +169,6 @@ pub fn default_options() -> Options {
         ball: None,
         debug: false,
         look: None,
-        level_stats: None,
         supports_check: None,
         audit: Vec::new(),
         audit_csv: None,
@@ -223,6 +183,16 @@ pub fn default_options() -> Options {
 
 /// Runs what the options ask for: the import, a command without a window, or the game.
 pub fn run(o: Options) -> Result<(), String> {
+    match begin(o)? {
+        Some((o, data)) => app::run(o, data),
+        None => Ok(()),
+    }
+}
+
+/// What every run does first: the import (then None: nothing more to do), else the player's copy found and, without
+/// one and with no level named, the first shipped level chosen. A program built on the library starts its own runs
+/// from here.
+pub fn begin(o: Options) -> Result<Option<(Options, Data)>, String> {
     if let Some(from) = &o.import {
         let copied = levels::import(from)?;
         levels::prepare(&lang::docs_language(app::setting("language").as_deref()));
@@ -230,7 +200,7 @@ pub fn run(o: Options) -> Result<(), String> {
             "{copied} files copied to {}",
             levels::dir(levels::Kind::Original).display()
         );
-        return Ok(());
+        return Ok(None);
     }
     // the copy of the original is optional: without it the game plays its shipped levels (decisions.md, "The game
     // plays out of the box"); a folder named with --data must itself be a copy (no other place is tried)
@@ -259,8 +229,5 @@ pub fn run(o: Options) -> Result<(), String> {
             Source::Nmo(first.level)
         };
     }
-    if pilot::wanted(&o) {
-        return pilot::run(o, data);
-    }
-    app::run(o, data)
+    Ok(Some((o, data)))
 }

@@ -74,8 +74,8 @@ Die Doku gibt es auf Englisch, Russisch, Deutsch und in vereinfachtem Chinesisch
 `docs/zh/`), auch als mit VitePress gebaute Website (`docs/.vitepress`). Beginnen Sie mit dem
 [Fahrplan](docs/de/drahtseilakt/roadmap.md) (der Plan und was „fertig“ heißt) und den
 [Entscheidungen](docs/de/drahtseilakt/decisions.md) (warum). Das Handbuch für Spieler liegt in `docs/manual/<Sprache>/` und
-wird mit dem Spiel ausgeliefert. Zum Testen gibt es einen fensterlosen Replay-Check, einen Testspieler (`--autopilot`,
-[der Testspieler](docs/de/drahtseilakt/autopilot.md)) und Fuzzing jedes Parsers ([Fuzzing](docs/de/drahtseilakt/fuzzing.md)).
+wird mit dem Spiel ausgeliefert. Zum Testen gibt es einen fensterlosen Replay-Check, aufgezeichnete
+Läufe, die die Tests abspielen, und Fuzzing jedes Parsers ([Fuzzing](docs/de/drahtseilakt/fuzzing.md)).
 Regeln für Mitwirkende: [distribution.md](docs/de/drahtseilakt/distribution.md) und `CLAUDE.md`.
 
 ## Wer es gemacht hat

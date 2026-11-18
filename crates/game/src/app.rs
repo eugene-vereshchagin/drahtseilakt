@@ -1524,9 +1524,8 @@ pub fn commands(
     // the menu at the start has no level behind it: nothing of any level is read or uploaded before it shows
     let menu_start = !o.chosen
         && o.replay.is_none()
-        && o.frames.is_none()
         && o.screenshot.is_none()
-        && !o.autopilot
+        && !o.driven
         && !o.headless
         && o.video.is_none()
         && o.from.is_none()

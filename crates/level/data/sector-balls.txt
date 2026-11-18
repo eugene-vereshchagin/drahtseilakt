@@ -1,9 +1,9 @@
 # The ball a run has when it begins each sector of the original levels: the kind the player has when passing the
-# sector's checkpoint in a finished run. `--sector N` without `--ball` (and the autopilot's and the tests' sector
-# starts) take it. Sector 1 is not listed: it begins with the level's own start ball (the game's level table).
+# sector's checkpoint in a finished run. `--sector N` without `--ball` (and the sector starts of the tests and of the
+# programs built on the game) take it. Sector 1 is not listed: it begins with the level's own start ball (the game's level table).
 # Format: <level> <sector> <wood|stone|paper>. Read by crates/level/src/sectorballs.rs (compiled in).
 #
-# Levels 1-12: read off the finished runs of hints/runs/ (the ball at each checkpoint, headless).
+# Levels 1-12: read off the finished runs kept outside the repository (the ball at each checkpoint, headless).
 # Level 13: sectors 2 and 3 from the owner's runs and the route (Level_13.route), sectors 4 and 5 from the route and
 # the plan's order of the transformers (Level_13.plan: the last transformer before each checkpoint) - not yet driven
 # through, so unverified.
