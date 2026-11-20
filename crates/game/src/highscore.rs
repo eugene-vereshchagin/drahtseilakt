@@ -5,14 +5,13 @@
 use crate::lang::PLACES;
 use std::path::PathBuf;
 
-/// The longest name kept, in bytes (the original's entry field holds about this many letters).
-pub const NAME_MAX: usize = 16;
-/// Levels a file may list, and lines read from it.
-const LEVELS_MAX: usize = 64;
-const LINES_MAX: usize = LEVELS_MAX * PLACES;
-const FILE_MAX: u64 = 64 * 1024;
+use gamedata::progress::{FILE_MAX, LEVELS_MAX};
+/// The longest name kept, in bytes (the original's entry field holds about this many letters). The file format
+/// itself (reading, writing, merging) is in gamedata::progress, which the toolbox uses to take over the original's
+/// highscores.
+pub use gamedata::progress::{List, NAME_MAX};
 
-pub type List = Vec<(Vec<u8>, i64)>;
+const _: () = assert!(PLACES == gamedata::progress::PLACES);
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Table {
@@ -89,60 +88,19 @@ impl Table {
     }
 
     fn to_text(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        for (i, list) in self.lists.iter().enumerate() {
-            for (name, points) in list {
-                out.extend_from_slice(format!("{} {points} ", i.saturating_add(1)).as_bytes());
-                // the name in one line: Latin-1 bytes without line breaks
-                out.extend(
-                    name.iter()
-                        .map(|&c| if c == b'\n' || c == b'\r' { b' ' } else { c }),
-                );
-                out.push(b'\n');
-            }
-        }
-        out
+        gamedata::progress::scores_text(&self.lists)
     }
 
     /// A saved file; lines that do not read as "level points name" are skipped.
     pub(crate) fn parse(bytes: &[u8]) -> Table {
-        let mut t = Table::default();
-        for line in bytes.split(|&c| c == b'\n').take(LINES_MAX) {
-            let mut parts = line.splitn(3, |&c| c == b' ');
-            let num = |p: Option<&[u8]>| {
-                p.and_then(|p| std::str::from_utf8(p).ok())
-                    .map(str::trim)
-                    .map(str::to_owned)
-            };
-            let (Some(level), Some(points)) = (num(parts.next()), num(parts.next())) else {
-                continue;
-            };
-            let (Ok(level), Ok(points)) = (level.parse::<usize>(), points.parse::<i64>()) else {
-                continue;
-            };
-            if level == 0 || level > LEVELS_MAX {
-                continue;
-            }
-            let name = parts.next().unwrap_or_default();
-            let name = name.strip_suffix(b"\r").unwrap_or(name);
-            if t.lists.len() < level {
-                t.lists.resize(level, Vec::new());
-            }
-            if let Some(list) = t.lists.get_mut(level.saturating_sub(1))
-                && list.len() < PLACES
-            {
-                list.push((name.get(..NAME_MAX).unwrap_or(name).to_vec(), points));
-            }
+        Table {
+            lists: gamedata::progress::parse_scores(bytes),
         }
-        for list in &mut t.lists {
-            list.sort_by_key(|e| std::cmp::Reverse(e.1));
-        }
-        t
     }
 }
 
 fn path() -> PathBuf {
-    crate::levels::data_dir().join("highscores.txt")
+    gamedata::progress::scores_path(&crate::levels::data_dir())
 }
 
 #[cfg(test)]

@@ -44,8 +44,7 @@ Persönliche ist der Name in der Highscore-Liste.
   (Yes / No). Das ist alles, was ein Spieler der Original-Level verändert sieht.
 - Level werden wie im Original freigeschaltet. Highscores wie im Original: zehn pro Level, Punkte, ein Name. Sie
   beginnen mit unseren eigenen Vorgabelisten (mit der Oberfläche des Originals mit denen der Kopie) und werden in unserem eigenen Datenordner gespeichert, nie in den Dateien
-  des Spiels. Die `Database.tdb` des Spielers zu lesen, um alte Punkte zu übernehmen, ist eine spätere Option
-  (ein Parser: geprüft wie jeder Dateileser).
+  des Spiels. Die Toolbox kann den Fortschritt aus der `Database.tdb` des Originals übernehmen (ihre Option *Meinen Fortschritt übernehmen* oder `drahtseilakt-toolbox progress`): die freigeschalteten Level (in `unlocked.txt`, zusätzlich zu den Leveln, die der Spieler beendet hat) und die Highscore-Listen. Es wird nur hinzugefügt: freigeschaltete Level sind eine Vereinigung, eine Liste behält die besten zehn beider, nichts wird gesenkt. Der Dateileser wird geprüft wie jeder andere (Größen begrenzt, Fehler statt Abstürze).
 - **Graphics**: die drei Zeilen des Originals und eine weitere, *Fullscreen?* (No / Yes / Exclusive), da ein Fenster
   den ganzen Bildschirm füllen kann. Links und rechts (oder Enter) ändern eine Zeile; die Änderung wirkt sofort und
   wird in `settings.txt` gespeichert:

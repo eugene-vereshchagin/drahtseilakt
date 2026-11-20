@@ -377,11 +377,16 @@ impl Menu {
         current: Option<u32>,
         features: Features,
     ) -> Menu {
+        // levels the toolbox took over from the original game's Database.tdb count as unlocked
+        let taken = gamedata::progress::read_unlocked(&crate::levels::data_dir());
         let entries: Vec<Entry> = (1..=LEVELS)
             .map(|number| Entry {
                 number,
                 available: data.original(number).is_some(),
-                open: features.has(Feature::AllLevels) || number == 1 || finished(number - 1),
+                open: features.has(Feature::AllLevels)
+                    || number == 1
+                    || taken.contains(&number)
+                    || finished(number - 1),
                 best: features
                     .has(Feature::BestTimes)
                     .then(|| best_ticks(number))

@@ -43,8 +43,8 @@ per-player thing is the name in the highscore list.
   desktop) if it is one of these, else English. *Extended* has the switch *Extended mode?* (Yes / No).
   That is all a player of the original levels sees changed.
 - Levels unlock as in the original. Highscores are the original's: ten per level, points, a name. They start
-  from our own default lists (the copy's with the original's interface) and are saved in our own data folder, never in the game's files. Reading the player's
-  `Database.tdb` to take over their old scores is a later option (a parser: reviewed like every file reader).
+  from our own default lists (the copy's with the original's interface) and are saved in our own data folder, never in the game's files. The toolbox can take over
+  the player's progress from the original's `Database.tdb` (its option *Take over my progress*, or `drahtseilakt-toolbox progress`): the unlocked levels (kept in `unlocked.txt`, added to the levels the player has finished) and the highscore lists. It only adds: the unlocked levels are a union and a list keeps the best ten of both, so nothing is lowered. The file reader is checked like every other (sizes capped, errors instead of panics).
 - **Graphics**: the original's three lines and one more, *Fullscreen?* (No / Yes / Exclusive), as a window can
   be one. Left and right (or Enter) change a line; it takes effect at once and is saved in `settings.txt`:
   - *Screen Resolution* goes through the monitor's modes and the usual window sizes (`resolution 1600x900`); the

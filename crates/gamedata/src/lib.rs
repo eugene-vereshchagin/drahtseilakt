@@ -8,6 +8,7 @@ pub mod mods;
 pub mod package;
 pub mod packs;
 pub mod profile;
+pub mod progress;
 pub mod provenance;
 pub mod resources;
 pub mod sound_themes;
