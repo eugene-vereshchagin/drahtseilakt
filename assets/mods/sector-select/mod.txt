@@ -1,0 +1,22 @@
+# Sector select: picking a level in the menu opens a list of its sectors; the run begins at the one chosen. Sector 1 is the ordinary start. A run begun at a later sector is a test run: no best time, no highscore, nothing unlocked.
+name.en Sector select
+name.ru Выбор сектора
+name.de Sektorauswahl
+name.zh 区段选择
+name.fr Choix du secteur
+name.es Elección de sector
+name.it Scelta del settore
+description.en Picking a level lists its sectors; the run starts at the one you choose. Later sectors make a test run (no best time, no highscore).
+description.ru Выбор уровня открывает список секторов; забег начнётся с выбранного. С позднего сектора это тестовый забег (без рекорда и таблицы).
+description.de Die Levelwahl listet die Sektoren; der Lauf beginnt im gewählten. Ab einem späteren Sektor ist es ein Testlauf (keine Bestzeit, kein Highscore).
+description.zh 选关后列出区段，从所选区段开始。从后面区段开始为测试局（无最佳成绩、无高分）。
+description.fr Choisir un niveau liste ses secteurs ; la partie commence au secteur choisi. Depuis un secteur ultérieur : un essai (ni meilleur temps ni score).
+description.es Al elegir un nivel se listan sus sectores; la partida empieza en el elegido. Desde uno posterior es una prueba (sin mejor tiempo ni récord).
+description.it Scegliendo un livello si elencano i settori; la partita parte da quello scelto. Da uno successivo è una prova (nessun tempo migliore né record).
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+
+on level
+do sector.menu

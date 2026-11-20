@@ -45,6 +45,7 @@ Start des Levels.
 | `play-time` | WatchYourTime | die Spielzeit je Level und gesamt, auf dem Bildschirm und in der `playtime.txt` des Datenordners; Option: anzeigen | nein |
 | `sack-supports` | (unserer; im Original hängen die Säcke in der Luft) | die Halter der schwingenden Säcke hängen an etwas: einer Steinsäule, einem gestreiften Mast, einem Holzpfosten oder einem Tor aus zweien, oder einem Pfosten aus dem Schienenrohr der Bahn, der in seinen Balken umbiegt, neben der Bahn; an einem Balken zur nahen Wand oder Säule des Levels; und ein Sack ohne eigenen Platz an einem Querbalken zum Halter des Nachbarn, sodass eine Gruppe an einer oder zwei Stützen hängt. Halterung, Balken und Pfosten sind aus einem Material und mit einer gebauten Verbindung gefügt (Holz: Kopfklotz in Eisenbändern und verschraubter Balkenschuh; Eisenrohr: Flanschnabe und Schelle um Säule oder Mast; Schienenrohr: Klemmen und Muffe), jedes Glied liegt waagrecht oder steht senkrecht. Für jeden Sack beim Laden des Levels gewählt, nur wo die Stütze den Raum des Balls, alle beweglichen Teile, die Kulisse und den Blick der Kamera auf den Ball frei lässt; wo nichts frei ist, hängt der Sack wie eh und je. Nur gezeichnet, mit den eigenen Modellen des Spiels (die des Originals bleiben, wie sie sind). **An, bis man ihn ausschaltet** (er bessert das Aussehen und ändert keine Regel; der klassische Modus führt weiterhin keinen Mod aus). Option: verschiedene Bauarten | nein |
 | `sector-jump` | SpeedrunShortcuts (Sektor setzen) | Tasten (F7 / PageUp, F6 / PageDown) starten das Level im nächsten oder vorigen Sektor neu | ja (gemoddet) |
+| `sector-select` | (eigener) | die Levelwahl öffnet eine Liste der Sektoren (Sektor 1, 2, ...); der Lauf beginnt im gewählten, Esc führt zurück zur Levelliste. Ein Lauf ab einem späteren Sektor ist ein Testlauf: keine Bestzeit, kein Highscore, nichts wird freigeschaltet | nein (der Mod hält den Lauf klassisch; ein späterer Start gilt als Testlauf) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (Startpunkt setzen) | eine Taste (F8, H oder J) setzt einen Startpunkt, wo die Kugel ist, eine andere (G, F4 oder C) bringt die Kugel ruhend dorthin zurück, als die Kugel, die sie war; der Sektor und seine Objekte bleiben, wie sie sind | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
 | `endless-lives` | Übungswerkzeuge von god-mode | die letzte Kugel geht nie verloren; Option: an oder aus | ja (gemoddet) |
@@ -167,6 +168,8 @@ vor der Physik), `sector` (ein Kontrollpunkt erreicht), `lost` (die Kugel verlor
 Die Ereignisse der Ansicht: `frame` (jedes gezeichnete Bild), `key <option>` (die Taste einer der Tastenoptionen des
 Mods gedrückt).
 
+Das Ereignis des Menüs: `level` (ein in der Levelliste gewähltes Level ist geladen und beginnt gleich, einmal; nicht bei einem Neustart).
+
 ### Werte
 
 | Wert | | Wert | |
@@ -248,6 +251,7 @@ Ansichtsaktionen (nur auf `frame` oder `key`):
   von god-mode).
 - `do ghost <0..1>` — der beste Lauf als durchscheinende Kugel, so deckend.
 - `do screenshot`, `do restart` — nur bei `key` (nie in jedem Bild); höchstens ein Screenshot pro Sekunde.
+- `do sector.menu` — nur bei `level`: über dem Level öffnet sich ein Menü seiner Sektoren, statt dass der Lauf startet; der Spieler wählt den Sektor, in dem der Lauf beginnt (Sektor 1 ist der normale Start), Esc führt zur Levelliste. Ein Lauf ab einem späteren Sektor beginnt wie mit `--sector`: ein Testlauf, als `-modded` gespeichert, nie eine Bestzeit, ein Highscore oder eine Freischaltung.
 
 Beide: `do set <variable> = <expression>`. Eine Variable, die eine Ansichtsregel setzt, gehört der Ansicht; die Regeln
 des Laufs dürfen sie weder setzen noch lesen.

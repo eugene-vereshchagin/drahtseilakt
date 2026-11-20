@@ -43,6 +43,7 @@ the level.
 | `play-time` | WatchYourTime | the time played, per level and in all, on screen and kept in the data folder's `playtime.txt`; option: show it | no |
 | `sack-supports` | (ours; the original's sacks hang in the air) | the swinging sacks' holders hang on something: a stone column, a striped mast, a timber post or a gate of two, or a post of the track's rail tube bent over into its beam, beside the track; a beam to a wall or a pillar of the level near by; or, for a sack with no room of its own, a cross-beam to a neighbour's holder, so that a group hangs on one or two supports. The holder's mount, the beam and the post are of one material with a made joint (timber: a head block in iron straps and a bolted shoe; iron pipe: a flanged hub and a band round the column or mast; rail tube: clamps and a sleeve), and every member is level or upright. Chosen for each sack as the level loads, only where it stands clear of the ball's space, of every moving part, of the scenery and of the camera's sight of the ball; where nothing is clear the sack hangs as it always did. Drawn only, with the game's own models (the original's are left as they are). **On until switched off** (it mends the look and changes no rule; the classic mode still runs no mod). Option: varied designs | no |
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
+| `sector-select` | (ours) | picking a level opens a list of its sectors (Sector 1, 2, ...); the run begins at the one chosen, Esc goes back to the level list. A run from a later sector is a test run: no best time, no highscore, nothing unlocked | no (the mod keeps the run classic; a later start is marked as a test run) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (set spawn) | a key (F8, H or J) sets a spawn point where the ball is, another (G, F4 or C) puts the ball back there at rest, as the ball it was; the sector and its objects stay as they are | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
 | `endless-lives` | god-mode's practice tools | the last ball is never lost; option: on or off | yes (modded) |
@@ -156,6 +157,8 @@ life taken), `finish`.
 
 The view's events: `frame` (every frame drawn), `key <option>` (the key of one of the mod's key options pressed).
 
+The menu's event: `level` (a level picked in the level list has loaded and is about to begin, once; not for a restart).
+
 ### Values
 
 | Value | | Value | |
@@ -245,6 +248,7 @@ View actions (only on `frame` or `key`):
 - `do keys <corner>` — the mod's own key options as HUD lines, "label: key" (god-mode's hint).
 - `do ghost <0..1>` — the best run as a translucent ball, so opaque.
 - `do screenshot`, `do restart` — only on `key` (never every frame); one screenshot a second at most.
+- `do sector.menu` — only on `level`: a menu of the level's sectors opens over the level instead of the run starting; the player picks the sector the run begins at (Sector 1 is the ordinary start), Esc leaves for the level list. A run begun at a later sector is begun as `--sector` begins it: a test run, kept as `-modded`, never a best run, a highscore or an unlock.
 
 Both: `do set <variable> = <expression>`. A variable a view rule sets belongs to the view; the run's rules may not set
 or read it.

@@ -91,6 +91,8 @@ pub enum Screen {
     Mods,
     /// One mod's page: on or off, its options, its description.
     ModPage,
+    /// Over a freshly loaded level, with the sector-select mod on: where the run begins (`Menu::sectors` of them).
+    Sectors,
     /// The menus' language.
     Language,
     Credits,
@@ -158,6 +160,8 @@ enum Line {
     /// The Mods screen; a mod on it (by its place among those found); its page's switch and options.
     ModsMenu,
     Mod(usize),
+    /// The Sectors screen: a sector, by its place (the first is the level's start).
+    Sector(usize),
     ModOn,
     ModOpt(usize),
     /// Where the interface's files come from: own, the original, its remaster (resources.rs).
@@ -240,6 +244,10 @@ pub enum Action {
     ModSwitch(usize),
     /// A mod's option stepped: the mod, the option, the step.
     ModOption(usize, usize, i32),
+    /// The sector menu's choice: the run begins at this sector (1 is the level's start).
+    Sector(usize),
+    /// Esc on the sector menu: the level is left for the list it was picked from.
+    SectorsBack,
 }
 
 /// What a button under the cursor is: a line of the screen (by its place in the screen's lines), or one of the
@@ -348,6 +356,8 @@ pub struct Menu {
     /// The mods found, which are on and their options (the game's, shown and changed here); the mod whose page is up.
     pub mods: crate::modrt::Mods,
     mod_page: usize,
+    /// How many sectors the Sectors screen lists.
+    pub sectors: usize,
     /// The first line a long list shows (the custom levels): it moves only as far as keeps the chosen line in view,
     /// so the line under the cursor stays where it is.
     top: usize,
@@ -424,6 +434,7 @@ impl Menu {
             waiting: None,
             mods: crate::modrt::Mods::default(),
             mod_page: 0,
+            sectors: 1,
             top: 0,
             credits_top: 0,
             credits_max: std::cell::Cell::new(0),
@@ -1100,6 +1111,10 @@ impl Menu {
                 .chain((0..self.page_options().len()).map(Line::ModOpt))
                 .chain([Line::Back])
                 .collect(),
+            Screen::Sectors => (0..self.sectors)
+                .map(Line::Sector)
+                .chain([Line::Back])
+                .collect(),
             Screen::Extended => vec![Line::Mode, Line::Back],
             Screen::Highscore if self.after_entry => vec![Line::Next],
             // the original's lines, ours (the full screen, the texture and model packs: either mode), and the extended
@@ -1423,6 +1438,7 @@ impl Menu {
                 .maps
                 .get(i)
                 .map_or(Action::None, |p| Action::Map(p.level.clone())),
+            Line::Sector(i) => Action::Sector(i + 1),
             Line::Mode => Action::ToggleDebug,
             Line::Look => Action::Look(crate::look::next(1)),
             Line::Interface => Action::Interface(next_provider(1)),
@@ -1468,6 +1484,7 @@ impl Menu {
         }
         match self.screen() {
             Screen::Pause => Action::Continue,
+            Screen::Sectors => Action::SectorsBack,
             Screen::Main | Screen::Dead | Screen::End | Screen::Entry => Action::None,
             Screen::Highscore if self.after_entry => self.enter(),
             _ => {
@@ -1880,6 +1897,7 @@ impl Menu {
             Line::SaveReplays => s.ours("save replays"),
             Line::OpenFolder => s.ours("open folder"),
             Line::Replay(i) => self.replay_name(i),
+            Line::Sector(i) => s.ours("sector number").replace("{n}", &(i + 1).to_string()),
             Line::Language => s.ours("language"),
             Line::Help => s.ours("manual"),
             Line::Report => s.ours("report problem"),
@@ -2044,6 +2062,7 @@ impl Menu {
             Screen::Sound => s.get("Menu_Options Button Sound", "Sound"),
             Screen::Extended => s.ours("extended"),
             Screen::Mods => s.ours("mods"),
+            Screen::Sectors => s.ours("sectors"),
             Screen::Replays | Screen::ReplaySettings => s.ours("replays"),
             Screen::ModPage => self.label(Line::Mod(self.mod_page)),
             Screen::Language => s.ours("language"),
@@ -2317,7 +2336,7 @@ impl Menu {
         let fields = self.fields(screen);
         // a long list shows the lines around the chosen one (the custom levels' Back as well, after them)
         let mut shown: Vec<usize> = self.shown(self.list_len(screen)).collect();
-        if screen == Screen::Custom {
+        if matches!(screen, Screen::Custom | Screen::Sectors) {
             shown.push(lines.len().saturating_sub(1));
         }
         let total = 6.0 + fields.len() as f32 + 1.2 * shown.len() as f32;
@@ -2969,6 +2988,35 @@ impl Menu {
                 let text = self.page_note(lines.get(self.chosen()).copied());
                 let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
                 note(&mut out, &text, NOTE_BOTTOM, true, NOTE_BOTTOM - top);
+                back_only(&mut out);
+            }
+            Screen::Sectors => {
+                title(&mut out);
+                let n = self.list_len(sc);
+                let shown = self.shown(n);
+                for (k, i) in shown.clone().enumerate() {
+                    let y = LIST_TOP + k as f32 * ROW_STEP;
+                    let r = [LIST_X[0], y, LIST_X[1], y + ROW_H];
+                    row(&mut out, r, state(i), Some(Target::Line(i)));
+                    let mut st = FONT_ROW;
+                    st.align = crate::ui::ALIGN_LEFT;
+                    label(
+                        &mut out,
+                        &self.label(lines[i]),
+                        [LIST_X[0] + ROW_INDENT, y, LIST_X[1] - 0.012, y + ROW_H],
+                        &st,
+                    );
+                }
+                let bottom = LIST_TOP + shown.len().saturating_sub(1) as f32 * ROW_STEP + ROW_H;
+                scroll(&mut out, LIST_X[1] + 0.006, LIST_TOP, bottom, shown, n);
+                let top = LIST_TOP + self.page_len() as f32 * ROW_STEP + HINT_H + 0.008;
+                note(
+                    &mut out,
+                    &self.with_hint(String::new()),
+                    NOTE_BOTTOM,
+                    true,
+                    NOTE_BOTTOM - top,
+                );
                 back_only(&mut out);
             }
             Screen::Highscore => {
@@ -3990,14 +4038,21 @@ impl KeyRepeat {
 fn scrolls(screen: Screen) -> bool {
     matches!(
         screen,
-        Screen::Custom | Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings
+        Screen::Custom
+            | Screen::Sectors
+            | Screen::Mods
+            | Screen::ModPage
+            | Screen::Replays
+            | Screen::ReplaySettings
     )
 }
 
 /// The rows a screen's list shows at once.
 fn page(screen: Screen) -> usize {
     match screen {
-        Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings => MODS_LINES,
+        Screen::Sectors | Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings => {
+            MODS_LINES
+        }
         _ => LIST_LINES,
     }
 }
@@ -4248,6 +4303,7 @@ mod tests {
             waiting: None,
             mods: crate::modrt::Mods::default(),
             mod_page: 0,
+            sectors: 1,
             top: 0,
             credits_top: 0,
             credits_max: std::cell::Cell::new(0),
@@ -4255,6 +4311,23 @@ mod tests {
         };
         m.push(Screen::Main);
         m
+    }
+
+    #[test]
+    fn the_sector_menu_lists_the_sectors_and_chooses_one() {
+        let mut m = menu(&[true], false);
+        m.sectors = 4;
+        m.push(Screen::Sectors);
+        assert_eq!(m.screen(), Screen::Sectors);
+        assert_eq!(m.lines(Screen::Sectors).len(), 5, "four sectors and Back");
+        assert_eq!(m.label(Line::Sector(1)), "Sector 2");
+        assert_eq!(m.title(Screen::Sectors).as_deref(), Some("Sectors"));
+        m.step(2);
+        assert_eq!(m.enter(), Action::Sector(3));
+        // Back and Esc both leave the level
+        m.set_chosen(4);
+        assert_eq!(m.enter(), Action::SectorsBack);
+        assert_eq!(m.back(), Action::SectorsBack);
     }
 
     #[test]
@@ -4814,6 +4887,13 @@ mod tests {
                         for i in 0..m.lines(Screen::Mods).len() {
                             states.push((Screen::Mods, i, 0));
                         }
+                        // the sector menu: a few sectors and a long list (the last, the widest number)
+                        for n in [3usize, 120] {
+                            m.sectors = n;
+                            for i in [0, 1, n / 2, n - 1, n] {
+                                states.push((Screen::Sectors, i, n));
+                            }
+                        }
                         // the replays: the longest of names and values, the three states of a file
                         {
                             use crate::userreplay::{Item, Outcome, State};
@@ -4855,6 +4935,7 @@ mod tests {
                     }
                     for (sc, i, extra) in states {
                         m.mod_page = if sc == Screen::ModPage { extra } else { 0 };
+                        m.sectors = if sc == Screen::Sectors { extra } else { 1 };
                         m.credits_top = if sc == Screen::Credits { extra } else { 0 };
                         let n = m.lines(sc).len();
                         m.stack = vec![(Screen::Main, 0), (sc, i.min(n.saturating_sub(1)))];
