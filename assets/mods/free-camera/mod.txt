@@ -1,0 +1,31 @@
+# Free camera (after god-mode's practice tools): a key frees the camera to fly about the level; pressed again it
+# goes back to the ball. Changes the run: modded.
+name.en Free camera
+name.ru Свободная камера
+name.de Freie Kamera
+name.zh 自由视角
+name.fr Caméra libre
+name.es Cámara libre
+name.it Camera libera
+description.en A key frees the camera to fly about the level. Such runs are modded.
+description.ru Клавиша освобождает камеру для полёта по уровню. Такие прохождения помечаются как с модами.
+description.de Eine Taste befreit die Kamera zum Flug durchs Level. Solche Läufe sind modifiziert.
+description.zh 一键解锁摄像机，可在关卡中自由飞行。此类通关记为改动。
+description.fr Une touche libère la caméra pour survoler le niveau. Ces parties sont modifiées.
+description.es Una tecla libera la cámara para volar por el nivel. Esas partidas se marcan como modificadas.
+description.it Un tasto libera la camera per volare nel livello. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option camera key F2,KeyC
+label camera en Free camera
+label camera ru Свободная камера
+label camera de Freie Kamera
+label camera zh 自由视角
+label camera fr Caméra libre
+label camera es Cámara libre
+label camera it Camera libera
+
+on key camera
+do freecam

@@ -1,0 +1,39 @@
+# Rewind (after god-mode's practice tools): a key takes the run back some seconds; pressed again it goes further back.
+# Changes the run: modded.
+name.en Rewind
+name.ru Отмотка назад
+name.de Zurückspulen
+name.zh 倒退
+name.fr Retour en arrière
+name.es Rebobinar
+name.it Riavvolgi
+description.en A key takes the run back a few seconds. Such runs are modded.
+description.ru Клавиша отматывает забег на несколько секунд назад. Такие прохождения помечаются как с модами.
+description.de Eine Taste spult den Lauf einige Sekunden zurück. Solche Läufe sind modifiziert.
+description.zh 一键让本局倒退数秒，此类通关记为改动。
+description.fr Une touche ramène la partie quelques secondes en arrière. Ces parties sont modifiées.
+description.es Una tecla rebobina la partida unos segundos. Esas partidas se marcan como modificadas.
+description.it Un tasto riporta la partita indietro di qualche secondo. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option back number 1 30 1 5
+option rewind key F3,KeyB,KeyZ
+label back en Seconds back
+label back ru Секунд назад
+label back de Sekunden zurück
+label back zh 倒退秒数
+label back fr Secondes en arrière
+label back es Segundos atrás
+label back it Secondi indietro
+label rewind en Back
+label rewind ru Назад
+label rewind de Zurück
+label rewind zh 倒退
+label rewind fr Retour
+label rewind es Atrás
+label rewind it Indietro
+
+on key rewind
+do rewind opt.back

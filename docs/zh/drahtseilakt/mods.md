@@ -41,6 +41,13 @@
 | `sector-jump` | SpeedrunShortcuts（设置小节） | 按键（F7 / PageUp、F6 / PageDown）从下一个或上一个小节重新开始关卡 | 是（modded） |
 | `spawn-point` | NewSpawn、SpeedrunShortcuts（设置出生点） | 一个键（F8、H 或 J）在球所在处设出生点，另一个键（G、F4 或 C）把球静止地送回那里，恢复当时的球种；小节及其物体保持原样 | 是（modded） |
 | `free-steering` | FreeViewRotation（含操控） | 类似 `free-view`，但方向键沿转动后的视角推动；视角的转动记录在回放中 | 是（modded） |
+| `endless-lives` | god-mode 的练习工具 | 最后一个球永不丢失；选项：开或关 | 是（modded） |
+| `rewind` | god-mode 的练习工具 | 一个键（F3、B 或 Z）让本局倒退数秒（选项：1–30，默认 5）；再按则退得更远 | 辅助本局（不会成为最佳成绩） |
+| `save-moment` | god-mode 的练习工具 | 一个键（F5 或 K）保存当前时刻，另一个键（F9 或 L）回到该时刻；屏幕显示保存的时间，失败的一局会等待读取 | 辅助本局（不会成为最佳成绩） |
+| `slow-motion` | god-mode 的练习工具 | 按键（`[` / `]` 或 `-` / `=`）把游戏速度减半或加倍，最慢八分之一；速度低于 1 时显示 | 辅助本局（不会成为最佳成绩） |
+| `free-camera` | god-mode 的练习工具、AdvancedTravelCam | 一个键（F2 或 C）解锁摄像机，可在关卡中飞行；本局暂停等待 | 否 |
+
+god-mode 的每个练习工具同时也是一个独立的内置模组（`endless-lives`、`rewind`、`save-moment`、`slow-motion`、`free-camera`），随发布包提供，玩家可以单独选用其中任何一个；god-mode 本身仍是开发用模组。
 
 ## 粘性球种类
 

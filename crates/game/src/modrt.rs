@@ -823,6 +823,37 @@ mod tests {
         do show top-right - int seen\n";
 
     #[test]
+    fn each_practice_factory_mod_works_alone() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/mods");
+        let zero = |_: Value| 0.0;
+        for (name, key, deed) in [
+            ("rewind", "F3", Practice::Rewind(5.0)),
+            ("save-moment", "F5", Practice::Save),
+            ("save-moment", "F9", Practice::Load),
+            ("slow-motion", "BracketLeft", Practice::Slower),
+            ("slow-motion", "BracketRight", Practice::Faster),
+            ("free-camera", "F2", Practice::FreeCam),
+        ] {
+            let text = std::fs::read_to_string(dir.join(name).join("mod.txt")).unwrap();
+            let m = Mods::load(vec![found(name, &text)], |_| Some("on".into()));
+            let (sim, mut view) = m.running(true);
+            assert!(view.practice(), "{name} is a practice mod");
+            view.press(key, &zero, &sim, "en");
+            assert_eq!(
+                std::mem::take(&mut view.out.practice),
+                vec![deed],
+                "{name} {key}"
+            );
+        }
+        let text = std::fs::read_to_string(dir.join("endless-lives/mod.txt")).unwrap();
+        let m = Mods::load(vec![found("endless-lives", &text)], |_| Some("on".into()));
+        let (mut sim, view) = m.running(true);
+        assert!(sim.modded() && !view.practice());
+        sim.fire(Event::Tick, &zero);
+        assert!(sim.out.endless, "endless lives");
+    }
+
+    #[test]
     fn god_modes_keys_ask_for_its_deeds_and_its_hint_shows_them() {
         let text = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -965,9 +996,14 @@ mod tests {
         assert_eq!(
             modded,
             vec![
+                "endless-lives",
+                "free-camera",
                 "free-steering",
                 "physics-lab",
+                "rewind",
+                "save-moment",
                 "sector-jump",
+                "slow-motion",
                 "spawn-point",
                 "sticky-ball"
             ],

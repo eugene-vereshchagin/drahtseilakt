@@ -47,6 +47,13 @@ Start des Levels.
 | `sector-jump` | SpeedrunShortcuts (Sektor setzen) | Tasten (F7 / PageUp, F6 / PageDown) starten das Level im nächsten oder vorigen Sektor neu | ja (gemoddet) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (Startpunkt setzen) | eine Taste (F8, H oder J) setzt einen Startpunkt, wo die Kugel ist, eine andere (G, F4 oder C) bringt die Kugel ruhend dorthin zurück, als die Kugel, die sie war; der Sektor und seine Objekte bleiben, wie sie sind | ja (gemoddet) |
 | `free-steering` | FreeViewRotation (auch die Steuerung) | wie `free-view`, aber die Pfeile schieben entlang der gedrehten Sicht; die Drehung der Sicht steht im Replay | ja (gemoddet) |
+| `endless-lives` | Übungswerkzeuge von god-mode | die letzte Kugel geht nie verloren; Option: an oder aus | ja (gemoddet) |
+| `rewind` | Übungswerkzeuge von god-mode | eine Taste (F3, B oder Z) spult den Lauf einige Sekunden zurück (Option: 1–30, Standard 5); erneut gedrückt, weiter zurück | hilft dem Lauf (nie ein Bestlauf) |
+| `save-moment` | Übungswerkzeuge von god-mode | eine Taste (F5 oder K) sichert den Moment, eine andere (F9 oder L) geht zu ihm zurück; die gesicherte Zeit steht auf dem Schirm, ein verlorener Lauf wartet aufs Laden | hilft dem Lauf (nie ein Bestlauf) |
+| `slow-motion` | Übungswerkzeuge von god-mode | Tasten (`[` / `]` oder `-` / `=`) halbieren und verdoppeln das Spieltempo, bis auf ein Achtel; das Tempo steht da, solange es unter 1 liegt | hilft dem Lauf (nie ein Bestlauf) |
+| `free-camera` | Übungswerkzeuge von god-mode, AdvancedTravelCam | eine Taste (F2 oder C) befreit die Kamera zum Flug durchs Level; der Lauf wartet | nein |
+
+Jedes Übungswerkzeug von god-mode ist auch ein eigener Werks-Mod (`endless-lives`, `rewind`, `save-moment`, `slow-motion`, `free-camera`), im Release enthalten, sodass jeder allein gewählt werden kann; god-mode selbst bleibt ein Entwickler-Mod.
 
 ## Die klebrige Kugelart
 

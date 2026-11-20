@@ -45,6 +45,13 @@ the level.
 | `sector-jump` | SpeedrunShortcuts (set sector) | keys (F7 / PageUp, F6 / PageDown) start the level again at the next or the previous sector | yes (modded) |
 | `spawn-point` | NewSpawn, SpeedrunShortcuts (set spawn) | a key (F8, H or J) sets a spawn point where the ball is, another (G, F4 or C) puts the ball back there at rest, as the ball it was; the sector and its objects stay as they are | yes (modded) |
 | `free-steering` | FreeViewRotation (the steering too) | like `free-view`, but the arrows push along the turned view; the view's turn is recorded in the replay | yes (modded) |
+| `endless-lives` | god-mode's practice tools | the last ball is never lost; option: on or off | yes (modded) |
+| `rewind` | god-mode's practice tools | a key (F3, B or Z) takes the run back some seconds (option: 1–30, default 5); pressed again, further | helps the run (never a best one) |
+| `save-moment` | god-mode's practice tools | a key (F5 or K) saves the moment, another (F9 or L) goes back to it; the saved time is on screen, and a lost run waits for the load key | helps the run (never a best one) |
+| `slow-motion` | god-mode's practice tools | keys (`[` / `]`, or `-` / `=`) halve and double the game's speed, down to an eighth; the speed shows while below 1 | helps the run (never a best one) |
+| `free-camera` | god-mode's practice tools, AdvancedTravelCam | a key (F2 or C) frees the camera to fly about the level; the run waits | no |
+
+Each practice tool of god-mode is also a factory mod of its own (`endless-lives`, `rewind`, `save-moment`, `slow-motion`, `free-camera`), shipped in releases, so a player may pick each one alone; god-mode itself stays a development mod.
 
 ## The sticky ball kind
 
