@@ -833,7 +833,7 @@ impl Game {
             .to_owned();
         let dir = self.runs_dir(&stem);
         // a modded run is kept as such and opens no level (menu.rs `finished`)
-        let tag = if self.sim.mods.modded() {
+        let tag = if self.sim.mods.modded() || self.start.is_some() {
             "-modded"
         } else {
             ""
@@ -1148,6 +1148,8 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
         "pause" => Screen::Pause,
         "dead" => Screen::Dead,
         "end" => Screen::End,
+        // the sector-select mod's menu over the level
+        "sectors" => Screen::Main,
         _ => return None,
     };
     let strings = load_strings(data);
@@ -1164,6 +1166,10 @@ fn shot_menu(spec: &str, data: &Data, game: &Game, o: &Options, size: (u32, u32)
     m.resolutions = crate::options::WINDOWED.to_vec();
     m.replays.mode = crate::userreplay::Mode::load(setting);
     m.replays.dirs = crate::userreplay::dirs(setting);
+    if spec.starts_with("sectors") {
+        m.sectors = game.sim.sector_count();
+        m.push(Screen::Sectors);
+    }
     for k in keys.chars() {
         match k {
             'u' => m.step(-1),
@@ -1821,6 +1827,8 @@ pub fn run_window(
         opts: o.clone(),
         menu,
         pause_told: false,
+        sector_stash: None,
+        sector_pending: false,
         save_replays: crate::userreplay::Mode::load(setting),
         replay_prompt: None,
         run_recorded: false,
@@ -2619,7 +2627,7 @@ pub fn screenshot(game: &mut Game, data: &Data, o: &Options, path: &Path) -> Res
         full_view.clone()
     };
     // DRAHTSEILAKT_SHOT_MENU=base:keys draws a menu over the frame, to look at the menus without a window: base is
-    // main, pause, dead or end, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options. A
+    // main, pause, dead, end or sectors, keys are u d l r (arrows), e (Enter) and b (Esc), e.g. "main:ddde" for Options. A
     // menu not over the level has the menu scene behind it, DRAHTSEILAKT_SHOT_MENU_MS (default 0) into the menu.
     let shot = std::env::var("DRAHTSEILAKT_SHOT_MENU").ok();
     let menu = shot.and_then(|spec| shot_menu(&spec, data, game, o, (w, h)));
@@ -3033,6 +3041,10 @@ struct App {
     menu: Option<Menu>,
     /// The pause menu was opened over the run and the scripts were told (they hear the end of it too).
     pause_told: bool,
+    /// The level list a level was picked from, kept while the sector menu is over the level (sector-select mod).
+    sector_stash: Option<Menu>,
+    /// A level was picked from a list and has not begun: the sector menu may be asked for.
+    sector_pending: bool,
     /// Save replays: Off, Ask or Always (userreplay.rs); the prompt up now, if any; a run's end already offered or saved.
     save_replays: crate::userreplay::Mode,
     replay_prompt: Option<ReplayPrompt>,
@@ -4441,6 +4453,7 @@ impl App {
         }
         self.apply_mods();
         self.acc = 0.0;
+        self.sector_menu_if_asked();
         let took = l.began.elapsed();
         self.stall.note("level load", took);
         eprintln!(
@@ -4850,6 +4863,47 @@ impl App {
         self.menu_action(action, event_loop);
     }
 
+    /// A level is picked from a list: the list is kept aside (not dropped) for a sector menu's Esc to come back to.
+    fn stash_list(&mut self) {
+        use crate::menu::Screen;
+        self.sector_stash = None;
+        if self
+            .menu
+            .as_ref()
+            .is_some_and(|m| matches!(m.screen(), Screen::Start | Screen::Custom))
+        {
+            self.sector_stash = self.menu.take();
+            self.sector_pending = true;
+        }
+    }
+
+    /// A picked level is ready to begin (loaded, or the one already loaded): a mod's `level` rule may ask for the
+    /// sector menu, which opens over the level instead of the run starting.
+    fn sector_menu_if_asked(&mut self) {
+        if !self.sector_pending || self.loading.is_some() || self.user_replay.is_some() {
+            return;
+        }
+        self.sector_pending = false;
+        self.view_mods.out.sector_menu = false;
+        let mut view = std::mem::take(&mut self.view_mods);
+        view.fire(
+            gamedata::mods::Event::Level,
+            &|_| 0.0,
+            &self.game.sim.mods,
+            self.strings.language(),
+        );
+        self.view_mods = view;
+        if !std::mem::take(&mut self.view_mods.out.sector_menu) {
+            self.sector_stash = None;
+            return;
+        }
+        self.open_menu(crate::menu::Screen::Main);
+        if let Some(m) = &mut self.menu {
+            m.sectors = self.game.sim.sector_count();
+            m.push(crate::menu::Screen::Sectors);
+        }
+    }
+
     /// Does what a menu's key asked.
     fn menu_action(&mut self, action: Action, event_loop: &ActiveEventLoop) {
         match action {
@@ -4860,9 +4914,43 @@ impl App {
                     self.game.sim.notify_pause(false);
                 }
             }
-            Action::Play(n) => self.play(n),
-            Action::Map(path) if path.is_dir() => self.load(crate::assets::Source::Open(path)),
-            Action::Map(path) => self.load(crate::assets::Source::Nmo(path)),
+            Action::Play(n) => {
+                self.stash_list();
+                self.play(n);
+                self.sector_menu_if_asked();
+            }
+            Action::Map(path) => {
+                self.stash_list();
+                if path.is_dir() {
+                    self.load(crate::assets::Source::Open(path))
+                } else {
+                    self.load(crate::assets::Source::Nmo(path))
+                }
+            }
+            Action::Sector(n) => {
+                // the run begins at the sector chosen (1: the level's start); past the first it is a test run, as
+                // --sector makes: never a best run, never unlocking
+                self.menu = None;
+                self.sector_stash = None;
+                let top = self.game.sim.sector_count();
+                self.game.start = (n > 1).then(|| crate::replay::Start {
+                    sector: n.clamp(1, top.max(1)),
+                    ball: None,
+                    at: None,
+                });
+                self.restart();
+                self.saved = None;
+                self.history.clear();
+            }
+            Action::SectorsBack => {
+                // Esc: the level is left, the list it was picked from is open again
+                self.leave_run(false);
+                self.game.start = None;
+                match self.sector_stash.take() {
+                    Some(list) => self.menu = Some(list),
+                    None => self.open_menu(crate::menu::Screen::Main),
+                }
+            }
             Action::Restart => {
                 self.menu = None;
                 self.restart();

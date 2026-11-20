@@ -163,6 +163,7 @@ fn action_exprs(a: &Action) -> Vec<&Expr> {
         | Action::Keys(_)
         | Action::Screenshot
         | Action::Restart
+        | Action::SectorMenu
         | Action::SaveMoment
         | Action::LoadMoment
         | Action::Slower
@@ -306,6 +307,8 @@ pub struct ViewOut {
     pub splits: Vec<Corner>,
     pub screenshot: bool,
     pub restart: bool,
+    /// A level picked in the menu asks for the sector menu (`sector.menu` on `level`).
+    pub sector_menu: bool,
     /// The practice's deeds asked for by a key, in order (the window does them).
     pub practice: Vec<Practice>,
 }
@@ -346,6 +349,7 @@ impl Default for ViewOut {
             splits: Vec::new(),
             screenshot: false,
             restart: false,
+            sector_menu: false,
             practice: Vec::new(),
         }
     }
@@ -517,6 +521,7 @@ impl ViewMods {
                     }
                     Action::Screenshot => out.screenshot = true,
                     Action::Restart => out.restart = true,
+                    Action::SectorMenu => out.sector_menu = true,
                     Action::Rewind(_) if out.practice.len() < 16 => {
                         out.practice.push(Practice::Rewind(x.clamp(1.0, 30.0)));
                     }

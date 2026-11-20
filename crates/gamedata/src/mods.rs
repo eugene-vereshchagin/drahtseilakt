@@ -84,13 +84,15 @@ pub enum Event {
     // the view's events: what is seen, outside the run
     /// Every frame drawn.
     Frame,
+    /// A level picked in the menu has loaded and is about to begin (once; not for a restart or a replay).
+    Level,
     /// The key of one of the mod's key options is pressed (its index among the options).
     Key(usize),
 }
 
 impl Event {
     pub fn sim(self) -> bool {
-        !matches!(self, Event::Frame | Event::Key(_))
+        !matches!(self, Event::Frame | Event::Level | Event::Key(_))
     }
 }
 
@@ -486,6 +488,9 @@ pub enum Action {
     Keys(Corner),
     Screenshot,
     Restart,
+    /// A menu of the level's sectors instead of an immediate start (only on `level`): the player picks the sector
+    /// the run begins at. A run begun past the first sector is a test run, as `--sector` makes.
+    SectorMenu,
     // the run's (sim) action of the practice: the last ball is never lost (0 or 1)
     EndlessLives(Expr),
     // the practice's deeds, only on a key (on key <option>): they reach into the run from outside it, so a mod that
@@ -579,6 +584,7 @@ impl Action {
             | Action::Keys(_)
             | Action::Screenshot
             | Action::Restart
+            | Action::SectorMenu
             | Action::SaveMoment
             | Action::LoadMoment
             | Action::Slower
@@ -1221,6 +1227,7 @@ fn parse_event(rest: &str, options: &[OptSpec]) -> Result<Event, String> {
         "extra" => Event::Extra,
         "finish" => Event::Finish,
         "frame" => Event::Frame,
+        "level" => Event::Level,
         "key" => {
             let o = f.next().unwrap_or_default();
             let i = options
@@ -1242,7 +1249,13 @@ fn split_args_ws(s: &str) -> Vec<&str> {
     s.split_whitespace().collect()
 }
 
-fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Action, String> {
+fn parse_action(
+    rest: &str,
+    m: &mut ModTxt,
+    sim: bool,
+    key: bool,
+    level: bool,
+) -> Result<Action, String> {
     let (verb, args) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
     let args = args.trim();
     let names_vars = m.vars.clone();
@@ -1313,6 +1326,7 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
         "ghost" => Action::Ghost(e(args)?),
         "screenshot" if args.is_empty() => Action::Screenshot,
         "restart" if args.is_empty() => Action::Restart,
+        "sector.menu" if args.is_empty() => Action::SectorMenu,
         "lives.endless" => Action::EndlessLives(e(args)?),
         "rewind" => Action::Rewind(e(args)?),
         "save" if args.is_empty() => Action::SaveMoment,
@@ -1388,6 +1402,9 @@ fn parse_action(rest: &str, m: &mut ModTxt, sim: bool, key: bool) -> Result<Acti
     // a screenshot, a restart or a practice deed is a single deed: only on a key, never every frame
     if (matches!(a, Action::Screenshot | Action::Restart) || a.deed()) && !key {
         return Err(format!("{verb} only on a key (on key <option>)"));
+    }
+    if matches!(a, Action::SectorMenu) && !level {
+        return Err(format!("{verb} only on level (on level)"));
     }
     if !a.sim() && sim && !matches!(a, Action::Set(..)) {
         return Err(format!("{verb} is for the view: only on frame or key"));
@@ -1648,7 +1665,8 @@ pub fn parse_mod_txt(text: &str) -> Result<ModTxt, String> {
                     .rules
                     .last()
                     .is_some_and(|r| matches!(r.event, Event::Key(_)));
-                let a = parse_action(rest, &mut m, sim, key).map_err(at)?;
+                let level = m.rules.last().is_some_and(|r| r.event == Event::Level);
+                let a = parse_action(rest, &mut m, sim, key, level).map_err(at)?;
                 let r = m
                     .rules
                     .last_mut()
@@ -1978,6 +1996,11 @@ mod tests {
             "the run reads no view value"
         );
         assert!(parse_mod_txt(&format!("{head}on tick\ndo steer.yaw playtime.all\n")).is_err());
+        // the sector menu is the view's, on a loaded level only; it changes nothing of the run itself
+        let menu = parse_mod_txt("name.en T\non level\ndo sector.menu\n").unwrap();
+        assert!(!menu.modded() && matches!(menu.rules[0].actions[0], Action::SectorMenu));
+        assert!(parse_mod_txt("name.en T\non frame\ndo sector.menu\n").is_err());
+        assert!(parse_mod_txt("name.en T\non start\ndo sector.menu\n").is_err());
         // a jump to a sector is a deed on a key: modded, but not the practice's keeping of moments
         let jump =
             parse_mod_txt(&format!("{head}on key k\ndo sector.set run.sector + 1\n")).unwrap();
