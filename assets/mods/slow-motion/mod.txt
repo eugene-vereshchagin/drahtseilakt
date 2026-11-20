@@ -1,0 +1,53 @@
+# Slow motion (after god-mode's practice tools): keys halve and double the game's speed (down to 1/8); the speed
+# shows while it is below 1. Changes the run: modded.
+name.en Slow motion
+name.ru Замедление
+name.de Zeitlupe
+name.zh 慢动作
+name.fr Ralenti
+name.es Cámara lenta
+name.it Rallentatore
+description.en Keys slow the game down and speed it up again. Such runs are modded.
+description.ru Клавиши замедляют игру и снова ускоряют её. Такие прохождения помечаются как с модами.
+description.de Tasten verlangsamen das Spiel und beschleunigen es wieder. Solche Läufe sind modifiziert.
+description.zh 按键减慢游戏速度，再加快回来。此类通关记为改动。
+description.fr Des touches ralentissent le jeu et l'accélèrent de nouveau. Ces parties sont modifiées.
+description.es Las teclas ralentizan el juego y lo aceleran de nuevo. Esas partidas se marcan como modificadas.
+description.it I tasti rallentano il gioco e lo riaccelerano. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option slower key BracketLeft,Minus
+option faster key BracketRight,Equal
+label slower en Slower
+label slower ru Медленнее
+label slower de Langsamer
+label slower zh 减速
+label slower fr Plus lent
+label slower es Más lento
+label slower it Più lento
+label faster en Faster
+label faster ru Быстрее
+label faster de Schneller
+label faster zh 加速
+label faster fr Plus vite
+label faster es Más rápido
+label faster it Più veloce
+label speed en Speed 1/
+label speed ru Скорость 1/
+label speed de Tempo 1/
+label speed zh 速度 1/
+label speed fr Vitesse 1/
+label speed es Velocidad 1/
+label speed it Velocità 1/
+
+on key slower
+do slower
+
+on key faster
+do faster
+
+on frame
+if practice.speed < 1
+do show top-left speed int 1 / practice.speed

@@ -1,0 +1,55 @@
+# Save moment (after god-mode's practice tools): a key saves the run as it is, another goes back to it; a lost run
+# waits for the load key. Changes the run: modded.
+name.en Save moment
+name.ru Сохранение момента
+name.de Moment sichern
+name.zh 保存时刻
+name.fr Sauver le moment
+name.es Guardar momento
+name.it Salva momento
+description.en A key saves the moment, another loads it again. Such runs are modded.
+description.ru Одна клавиша сохраняет момент, другая загружает его снова. Такие прохождения помечаются как с модами.
+description.de Eine Taste sichert den Moment, eine andere lädt ihn wieder. Solche Läufe sind modifiziert.
+description.zh 一键保存当前时刻，另一键重新读取。此类通关记为改动。
+description.fr Une touche sauve le moment, une autre le recharge. Ces parties sont modifiées.
+description.es Una tecla guarda el momento y otra lo carga de nuevo. Esas partidas se marcan como modificadas.
+description.it Un tasto salva il momento, un altro lo ricarica. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option save key F5,KeyK
+option load key F9,KeyL
+label save en Save
+label save ru Сохранить
+label save de Sichern
+label save zh 保存
+label save fr Sauver
+label save es Guardar
+label save it Salva
+label load en Load
+label load ru Загрузить
+label load de Laden
+label load zh 读取
+label load fr Charger
+label load es Cargar
+label load it Carica
+label saved en Saved at
+label saved ru Сохранено:
+label saved de Gesichert:
+label saved zh 已保存:
+label saved fr Sauvé :
+label saved es Guardado:
+label saved it Salvato:
+var saved_at 0
+
+on key save
+do save
+do set saved_at = run.time
+
+on key load
+do load
+
+on frame
+if practice.saved
+do show top-left saved time saved_at

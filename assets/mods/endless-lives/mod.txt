@@ -1,0 +1,30 @@
+# Endless lives (after god-mode's practice tools): a lost ball comes back, the lives never run out. Changes the run: modded.
+name.en Endless lives
+name.ru Бесконечные жизни
+name.de Unendliche Leben
+name.zh 无限生命
+name.fr Vies infinies
+name.es Vidas infinitas
+name.it Vite infinite
+description.en The lives never run out. Such runs are modded.
+description.ru Жизни не кончаются. Такие прохождения помечаются как с модами.
+description.de Die Leben gehen nie aus. Solche Läufe sind modifiziert.
+description.zh 生命永不耗尽，此类通关记为改动。
+description.fr Les vies ne s'épuisent jamais. Ces parties sont modifiées.
+description.es Las vidas nunca se agotan. Esas partidas se marcan como modificadas.
+description.it Le vite non finiscono mai. Tali partite sono modificate.
+author Drahtseilakt
+version 1.0
+licence GPL-3.0-only
+requires 0.1
+option lives switch on
+label lives en Endless lives?
+label lives ru Бесконечные жизни?
+label lives de Unendliche Leben?
+label lives zh 无限生命?
+label lives fr Vies infinies ?
+label lives es ¿Vidas infinitas?
+label lives it Vite infinite?
+
+on tick
+do lives.endless opt.lives

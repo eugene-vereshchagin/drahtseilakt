@@ -4661,7 +4661,7 @@ impl App {
         c.key(&mut ctx, code, down)
     }
 
-    /// A mod with practice deeds is on (god-mode, assets/mods-dev): the game keeps the run's moments for going back,
+    /// A mod with practice deeds is on (god-mode, or the factory mods rewind, save-moment, slow-motion, free-camera): the game keeps the run's moments for going back,
     /// shows the sector and tick, and a lost run waits for the saved moment.
     fn practice(&self) -> bool {
         self.view_mods.practice()
