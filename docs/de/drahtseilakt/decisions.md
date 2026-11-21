@@ -509,4 +509,6 @@ noch der Moment, in dem der Schlaftest der Physik eine langsame Kugel findet. Di
 Schritte der Physik an der bewegten Einheit, bei der sein Zähler abläuft, mit einer Zufallsfolge für das ganze Spiel;
 daher kommen die Objekte eines Levels in der Reihenfolge des Originals in die Physik (nach Modulgruppen, zuerst P_Box,
 jede Gruppe ab ihrem letzten Mitglied), und die Folge beginnt ein Level dort, wo Menü und Laden des Levels sie im
-Original lassen (2026-11-22).
+Original lassen (2026-11-22). Ein Frame bringt die Physik um die in float geglättete Framezeit des Managers des
+Originals mal Zeitfaktor durch tausend weiter (0,033333331 s bei 60 Frames pro Sekunde und Zeitfaktor 2, nicht 1/30):
+damit stimmt der freie Fall der Kugel bis aufs letzte Bit mit dem Original überein.

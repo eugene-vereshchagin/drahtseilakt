@@ -553,4 +553,7 @@ in the measured runs matches the original's to 1e-7 for hundreds of ticks; what 
 physics' sleep test finds a slow ball. That test runs every 15 to 19 steps of the physics on whichever moving
 unit its countdown runs out at, from one random sequence for the whole game; so a level's objects come into the
 physics in the original's order (by module group, P_Box first, each group from its last member), and the sequence
-starts a level where the original's does after its menu and the level's loading (2026-11-22).
+starts a level where the original's does after its menu and the level's loading (2026-11-22). A frame advances the
+physics by the original manager's smoothed frame time in float times the time factor over a thousand (0.033333331 s
+at 60 frames a second and time factor 2, not 1/30): with it the ball's free fall matches the original's to the last
+bit.
