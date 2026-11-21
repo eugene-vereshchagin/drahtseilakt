@@ -505,4 +505,8 @@ Drehung beginnt, und im Frame, in dem der Schub die neue Richtung übernimmt, sc
 Kräfte. Eine Kugel, die einen Tiefentest-Würfel erreicht, wird noch 4 Frames geschoben; sie verlässt die Physik 63 Frames
 nach dem Verlust, die neue Kugel erscheint 71 Frames danach und fällt 249 Frames danach (2026-11-22). Damit stimmt der
 Weg der Kugel in den gemessenen Läufen über Hunderte von Ticks bis auf 1e-7 mit dem Original überein; abweichend ist
-noch der Moment, in dem der Schlaftest der Physik eine langsame Kugel findet.
+noch der Moment, in dem der Schlaftest der Physik eine langsame Kugel findet. Dieser Test läuft alle 15 bis 19
+Schritte der Physik an der bewegten Einheit, bei der sein Zähler abläuft, mit einer Zufallsfolge für das ganze Spiel;
+daher kommen die Objekte eines Levels in der Reihenfolge des Originals in die Physik (nach Modulgruppen, zuerst P_Box,
+jede Gruppe ab ihrem letzten Mitglied), und die Folge beginnt ein Level dort, wo Menü und Laden des Levels sie im
+Original lassen (2026-11-22).

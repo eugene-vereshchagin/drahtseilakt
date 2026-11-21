@@ -1136,7 +1136,8 @@ impl Sim {
             .iter()
             .flat_map(StaticMesh::world_triangles)
             .collect();
-        let mut sectors: Vec<Vec<usize>> = Vec::new();
+        // each sector's objects with their module group and place in it, for the order they come into the physics
+        let mut sectored: Vec<Vec<(String, usize, usize)>> = Vec::new();
         let mut unsectored = Vec::new();
         for (i, o) in level.objects.iter().enumerate() {
             let Some(mesh) = o.mesh.and_then(|m| level.meshes.get(m)) else {
@@ -1242,15 +1243,33 @@ impl Sim {
             world.set_sound(body, sound);
             match sector {
                 Some(n) => {
-                    if sectors.len() <= n {
-                        sectors.resize(n + 1, Vec::new());
+                    if sectored.len() <= n {
+                        sectored.resize(n + 1, Vec::new());
                     }
-                    sectors[n].push(body);
+                    let group = level.module_of(i).to_ascii_lowercase();
+                    let place = level
+                        .members(level.module_of(i))
+                        .position(|(k, _)| k == i)
+                        .unwrap_or(0);
+                    sectored[n].push((group, place, body));
                 }
                 None => unsectored.push(body),
             }
             loose.push((i, body));
         }
+        // A sector's objects come into the physics group by group, the groups in reverse order of their names
+        // (P_Box, P_Ball_Wood, P_Ball_Stone, P_Ball_Paper) and each group's members from its last to its first.
+        // The order is the physics' list of moving units, whose order decides which of them takes the sleep test
+        // when its countdown runs out (measured against the original's level 1 on Ballanced, 2026-11-22: P_Box_03,
+        // _02, _01, P_Ball_Wood_03, P_Ball_Paper_04 ... _01; with our earlier order of the level's objects the boxes
+        // fall asleep at other times and the ball's path parts from the original's where it slows down).
+        let sectors: Vec<Vec<usize>> = sectored
+            .into_iter()
+            .map(|mut objs| {
+                objs.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+                objs.into_iter().map(|(_, _, body)| body).collect()
+            })
+            .collect();
         // The level start as the C game runs it at level 1: the physics runs at time factor 1 with only the level's
         // geometry, then the first sector's objects are made (at 9.90 s of its time), then the ball four frames later
         // (9.9667 s). The time puts the steps of the physics where the original's are.

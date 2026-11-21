@@ -550,4 +550,7 @@ On the frame a turn starts and on the frame the push takes the new heading, the 
 forces. A ball that falls into a depth-test cube is still pushed for 4 frames; it leaves the physics 63 frames after the
 loss, the new ball shows 71 frames after it and drops 249 frames after it (2026-11-22). With these, the ball's path
 in the measured runs matches the original's to 1e-7 for hundreds of ticks; what still parts is the moment the
-physics' sleep test finds a slow ball.
+physics' sleep test finds a slow ball. That test runs every 15 to 19 steps of the physics on whichever moving
+unit its countdown runs out at, from one random sequence for the whole game; so a level's objects come into the
+physics in the original's order (by module group, P_Box first, each group from its last member), and the sequence
+starts a level where the original's does after its menu and the level's loading (2026-11-22).

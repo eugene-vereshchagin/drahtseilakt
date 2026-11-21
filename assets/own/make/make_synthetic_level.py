@@ -262,7 +262,7 @@ check plates-stone : ball stone -12 0 0 ; go 30 0 0 5 900 ; lost
 platebridge
 floor 18
 sign "P_Modul_08: swing over a trench (level 8)"
-check swing : ball wood -8 0 0 ; wait 120 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
+check swing : ball wood -8 0 0 ; wait 140 ; go 32 0 0 5 900 ; reach 32 0 0 3 ; kept
 # level 8: the swing hangs over a trench 6.2 deep under the gap, its floor about as wide as the gap is long
 plaza 18 15 kerb up -6.2
 block 15.4 6.2 width 3 side 10.5 ahead -0.2 top 0

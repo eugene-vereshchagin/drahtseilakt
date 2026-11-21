@@ -108,7 +108,7 @@ lost
 
 check swing
 ball wood 1200.07 5.00 43.23
-wait 120
+wait 140
 go 1240.07 5.00 43.23 5 900
 reach 1240.07 5.00 43.23 3
 kept

@@ -233,6 +233,9 @@ impl World {
         {
             physics.advance(phase / 66.0);
         }
+        // where the physics' random numbers and its sleep countdown stand when the original's level starts
+        physics.rng = ivp::core::Rng::at_level_start();
+        physics.env.sleep_countdown = ivp::core::LEVEL_START_SLEEP_COUNTDOWN;
         physics.set_gravity([0.0, -GRAVITY, 0.0]);
         let mut world = World {
             physics,

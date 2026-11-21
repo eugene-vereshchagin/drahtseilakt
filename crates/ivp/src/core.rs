@@ -24,6 +24,13 @@ pub struct Rng {
     seed: u32,
 }
 
+/// The physics' random numbers are one sequence for the whole game: by the time a level's objects come into the
+/// physics, the menu's scene and the level's loading have drawn 15 of them (the original's level 1 played from the
+/// start of the game, measured on Ballanced, which runs the original's scripts, 2026-11-22). Its seed then.
+pub const LEVEL_START_SEED: u32 = 1_426_425_251; // 75^15 mod 2^32
+/// The sleep test's countdown at the same moment.
+pub const LEVEL_START_SLEEP_COUNTDOWN: u16 = 14;
+
 impl Default for Rng {
     fn default() -> Self {
         Rng { seed: 1 }
@@ -31,6 +38,13 @@ impl Default for Rng {
 }
 
 impl Rng {
+    /// The sequence where a level starts (`LEVEL_START_SEED`).
+    pub fn at_level_start() -> Self {
+        Rng {
+            seed: LEVEL_START_SEED,
+        }
+    }
+
     pub fn next_unit(&mut self) -> f32 {
         self.seed = self.seed.wrapping_mul(75);
         (self.seed & 0xffff) as f32 * 1.52587890625e-05
