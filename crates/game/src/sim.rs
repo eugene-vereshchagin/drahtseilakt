@@ -194,6 +194,9 @@ pub struct Camera {
     /// Target heading in quarter turns, and the heading the view has turned to (radians).
     pub quarter: i32,
     pub yaw: f32,
+    /// The heading the arrows push along, in quarter turns: the original's navigation takes the view's new heading
+    /// only on the tick after the view has finished turning.
+    pub push_quarter: i32,
     /// The heading's offset from whole quarters (radians): 0 unless a reset point is turned by other than a multiple
     /// of 90 degrees (the 45-degree maps); the view turns step from there, and the keys push along the exact heading.
     pub base: f32,
@@ -215,20 +218,24 @@ const CAM_DAMP: Vec3 = Vec3::new(0.5, 0.3, 0.5);
 const CAM_LIFT: f32 = 50.0;
 const CAM_LIFT_FORCE: f32 = 2.0;
 const CAM_TURN_TICKS: f32 = 15.0;
+/// The level's ball is made at tick 0 and falls from tick 1; the original switches its navigation on (the
+/// "Ball Nav Active" message) two frames later, so the arrows push it from tick 3 on. Measured on the original under
+/// TASSupport (2026-11-21, level 1): the keys are seen from the first frame, the ball first moves sideways on the third.
+const STEER_DELAY_TICKS: u64 = 3;
 
 impl Camera {
     /// Forward on the ground plane: where "up" pushes the ball.
     pub fn forward(&self) -> Vec3 {
         Vec3::new(self.yaw.sin(), 0.0, self.yaw.cos())
     }
-    /// The world axis "up" pushes along: the camera's heading in whole quarters, at once, even while the view is
-    /// still turning (the original's four navigation forces are along world axes).
+    /// The world axis "up" pushes along: the navigation's heading in whole quarters (the original's four
+    /// navigation forces are along world axes). While the view turns it is still the old one (`push_quarter`).
     pub fn push_forward(&self) -> Vec3 {
         if self.base != 0.0 {
-            let h = self.quarter as f32 * std::f32::consts::FRAC_PI_2 + self.base;
+            let h = self.push_quarter as f32 * std::f32::consts::FRAC_PI_2 + self.base;
             return Vec3::new(h.sin(), 0.0, h.cos());
         }
-        match self.quarter.rem_euclid(4) {
+        match self.push_quarter.rem_euclid(4) {
             0 => Vec3::Z,
             1 => Vec3::X,
             2 => Vec3::NEG_Z,
@@ -838,6 +845,10 @@ pub struct Sim {
     object_sectors: Vec<Option<usize>>,
     pub events: Vec<(u64, Event)>,
     prev_input: u8,
+    /// The keys of the previous tick, for the camera turns (all of them, unlike `prev_input` for the mods).
+    turn_prev: u8,
+    /// The first tick the arrows push the ball (the original's "Ball Navigation" comes on after the ball is made).
+    steer_from: u64,
     /// The spawn point a mod's key set (`input::SPAWN_SET`): where the ball was, how it was turned, its kind.
     spawn_point: Option<(Vec3, Quat, BallKind)>,
     /// The view's turn in whole degrees, handed in by the window each tick (a `view.turn` mod; recorded in the replay).
@@ -1401,6 +1412,7 @@ impl Sim {
         let mut camera = Camera {
             quarter,
             yaw,
+            push_quarter: quarter,
             base,
             lift: 0.0,
             position: Vec3::ZERO,
@@ -1434,6 +1446,8 @@ impl Sim {
             object_sectors,
             events: Vec::new(),
             prev_input: 0,
+            turn_prev: 0,
+            steer_from: STEER_DELAY_TICKS,
             spawn_point: None,
             turn: 0,
             input_now: script::InputFrame::default(),
@@ -1986,15 +2000,25 @@ impl Sim {
             self.spawn_deeds(pressed);
         }
 
-        // Camera turns: Shift + Left / Right, a quarter per press.
-        if input & input::SHIFT != 0 {
-            if pressed & input::LEFT != 0 {
-                self.camera.quarter -= 1;
-            }
-            if pressed & input::RIGHT != 0 {
-                self.camera.quarter += 1;
-            }
+        // The navigation takes the view's heading once the view has got there (the tick after the turn's end;
+        // measured on the original, 2026-11-21: with the axis switched any earlier or later the original's level 1
+        // runs part from ours within a tick of the switch).
+        let goal_now = self.camera.quarter as f32 * std::f32::consts::FRAC_PI_2 + self.camera.base;
+        if (goal_now - self.camera.yaw).abs() < 1e-5 {
+            self.camera.push_quarter = self.camera.quarter;
         }
+        // Camera turns: a quarter when Shift + Left (or Right) becomes held, whichever of the two keys came last: the
+        // original turns also for Shift pressed while the arrow is already down (the owner's level 1 run holds Left
+        // and adds Shift on its tick 91; the original's view turns). Shift + Left turns the heading a quarter one
+        // way, Shift + Right the other, as the original's pushes after a turn show.
+        let combo = |keys: u8, arrow: u8| keys & input::SHIFT != 0 && keys & arrow != 0;
+        if combo(input, input::LEFT) && !combo(self.turn_prev, input::LEFT) {
+            self.camera.quarter += 1;
+        }
+        if combo(input, input::RIGHT) && !combo(self.turn_prev, input::RIGHT) {
+            self.camera.quarter -= 1;
+        }
+        self.turn_prev = input;
         // a quarter in 250 ms at an even rate (the turn's Bezier progression is linear)
         let goal_yaw = self.camera.quarter as f32 * std::f32::consts::FRAC_PI_2 + self.camera.base;
         let rate = std::f32::consts::FRAC_PI_2 / CAM_TURN_TICKS;
@@ -2030,7 +2054,10 @@ impl Sim {
         // The physics owns the ball's state; the game only reads it back. Only a new ball (a respawn, the end of a
         // transformer) puts a new body in, as the original does.
         // A ball that has fallen off is no longer steered.
-        let push = if self.dying.is_some() {
+        // Nor is a ball whose navigation is not on yet (see `STEER_DELAY_TICKS`).
+        let steering = self.tick >= self.steer_from;
+        let push_keys = if steering { push_keys } else { 0 };
+        let push = if self.dying.is_some() || !steering {
             Vec3::ZERO
         } else {
             push
@@ -2896,6 +2923,7 @@ impl Sim {
             (quarter_of_turn(turn), 0.0)
         };
         self.camera.quarter = quarter;
+        self.camera.push_quarter = quarter;
         self.camera.base = base;
         self.camera.yaw = quarter as f32 * std::f32::consts::FRAC_PI_2 + base;
         self.camera.lift = 0.0;
@@ -3787,6 +3815,7 @@ pub(crate) mod tests {
         let mut c = Camera {
             quarter: 0,
             yaw: 0.0,
+            push_quarter: 0,
             base: 0.0,
             lift: 0.0,
             position: Vec3::ZERO,
@@ -3893,11 +3922,11 @@ pub(crate) mod tests {
         let old = Sim::with_rules(&level, BallKind::Paper, &Modules::default(), false, 7);
         assert_eq!(old.camera.quarter, START_QUARTER);
         assert!((old.camera.yaw - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
-        // a view turn steps a quarter from there
+        // a view turn steps a quarter from there (Shift + Right turns the heading back a quarter)
         for _ in 0..40 {
             sim.step(input::SHIFT | input::RIGHT);
         }
-        let turned = quarter_45 + std::f32::consts::FRAC_PI_2;
+        let turned = quarter_45 - std::f32::consts::FRAC_PI_2;
         assert!(
             (sim.camera.yaw - turned).abs() < 1e-4,
             "turned yaw {}",
@@ -4129,16 +4158,36 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_camera_turn_changes_the_push_axis_at_once() {
-        let mut cam = Sim::new(&flat_level(), BallKind::Wood).camera;
-        assert_eq!(cam.push_forward(), Vec3::X);
-        cam.quarter += 1;
-        // the view is still where it was, the push already along the next axis
-        assert!((cam.forward() - Vec3::X).length() < 1e-6);
-        assert_eq!(cam.push_forward(), Vec3::NEG_Z);
-        assert_eq!(cam.push_right(), Vec3::NEG_X);
-        cam.quarter = -1;
-        assert_eq!(cam.push_forward(), Vec3::NEG_X);
+    fn the_push_axis_follows_a_camera_turn_on_the_tick_after_the_view_gets_there() {
+        // Measured on the original under TASSupport (2026-11-21, level 1): the arrows keep pushing along the old
+        // axis while the view turns, and along the new one from the tick after it has turned (CAM_TURN_TICKS).
+        let mut sim = Sim::new(&flat_level(), BallKind::Wood);
+        assert_eq!(sim.camera.push_forward(), Vec3::X);
+        sim.step(input::SHIFT | input::LEFT);
+        assert_eq!(sim.camera.push_forward(), Vec3::X, "not while the view turns");
+        let turn = CAM_TURN_TICKS as usize;
+        for _ in 1..turn {
+            sim.step(input::SHIFT | input::LEFT);
+            assert_eq!(sim.camera.push_forward(), Vec3::X, "not while the view turns");
+        }
+        // the view is there now; the navigation takes it on the next tick
+        assert!((sim.camera.forward() - Vec3::NEG_Z).length() < 1e-5);
+        sim.step(0);
+        assert_eq!(sim.camera.push_forward(), Vec3::NEG_Z);
+        assert_eq!(sim.camera.push_right(), Vec3::NEG_X);
+    }
+
+    #[test]
+    fn shift_turns_the_view_also_when_the_arrow_is_already_held() {
+        let mut sim = Sim::new(&flat_level(), BallKind::Wood);
+        let before = sim.camera.quarter;
+        sim.step(input::LEFT);
+        sim.step(input::LEFT);
+        assert_eq!(sim.camera.quarter, before, "an arrow alone does not turn");
+        sim.step(input::SHIFT | input::LEFT);
+        assert_eq!(sim.camera.quarter, before + 1);
+        sim.step(input::SHIFT | input::LEFT);
+        assert_eq!(sim.camera.quarter, before + 1, "one quarter per press");
     }
 
     #[test]

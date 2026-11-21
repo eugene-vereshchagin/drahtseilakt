@@ -488,3 +488,16 @@ Datei für wen: `docs/de/drahtseilakt/distribution.md`; Bauen und Hochladen: `do
 ## Unsere Replays und aufgezeichneten Läufe liegen nicht in diesem Repository
 
 *Entscheidung des Besitzers, 2026-11-18.* Unsere eigenen Replays, aufgezeichneten Läufe und Entwicklungswerkzeuge liegen in einem eigenen privaten Repository und werden nie veröffentlicht. Die aufgezeichneten Läufe, die die eigenen Tests des Spiels spielen, findet die Umgebungsvariable `DRAHTSEILAKT_TEST_RUNS`; Tests, die sie brauchen, werden ohne sie mit einer Meldung übersprungen.
+
+## Das Verhalten des Originals, am Original gemessen
+
+*Entscheidung des Eigentümers, 2026-11-21* („wir machen eine VOLLSTÄNDIGE Kopie“). Jeder Unterschied zum Originalspiel,
+den eine Messung zeigt, wird in unserer Engine behoben, auch wenn er das Gefühl der Steuerung ändert und damit unsere
+aufgezeichneten Läufe bricht (sie werden neu aufgezeichnet). Die Messungen spielen unsere Läufe im echten Spiel
+(BallancePlayer mit BML+ und dem Mod TASSupport in einer virtuellen Windows-Maschine, die Position der Kugel wird jedes
+Frame protokolliert) und in Ballanced, einer Neuimplementierung auf Quelltextebene, die nur als Vergleichsreferenz dient:
+kein Code wird daraus übernommen. Erste Ergebnisse in Level 1: Die Pfeiltasten schieben die Kugel ab ihrem dritten Tick
+(die Kugelnavigation des Originals schaltet sich zwei Frames nach dem Erzeugen der Kugel ein); Shift mit Links oder
+Rechts dreht die Ansicht, sobald die Kombination gehalten wird, auch bei schon gedrückter Pfeiltaste; Shift + Links
+dreht die Richtung in die eine, Shift + Rechts in die andere Richtung, umgekehrt zu unserem bisherigen Verhalten; und die
+Pfeiltasten schieben erst ab dem Tick nach dem Ende der Drehung entlang der neuen Richtung.

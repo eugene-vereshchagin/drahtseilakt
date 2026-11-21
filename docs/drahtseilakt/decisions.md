@@ -534,3 +534,15 @@ build and upload steps: `docs/drahtseilakt/release.md`.
 ## Our replays and recorded runs are not in this repository
 
 *Owner's decision, 2026-11-18.* Our own replays, recorded runs and development tools live in a private repository of their own, never published. The recorded runs the game's own tests play are found through the environment variable `DRAHTSEILAKT_TEST_RUNS`; tests that need them skip with a message when it is absent.
+
+## The original's behaviour, measured on the original
+
+*Owner's decision, 2026-11-21* ("we make a FULL copy"). Every difference from the original game that a measurement
+shows is fixed in our engine, also when it changes the feel of the controls and so breaks our recorded runs (they are
+recorded again). The measurements play our runs on the real game (BallancePlayer with BML+ and the TASSupport mod in
+a Windows virtual machine, the ball's position logged every frame) and on Ballanced, a source-level reimplementation,
+which serves only as a reference to compare with: no code is taken from it. First results on level 1: the arrows push
+the ball from its third tick (the original's ball navigation comes on two frames after the ball is made); Shift with
+Left or Right turns the view when the combination becomes held, also with the arrow already down; Shift + Left turns
+the heading one way and Shift + Right the other, the reverse of what we had; and the arrows push along the new heading
+only from the tick after the view has finished turning.
