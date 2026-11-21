@@ -224,6 +224,15 @@ impl World {
     pub fn new(statics: &[StaticMesh]) -> World {
         let mut physics = IvpWorld::new();
         physics.time_start();
+        // Research knob: start the physics clock this many PSIs (1/66 s) late, to line our PSI grid up with another
+        // engine's when comparing traces (the original's phase depends on when its physics timer was reset).
+        if let Some(phase) = std::env::var("DRAHTSEILAKT_PSI_PHASE")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|p| (0.0..1.0).contains(p))
+        {
+            physics.advance(phase / 66.0);
+        }
         physics.set_gravity([0.0, -GRAVITY, 0.0]);
         let mut world = World {
             physics,
