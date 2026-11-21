@@ -1612,8 +1612,13 @@ pub fn commands(
             if let Some(n) = o.trace.filter(|&n| n > 0 && game.sim.tick % n == 0) {
                 let b = &game.sim.ball;
                 let _ = n;
+                // more digits with DRAHTSEILAKT_TRACE_DIGITS (comparisons with the original's traces need ~1e-6)
+                let d = std::env::var("DRAHTSEILAKT_TRACE_DIGITS")
+                    .ok()
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .map_or(2, |d| d.min(9));
                 println!(
-                    "{} ball ({:8.2} {:8.2} {:8.2}) speed {:6.2} {}",
+                    "{} ball ({:8.d$} {:8.d$} {:8.d$}) speed {:6.2} {}",
                     clock(game.sim.tick),
                     b.position.x,
                     b.position.y,
