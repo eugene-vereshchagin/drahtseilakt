@@ -500,4 +500,9 @@ kein Code wird daraus übernommen. Erste Ergebnisse in Level 1: Die Pfeiltasten 
 (die Kugelnavigation des Originals schaltet sich zwei Frames nach dem Erzeugen der Kugel ein); Shift mit Links oder
 Rechts dreht die Ansicht, sobald die Kombination gehalten wird, auch bei schon gedrückter Pfeiltaste; Shift + Links
 dreht die Richtung in die eine, Shift + Rechts in die andere Richtung, umgekehrt zu unserem bisherigen Verhalten; und die
-Pfeiltasten schieben erst ab dem Tick nach dem Ende der Drehung entlang der neuen Richtung.
+Pfeiltasten schieben erst ab dem Tick nach dem Ende der Drehung entlang der neuen Richtung. Im Frame, in dem eine
+Drehung beginnt, und im Frame, in dem der Schub die neue Richtung übernimmt, schiebt das Original mit keiner seiner
+Kräfte. Eine Kugel, die einen Tiefentest-Würfel erreicht, wird noch 4 Frames geschoben; sie verlässt die Physik 63 Frames
+nach dem Verlust, die neue Kugel erscheint 71 Frames danach und fällt 249 Frames danach (2026-11-22). Damit stimmt der
+Weg der Kugel in den gemessenen Läufen über Hunderte von Ticks bis auf 1e-7 mit dem Original überein; abweichend ist
+noch der Moment, in dem der Schlaftest der Physik eine langsame Kugel findet.

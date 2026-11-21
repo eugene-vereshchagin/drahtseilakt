@@ -546,3 +546,8 @@ the ball from its third tick (the original's ball navigation comes on two frames
 Left or Right turns the view when the combination becomes held, also with the arrow already down; Shift + Left turns
 the heading one way and Shift + Right the other, the reverse of what we had; and the arrows push along the new heading
 only from the tick after the view has finished turning.
+On the frame a turn starts and on the frame the push takes the new heading, the original pushes with none of its
+forces. A ball that falls into a depth-test cube is still pushed for 4 frames; it leaves the physics 63 frames after the
+loss, the new ball shows 71 frames after it and drops 249 frames after it (2026-11-22). With these, the ball's path
+in the measured runs matches the original's to 1e-7 for hundreds of ticks; what still parts is the moment the
+physics' sleep test finds a slow ball.

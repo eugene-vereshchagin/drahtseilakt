@@ -146,13 +146,15 @@ const SECTOR_BEGIN_TICKS: u64 = 48;
 const DEATH_SECTOR_END_TICKS: u64 = 62;
 const DEATH_SECTOR_BEGIN_TICKS: u64 = 66;
 
-/// After the ball's box reaches a depth-test cube, the C game stops the push at once, takes the falling ball out of the
-/// physics 61 frames later (a life goes then), shows the new ball at the reset point 10 frames after that, and makes
-/// it a body that rolls and answers the keys 245 frames after the loss (C game, level 2: lost at 331, the new body
-/// falling from 577).
-const DEATH_REMOVE_TICKS: u64 = 61;
+/// After the ball's box reaches a depth-test cube, the original still pushes the falling ball for 4 frames, takes it
+/// out of the physics 63 frames after the loss (a life goes then), shows the new ball at the reset point 71 frames
+/// after the loss, and makes it a body that rolls and answers the keys 249 frames after it (measured on the original,
+/// level 1, 2026-11-22: the ball's path matches ours to 1e-7 through the fall, the freeze, the new ball and its drop
+/// with these, and parts within a frame of any other value).
+const DEATH_PUSH_TICKS: u64 = 4;
+const DEATH_REMOVE_TICKS: u64 = 63;
 const DEATH_SHOW_TICKS: u64 = 71;
-const DEATH_RESPAWN_TICKS: u64 = 245;
+const DEATH_RESPAWN_TICKS: u64 = 249;
 /// The points counter waits while a ball is lost, and goes on this many ticks after the new ball, where it was.
 const POINTS_RESUME_TICKS: u64 = 5;
 
@@ -2000,11 +2002,14 @@ impl Sim {
             self.spawn_deeds(pressed);
         }
 
-        // The navigation takes the view's heading once the view has got there (the tick after the turn's end;
-        // measured on the original, 2026-11-21: with the axis switched any earlier or later the original's level 1
-        // runs part from ours within a tick of the switch).
+        // The navigation takes the view's heading once the view has got there (the tick after the turn's end), and
+        // on that frame pushes with none of its forces, as on the frame the turn starts (measured on the original,
+        // 2026-11-21/22: with the axis switched a tick earlier or later, or the push kept on that frame, the original's
+        // level 1 runs part from ours at the switch).
         let goal_now = self.camera.quarter as f32 * std::f32::consts::FRAC_PI_2 + self.camera.base;
+        let mut switched = false;
         if (goal_now - self.camera.yaw).abs() < 1e-5 {
+            switched = self.camera.push_quarter != self.camera.quarter;
             self.camera.push_quarter = self.camera.quarter;
         }
         // Camera turns: a quarter when Shift + Left (or Right) becomes held, whichever of the two keys came last: the
@@ -2012,11 +2017,16 @@ impl Sim {
         // and adds Shift on its tick 91; the original's view turns). Shift + Left turns the heading a quarter one
         // way, Shift + Right the other, as the original's pushes after a turn show.
         let combo = |keys: u8, arrow: u8| keys & input::SHIFT != 0 && keys & arrow != 0;
+        // On the frame a turn starts, the original's navigation pushes with none of its forces (measured on the
+        // original, 2026-11-22: with the push kept on that frame, its level 1 path parts from ours at once).
+        let mut turned = false;
         if combo(input, input::LEFT) && !combo(self.turn_prev, input::LEFT) {
             self.camera.quarter += 1;
+            turned = true;
         }
         if combo(input, input::RIGHT) && !combo(self.turn_prev, input::RIGHT) {
             self.camera.quarter -= 1;
+            turned = true;
         }
         self.turn_prev = input;
         // a quarter in 250 ms at an even rate (the turn's Bezier progression is linear)
@@ -2053,11 +2063,14 @@ impl Sim {
         // every PSI (66 a second of its time), while the ball is awake. The ball's force is its material's.
         // The physics owns the ball's state; the game only reads it back. Only a new ball (a respawn, the end of a
         // transformer) puts a new body in, as the original does.
-        // A ball that has fallen off is no longer steered.
+        // A ball that has fallen off is steered for `DEATH_PUSH_TICKS` more frames, then no longer.
         // Nor is a ball whose navigation is not on yet (see `STEER_DELAY_TICKS`).
         let steering = self.tick >= self.steer_from;
         let push_keys = if steering { push_keys } else { 0 };
-        let push = if self.dying.is_some() || !steering {
+        let lost = self
+            .dying
+            .is_some_and(|d| self.tick >= d + DEATH_PUSH_TICKS);
+        let push = if lost || !steering || turned || switched {
             Vec3::ZERO
         } else {
             push
@@ -4164,11 +4177,19 @@ pub(crate) mod tests {
         let mut sim = Sim::new(&flat_level(), BallKind::Wood);
         assert_eq!(sim.camera.push_forward(), Vec3::X);
         sim.step(input::SHIFT | input::LEFT);
-        assert_eq!(sim.camera.push_forward(), Vec3::X, "not while the view turns");
+        assert_eq!(
+            sim.camera.push_forward(),
+            Vec3::X,
+            "not while the view turns"
+        );
         let turn = CAM_TURN_TICKS as usize;
         for _ in 1..turn {
             sim.step(input::SHIFT | input::LEFT);
-            assert_eq!(sim.camera.push_forward(), Vec3::X, "not while the view turns");
+            assert_eq!(
+                sim.camera.push_forward(),
+                Vec3::X,
+                "not while the view turns"
+            );
         }
         // the view is there now; the navigation takes it on the next tick
         assert!((sim.camera.forward() - Vec3::NEG_Z).length() < 1e-5);
