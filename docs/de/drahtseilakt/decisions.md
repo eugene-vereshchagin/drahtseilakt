@@ -514,6 +514,11 @@ wenn die Kugel kommt). Level 1 beginnt wie die anderen, seine Objekte sechs Seku
 Originals hält es mit den Objekten vier Frames vor der Kugel an, aber ohne Tutorial gemessen liegen seine Objekte
 schlafend, bevor die Kugel kommt, und unser Spiel hat kein Tutorial. Damit stimmen die gemessenen Läufe von Level 1
 (fast) über ihre ganze Länge bis auf 1e-3 mit dem Original überein: Kalibrierung 1011 von 1012 Ticks, Respawn alle 851,
-der Lauf des Besitzers 813 und 888 von 1032 (2026-11-22, Lauf 8). Ein Frame bringt die Physik um die in float geglättete Framezeit des Managers des
-Originals mal Zeitfaktor durch tausend weiter (0,033333331 s bei 60 Frames pro Sekunde und Zeitfaktor 2, nicht 1/30):
-damit stimmt der freie Fall der Kugel bis aufs letzte Bit mit dem Original überein.
+der Lauf des Besitzers 813 und 888 von 1032 (2026-11-22, Lauf 8). Ein Frame bringt die Physik um die Framezeit in float mal Zeitfaktor durch tausend weiter:
+16,666666 ms × 0,002 = 0,033333335 s bei 60 Frames pro Sekunde und Zeitfaktor 2, ein float-Schritt über 1/30 (gemessen
+auf den Levels 1 bis 4, 2026-11-22, Lauf 9). Damit behalten die Frame-Enden über einen ganzen Lauf ihren Platz im
+Schrittraster der Physik wie beim Original; das zählt, wenn ein Frame kurz nach einem Schritt endet: ein im nächsten
+Frame gedrückter Pfeil verpasst diesen Schritt (Level 3). Die bisherigen 0,033333331 s wanderten in 2400 Frames um
+0,0005 Schritt. Die Lage des Rasters selbst (die Startphase) ist im Original von Laden zu Laden anders (0,3, 0, 0,4 und
+0,3 Schritt auf den Levels 1 bis 4), ebenso der Zustand der Zufallsfolge beim Levelstart: kein Zustand gibt den Levels
+1 bis 4 die Schlaftests des Originals, daher bleibt unser Startzustand die Messung von Level 1.

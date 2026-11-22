@@ -22,19 +22,16 @@ pub const SURFACE_FRICTION: f32 = 0.7;
 /// One tick, in seconds.
 const TICK: f64 = 1.0 / 60.0;
 
-/// The physics time of one frame as the original's physics manager takes it: the frame time in milliseconds smoothed
-/// in float (a quarter of the new one and three of the last), times the time factor over a thousand in float. Under a
-/// steady frame time the smoothing settles one float step under it, coming from below (the original's level 1 played
-/// at 60 frames a second: 0.033333331 s at time factor 2, not 1/30; measured on the original, 2026-11-22: with this
-/// and the right start phase the ball's free fall matches the original's to the last bit, with 1/30 it parts by one).
+/// The physics time of one frame as the original's physics manager takes it: the frame time in milliseconds as a
+/// float, times the time factor over a thousand in float (the original's level 1 played at 60 frames a second:
+/// 16.666666 ms * 0.002 = 0.033333335 s at time factor 2, one float step over 1/30). Measured on the original
+/// (2026-11-22, calibration runs on levels 1 to 4): with this step the frame ends keep their place on the PSI grid
+/// over a whole run, as the original's do (a key pressed in a frame that ends just after a PSI misses that PSI on
+/// level 3); the smoothed step 0.033333331 drifts by 0.0005 PSI in 2400 frames and gives that PSI the push.
 fn frame_step(time_factor: f64) -> f64 {
     let frame_ms = (TICK * 1000.0) as f32;
-    let mut smoothed = 0.0f32;
-    for _ in 0..200 {
-        smoothed = ((f64::from(smoothed) * 3.0 + f64::from(frame_ms)) * 0.25) as f32;
-    }
     let factor = time_factor as f32 * 0.001f32;
-    f64::from((f64::from(smoothed) * f64::from(factor)) as f32)
+    f64::from(frame_ms * factor)
 }
 /// The physics runs this many times faster than the frames while playing: the original's "Set Physics Globals" sets
 /// the time factor to 2 (checked in the C game: its physics time advances 2 s for every second of frames).

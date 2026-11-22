@@ -559,6 +559,11 @@ its objects six seconds before the ball: the original's tutorial stops it with t
 ball, but measured without the tutorial its objects lie asleep before the ball comes, and our game has no tutorial.
 With these, the measured runs of level 1 match the original's to 1e-3 over (nearly) their whole length: calibration
 1011 ticks of 1012, respawn all 851, the owner's run 813 and 888 of 1032 (2026-11-22, run 8). A frame advances the
-physics by the original manager's smoothed frame time in float times the time factor over a thousand (0.033333331 s
-at 60 frames a second and time factor 2, not 1/30): with it the ball's free fall matches the original's to the last
-bit.
+physics by the frame time in float times the time factor over a thousand: 16.666666 ms × 0.002 = 0.033333335 s at 60
+frames a second and time factor 2, one float step over 1/30 (measured on levels 1 to 4, 2026-11-22, run 9). With it
+the frame ends keep their place on the physics' step grid over a whole run as the original's do; that matters when a
+frame ends just after a step, where a key pressed in the next frame misses that step (level 3). The 0.033333331 s we
+had before drifted by 0.0005 of a step in 2400 frames. The place of the grid itself (the start phase) differs from
+load to load in the original (0.3, 0, 0.4 and 0.3 of a step on levels 1 to 4) and so does the random sequence's state
+when a level starts: no one state gives levels 1 to 4 the original's sleep tests, so the one we start with stays the
+level 1 measurement.

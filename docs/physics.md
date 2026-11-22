@@ -652,7 +652,9 @@ Fields:
 
 ### 3.1 Per frame (PostProcess `FUN_10007ce0`)
 
-1. `smoothed = (last_delta_ms + 3·smoothed) / 4`, starting from 0.
+1. `smoothed = (last_delta_ms + 3·smoothed) / 4`, starting from 0. Measured on the original under TAS (2026-11-22):
+   the step at 60 frames a second is 16.666666 × 0.002 = 0.033333335 s, the frame time itself, not the float step under
+   it where a float smoothing from 0 would stall.
    - `last_delta_ms` is TimeManager `+0x38`, which CK clamps to its min/max delta.
    - The constants are 3.0 at `0x10063378` and 0.25 at `0x10063374`.
 2. `dt = smoothed × mgr[+0xd0]`, which is `smoothed_ms × 0.001 × TimeFactor`. With factor 2 that is **2 × the
