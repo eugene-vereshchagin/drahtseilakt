@@ -565,8 +565,10 @@ the frame ends keep their place on the physics' step grid over a whole run as th
 frame ends just after a step, where a key pressed in the next frame misses that step (level 3). The 0.033333331 s we
 had before drifted by 0.0005 of a step in 2400 frames. The level 3 match needs a level-start
 random state fitted to that level; with the state the game starts with, level 3 parts at tick 100 (1e-3). The place of
-the grid itself (the start phase) differs from level to level in the original (0.3, 0, 0.4 and 0.3 of a step on levels
-1 to 4), but is not random: levels 2 to 4 played twice repeat to the bit up to ticks 2584 (the whole record), 2699 and
-2707 (2026-11-23). What sets the phase and the random sequence's state there is not found yet. None of the 4000
-level-start states tried gives levels 1 to 4 the original's sleep tests at once, so the one we start with stays the
-level 1 measurement for now.
+the grid itself (the start phase) is fixed for each level: 0.1 of a step for every frame the level takes to load
+(runs 10 and 11, 2026-11-23: that rule, found on levels 2 to 4, gave the phase of levels 5 to 12; level 1 has a longer
+start and 0.3). All the match figures above are measured with this phase set by a research setting. The game itself
+starts at phase 0 so far and so parts from the original on levels 1, 3 and 4 at the first tick (1e-3). The original
+itself does not always take the same path: eight plays of levels 2, 3 and 4 gave 2, 3 and 2 different paths, parting
+as early as ticks 30, 88 and 142, and level 1's calibration played again parts from run 8's at tick 144. So a match is
+always one with one of the original's paths, and the level 1 figures above are against run 7's and 8's.

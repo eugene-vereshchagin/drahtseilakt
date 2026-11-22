@@ -521,8 +521,11 @@ Schrittraster der Physik wie beim Original; das zählt, wenn ein Frame kurz nach
 Frame gedrückter Pfeil verpasst diesen Schritt (Level 3). Die bisherigen 0,033333331 s wanderten in 2400 Frames um
 0,0005 Schritt. Die Übereinstimmung von Level 3 braucht einen für dieses Level angepassten
 Startzustand der Zufallsfolge; mit dem des Spiels weicht Level 3 ab Tick 100 ab (1e-3). Die Lage des Rasters selbst (die
-Startphase) ist im Original von Level zu Level anders (0,3, 0, 0,4 und 0,3 Schritt auf den Levels 1 bis 4), aber nicht
-zufällig: die Levels 2 bis 4 wiederholen sich bitgenau bis zu den Ticks 2584 (ganze Aufnahme), 2699 und 2707
-(2026-11-23). Was Phase und Zufallszustand dort bestimmt, ist noch nicht gefunden. Keiner der 4000 probierten
-Startzustände gibt den Levels 1 bis 4 zugleich die Schlaftests des Originals, daher bleibt unser Startzustand vorerst
-die Messung von Level 1.
+Startphase) ist für jedes Level fest: 0,1 Schritt je Frame, den das Laden des Levels braucht (Läufe 10 und 11,
+2026-11-23: die auf den Levels 2 bis 4 gefundene Regel ergab die Phase der Levels 5 bis 12; Level 1 beginnt länger und
+hat 0,3). Alle Zahlen oben sind mit dieser über eine Forschungseinstellung gesetzten Phase gemessen. Das Spiel selbst
+beginnt bisher mit Phase 0 und weicht daher auf den Levels 1, 3 und 4 ab dem ersten Tick vom Original ab (1e-3). Das
+Original selbst nimmt nicht immer denselben Weg: acht Läufe der Levels 2, 3 und 4 ergaben 2, 3 und 2 verschiedene Wege,
+die sich schon bei den Ticks 30, 88 und 142 trennen, und die wiederholte Kalibrierung von Level 1 trennt sich von Lauf 8
+bei Tick 144. Eine Übereinstimmung gilt also immer einem der Wege des Originals, die Zahlen zu Level 1 oben denen der
+Läufe 7 und 8.
