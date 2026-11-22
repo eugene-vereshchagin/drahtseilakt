@@ -62,6 +62,7 @@ mod showcase;
 pub mod sim;
 mod sky;
 mod splashpic;
+mod startphase;
 pub mod supports;
 mod terrain;
 mod testlevels;

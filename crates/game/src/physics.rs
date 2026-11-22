@@ -234,15 +234,21 @@ impl World {
     /// A world with each of the level's physical objects as a fixed body: a compact surface of a convex piece per
     /// triangle in the object's frame, at the object's pose (the original's concave physicalize).
     pub fn new(statics: &[StaticMesh]) -> World {
+        World::with_phase(statics, 0.0)
+    }
+
+    /// As `new`, the physics clock this part of a PSI (1/66 s) into its step grid (`startphase`).
+    pub fn with_phase(statics: &[StaticMesh], phase: f64) -> World {
         let mut physics = IvpWorld::new();
         physics.time_start();
         // Research knob: start the physics clock this many PSIs (1/66 s) late, to line our PSI grid up with another
         // engine's when comparing traces (the original's phase depends on when its physics timer was reset).
-        if let Some(phase) = std::env::var("DRAHTSEILAKT_PSI_PHASE")
+        let phase = std::env::var("DRAHTSEILAKT_PSI_PHASE")
             .ok()
             .and_then(|v| v.parse::<f64>().ok())
             .filter(|p| (0.0..1.0).contains(p))
-        {
+            .unwrap_or(phase);
+        if phase > 0.0 {
             physics.advance(phase / 66.0);
         }
         // where the physics' random numbers and its sleep countdown stand when the original's level starts

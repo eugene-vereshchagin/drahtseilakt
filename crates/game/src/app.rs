@@ -297,6 +297,12 @@ impl Game {
         let format = replay_in
             .as_ref()
             .map_or(crate::replay::VERSION, |r| r.version);
+        // the original's run on its remake has the original's physics, its start phase too
+        if let Some(r) = &replay_in
+            && r.level_hash != level.hash
+        {
+            level.level.settings.source_hash = Some(r.level_hash);
+        }
         let mut sim = Sim::with_rules(&level.level, start_ball, &modules, format);
         sim.set_ball_boxes(ball_meshes.boxes);
         let pieces = crate::pieces::Pieces::find(&balls.level);

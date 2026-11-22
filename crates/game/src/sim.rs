@@ -1102,7 +1102,8 @@ impl Sim {
             kind: start_ball,
             on_ground: false,
         };
-        let mut world = World::new(&statics);
+        let phase = crate::startphase::start_phase(level.settings.source_hash);
+        let mut world = World::with_phase(&statics, phase);
         world.tag_baked(&static_rows);
         // Body 0 is the ball; it is made after the first sector's objects (below).
         let ball_body = world.reserve_ball(ball.position, ball.rotation);
