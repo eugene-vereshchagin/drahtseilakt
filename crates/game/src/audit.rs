@@ -525,7 +525,7 @@ pub fn map_issues(path: &Path, data: &Data) -> Vec<Issue> {
         .as_deref()
         .and_then(crate::sim::BallKind::from_name)
         .unwrap_or(crate::sim::BallKind::Wood);
-    let sim = Sim::with_rules(level, start, &modules, false, crate::replay::VERSION);
+    let sim = Sim::with_rules(level, start, &modules, crate::replay::VERSION);
     let placements = scene::placements(level, &modules, sim.loose(), sim.module_bodies());
     out.extend(level_issues(
         level,

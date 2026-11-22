@@ -553,7 +553,12 @@ in the measured runs matches the original's to 1e-7 for hundreds of ticks; what 
 physics' sleep test finds a slow ball. That test runs every 15 to 19 steps of the physics on whichever moving
 unit its countdown runs out at, from one random sequence for the whole game; so a level's objects come into the
 physics in the original's order (by module group, P_Box first, each group from its last member), and the sequence
-starts a level where the original's does after its menu and the level's loading (2026-11-22). A frame advances the
+starts a level in the state that, once the level's objects have come to rest, gives the ball the sleep tests the
+original gives it (measured: 112 draws and a countdown of 19 when the ball comes). Level 1 starts like the others,
+its objects six seconds before the ball: the original's tutorial stops it with the objects four frames before the
+ball, but measured without the tutorial its objects lie asleep before the ball comes, and our game has no tutorial.
+With these, the measured runs of level 1 match the original's to 1e-3 over (nearly) their whole length: calibration
+1011 ticks of 1012, respawn all 851, the owner's run 813 and 888 of 1032 (2026-11-22, run 8). A frame advances the
 physics by the original manager's smoothed frame time in float times the time factor over a thousand (0.033333331 s
 at 60 frames a second and time factor 2, not 1/30): with it the ball's free fall matches the original's to the last
 bit.

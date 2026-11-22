@@ -74,7 +74,7 @@ mod tests {
         input: &dyn Fn(u64) -> u8,
     ) -> Run {
         let modules = crate::scene::load_modules(level, data);
-        let mut sim = Sim::with_modules(level, ball, &modules, false);
+        let mut sim = Sim::with_modules(level, ball, &modules);
         if let Some(balls) = data.part("3D Entities/Balls.nmo") {
             sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
         }
@@ -144,7 +144,7 @@ mod tests {
             data.part("3D Entities/Balls.nmo").is_some()
                 && data.part("3D Entities/AnimTrafo.nmo").is_some()
         );
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         if let Some(balls) = data.part("3D Entities/Balls.nmo") {
             sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
         }

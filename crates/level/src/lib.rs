@@ -110,7 +110,8 @@ pub struct Settings {
     pub light: Option<[f32; 3]>,
     /// The points the finish adds.
     pub level_bonus: Option<i64>,
-    /// The level begins with the original's tutorial (level 1), which stops it before the ball comes.
+    /// The level begins with the original's tutorial (level 1). Kept from the level's data; our game has no tutorial
+    /// and starts such a level as any other (docs/drahtseilakt/decisions.md).
     pub tutorial: bool,
     /// The game's last level: its finish plays the last music, and lightning flashes over it.
     pub last_level: bool,

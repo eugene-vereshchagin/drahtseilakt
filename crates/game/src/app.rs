@@ -293,14 +293,11 @@ impl Game {
             rounded += level::smooth::add_looks_cached(m);
         }
         let extra_model = scene::ExtraModel::new(&modules);
-        // The original's level 1 begins with its tutorial, which stops the level before the ball comes (the level's
-        // settings say so: an .nmo's from the game's table, an open-format level's its own).
-        let tutorial = level.level.settings.tutorial;
         let ball_meshes = BallMeshes::find(&balls.level);
         let format = replay_in
             .as_ref()
             .map_or(crate::replay::VERSION, |r| r.version);
-        let mut sim = Sim::with_rules(&level.level, start_ball, &modules, tutorial, format);
+        let mut sim = Sim::with_rules(&level.level, start_ball, &modules, format);
         sim.set_ball_boxes(ball_meshes.boxes);
         let pieces = crate::pieces::Pieces::find(&balls.level);
         sim.set_pieces(pieces.clone());
@@ -923,13 +920,7 @@ impl Game {
 
     /// A fresh run of this level by `version`'s rules, as `restart` makes it (no mods: for the ghost).
     fn fresh_sim(&self, version: u32) -> Sim {
-        let mut sim = Sim::with_rules(
-            &self.level.level,
-            self.start_ball,
-            &self.modules,
-            self.level.name.eq_ignore_ascii_case("Level_01.NMO"),
-            version,
-        );
+        let mut sim = Sim::with_rules(&self.level.level, self.start_ball, &self.modules, version);
         sim.set_ball_boxes(self.ball_meshes.boxes);
         sim.set_pieces(self.pieces.clone());
         sim.bursts = version >= 2;

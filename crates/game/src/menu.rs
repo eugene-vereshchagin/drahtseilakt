@@ -4050,9 +4050,11 @@ fn scrolls(screen: Screen) -> bool {
 /// The rows a screen's list shows at once.
 fn page(screen: Screen) -> usize {
     match screen {
-        Screen::Sectors | Screen::Mods | Screen::ModPage | Screen::Replays | Screen::ReplaySettings => {
-            MODS_LINES
-        }
+        Screen::Sectors
+        | Screen::Mods
+        | Screen::ModPage
+        | Screen::Replays
+        | Screen::ReplaySettings => MODS_LINES,
         _ => LIST_LINES,
     }
 }

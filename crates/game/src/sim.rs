@@ -955,10 +955,11 @@ pub const TRAFO_REACH: f32 = PICK_RADIUS + 1.0;
 /// Physics time from the level's load to its first sector's objects: 594 frames at time factor 1 (the C game,
 /// level 1).
 const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
-/// Physics time between a sector's objects and the ball at a level start (the C game): 180 frames at time factor 2
-/// (levels 2 to 12), or four frames at time factor 1 when the tutorial stops the level first (level 1).
+/// Physics time between a sector's objects and the ball at a level start: 180 frames at time factor 2 (the C game,
+/// levels 2 to 12). Level 1 too: the original's tutorial stops it with the objects four frames before the ball,
+/// but measured on the original without the tutorial (TAS runs, 2026-11-22) its objects lie asleep long before the
+/// ball, and our game has no tutorial to stop for.
 const START_OBJECTS_SECONDS: f64 = 180.0 / 30.0;
-const START_OBJECTS_SECONDS_TUTORIAL: f64 = 4.0 / 60.0;
 const GATE_RADIUS: f32 = 7.0;
 /// The points a level starts with (the Energy array's StartPoints), and the counter that takes one every half
 /// second (its Timefactor, 500 ms): measured in the C game on level 2, the points go down at ticks 32, 62, 92...
@@ -987,33 +988,20 @@ impl Sim {
             level,
             start_ball,
             &Modules::default(),
-            false,
             crate::replay::VERSION,
         )
     }
 
     /// A run of a level, with the physics of the modules the port has (crate::modules) from their loaded files.
-    /// `tutorial`: the level starts with the original's tutorial (level 1), which stops the level before the ball.
     #[cfg(test)]
-    pub fn with_modules(
-        level: &Level,
-        start_ball: BallKind,
-        modules: &Modules,
-        tutorial: bool,
-    ) -> Sim {
-        Sim::with_rules(level, start_ball, modules, tutorial, crate::replay::VERSION)
+    pub fn with_modules(level: &Level, start_ball: BallKind, modules: &Modules) -> Sim {
+        Sim::with_rules(level, start_ball, modules, crate::replay::VERSION)
     }
 
     /// A run of a level by the rules of a replay format (crate::replay), so that a replay plays as it was recorded:
     /// format 5 made the loose objects (crates, paper balls, domes) of their module file's object, as the original
-    /// does; before, of the level's stand-in. `tutorial` as for `with_modules`.
-    pub fn with_rules(
-        level: &Level,
-        start_ball: BallKind,
-        modules: &Modules,
-        tutorial: bool,
-        format: u32,
-    ) -> Sim {
+    /// does; before, of the level's stand-in.
+    pub fn with_rules(level: &Level, start_ball: BallKind, modules: &Modules, format: u32) -> Sim {
         // A placeholder whose module is loaded is not solid itself: the module is made of its parts when the port
         // has its physics, and an original module without an entry has none. A placeholder whose module file is
         // missing (a map's own module) stays solid.
@@ -1334,11 +1322,7 @@ impl Sim {
             world.activate(b);
         }
         // The modules come one frame after the sector's objects, then the ball.
-        let (frame, until_ball) = if tutorial {
-            (1.0 / 60.0, START_OBJECTS_SECONDS_TUTORIAL)
-        } else {
-            (1.0 / 30.0, START_OBJECTS_SECONDS)
-        };
+        let frame = 1.0 / 30.0;
         world.run(frame);
         // The wake-ups on approach and the finish triggers, armed now for the modules that are in the physics from
         // the start.
@@ -1422,7 +1406,7 @@ impl Sim {
                 }
             }
         }
-        world.run(until_ball - frame);
+        world.run(START_OBJECTS_SECONDS - frame);
         world.replace_ball(
             0,
             BALL_RADIUS,
@@ -3340,13 +3324,7 @@ pub(crate) mod tests {
             .as_deref()
             .and_then(BallKind::from_name)
             .unwrap_or(BallKind::Wood);
-        let mut sim = Sim::with_rules(
-            level,
-            start,
-            &Modules::default(),
-            false,
-            crate::replay::VERSION,
-        );
+        let mut sim = Sim::with_rules(level, start, &Modules::default(), crate::replay::VERSION);
         assert!(sim.scripts.is_some(), "the map carries scripts");
         for _ in 0..ticks {
             sim.step(0);
@@ -3529,8 +3507,7 @@ pub(crate) mod tests {
         let mut level = flat_level();
         level.settings.sector_balls = vec![Some("paper".into())];
         let begin = |format: u32, kind: Option<BallKind>| {
-            let mut sim =
-                Sim::with_rules(&level, BallKind::Wood, &Modules::default(), false, format);
+            let mut sim = Sim::with_rules(&level, BallKind::Wood, &Modules::default(), format);
             sim.start_from(0, kind, None);
             sim.ball.kind
         };
@@ -3951,7 +3928,7 @@ pub(crate) mod tests {
         );
         assert!((sim.camera.push_forward() - Vec3::new(c, 0.0, c)).length() < 1e-5);
         // an older format keeps the start heading (+x)
-        let old = Sim::with_rules(&level, BallKind::Paper, &Modules::default(), false, 7);
+        let old = Sim::with_rules(&level, BallKind::Paper, &Modules::default(), 7);
         assert_eq!(old.camera.quarter, START_QUARTER);
         assert!((old.camera.yaw - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
         // a view turn steps a quarter from there (Shift + Right turns the heading back a quarter)
@@ -4357,7 +4334,7 @@ pub(crate) mod tests {
             names: vec!["P_Dome".into()],
         };
         let along = |format: u32| {
-            let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, format);
+            let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, format);
             for _ in 0..360 {
                 sim.step(input::UP);
             }
@@ -4590,7 +4567,7 @@ pub(crate) mod tests {
             .expect("level 1")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         sim.start_from(3, None, Some(Vec3::new(704.0, -9.0, -873.7)));
         for t in 0..400 {
             sim.step(if t < 120 { input::UP } else { 0 });
@@ -4639,7 +4616,7 @@ pub(crate) mod tests {
         let modules = crate::scene::load_modules(&level, &data);
         let at = Vec3::new(1016.67, 49.0, -366.74);
         let height = |kind| {
-            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
             sim.start_from(2, Some(kind), Some(at));
             let mut ys = Vec::new();
             for t in 0..600 {
@@ -4690,7 +4667,7 @@ pub(crate) mod tests {
             ),
         ];
         for (sector, x, samples) in cases {
-            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
             sim.start_from(sector, Some(BallKind::Wood), None);
             let body = sim
                 .swings
@@ -4731,7 +4708,7 @@ pub(crate) mod tests {
             .level;
         let modules = crate::scene::load_modules(&level, &data);
         let drop = |kind| {
-            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
             let plate = sim.breaks.first().expect("module 29").at.near;
             let p = sim.world.bodies[plate].pos;
             let sector = sector_near(&level, p).expect("its sector");
@@ -4777,7 +4754,7 @@ pub(crate) mod tests {
             .expect("level 2")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         let route: [(u64, u8); 9] = [
             (1, 0),
             (40, 1),
@@ -4825,7 +4802,7 @@ pub(crate) mod tests {
             .level;
         let modules = crate::scene::load_modules(&level, &data);
         let push = |kind| {
-            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+            let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
             sim.start_from(1, Some(kind), Some(Vec3::new(132.0, -7.0, -563.03)));
             let part = |n: &str| {
                 sim.module_bodies
@@ -4866,7 +4843,7 @@ pub(crate) mod tests {
             .expect("level 1")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         sim.start_from(0, None, Some(sim.ball.position + Vec3::Y * 6.0));
         let (mut hits, mut rolls) = (Vec::new(), Vec::new());
         for t in 0..240 {
@@ -4908,7 +4885,7 @@ pub(crate) mod tests {
             .expect("level 1")
             .level;
         let modules = crate::scene::load_modules(&level, &data);
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, true);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         assert!(!sim.extras.is_empty(), "the module's small balls");
         let at = sim.extras[0].center();
         sim.start_from(0, None, Some(at));
@@ -5077,7 +5054,7 @@ pub(crate) mod tests {
         let mut modules = Modules::default();
         modules.models.push(file);
         modules.names.push("P_Modul_34".into());
-        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         let parts = sim.module_bodies().to_vec();
         assert_eq!(parts.len(), 2);
         // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 20
@@ -5210,13 +5187,7 @@ pub(crate) mod tests {
             .level;
         let modules = crate::scene::load_modules(&level, &data);
         let run = |format: u32| {
-            let mut sim = Sim::with_rules(
-                &level,
-                BallKind::Wood,
-                &modules,
-                level.settings.tutorial,
-                format,
-            );
+            let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, format);
             sim.start_from(1, None, Some(Vec3::new(74.79, 8.0, -494.0)));
             let mut top = (0.0f32, 0.0f32);
             for t in 1..=560 {
@@ -5271,7 +5242,7 @@ pub(crate) mod tests {
         let text = std::fs::read_to_string(&file).expect("the bridge replay");
         let run = crate::replay::Replay::parse(&text).expect("replay");
         let start = run.start.clone().expect("a run from the spur");
-        let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, false, run.version);
+        let mut sim = Sim::with_rules(&level, BallKind::Wood, &modules, run.version);
         sim.start_from(
             start.sector - 1,
             start.ball.as_deref().and_then(BallKind::from_name),

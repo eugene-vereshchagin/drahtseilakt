@@ -508,7 +508,12 @@ Weg der Kugel in den gemessenen Läufen über Hunderte von Ticks bis auf 1e-7 mi
 noch der Moment, in dem der Schlaftest der Physik eine langsame Kugel findet. Dieser Test läuft alle 15 bis 19
 Schritte der Physik an der bewegten Einheit, bei der sein Zähler abläuft, mit einer Zufallsfolge für das ganze Spiel;
 daher kommen die Objekte eines Levels in der Reihenfolge des Originals in die Physik (nach Modulgruppen, zuerst P_Box,
-jede Gruppe ab ihrem letzten Mitglied), und die Folge beginnt ein Level dort, wo Menü und Laden des Levels sie im
-Original lassen (2026-11-22). Ein Frame bringt die Physik um die in float geglättete Framezeit des Managers des
+jede Gruppe ab ihrem letzten Mitglied), und die Folge beginnt ein Level in dem Zustand, der der Kugel, sobald die
+Objekte des Levels zur Ruhe gekommen sind, die Schlaftests des Originals gibt (gemessen: 112 Ziehungen und Zähler 19,
+wenn die Kugel kommt). Level 1 beginnt wie die anderen, seine Objekte sechs Sekunden vor der Kugel: das Tutorial des
+Originals hält es mit den Objekten vier Frames vor der Kugel an, aber ohne Tutorial gemessen liegen seine Objekte
+schlafend, bevor die Kugel kommt, und unser Spiel hat kein Tutorial. Damit stimmen die gemessenen Läufe von Level 1
+(fast) über ihre ganze Länge bis auf 1e-3 mit dem Original überein: Kalibrierung 1011 von 1012 Ticks, Respawn alle 851,
+der Lauf des Besitzers 813 und 888 von 1032 (2026-11-22, Lauf 8). Ein Frame bringt die Physik um die in float geglättete Framezeit des Managers des
 Originals mal Zeitfaktor durch tausend weiter (0,033333331 s bei 60 Frames pro Sekunde und Zeitfaktor 2, nicht 1/30):
 damit stimmt der freie Fall der Kugel bis aufs letzte Bit mit dem Original überein.

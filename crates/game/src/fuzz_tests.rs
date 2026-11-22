@@ -280,7 +280,7 @@ fn run_level_sim(input: &[u8]) {
     let mut sim = match data {
         Some(d) if fuzzkit::fnv(input) & 1 == 0 => {
             let modules = crate::scene::load_modules(&level, d);
-            crate::sim::Sim::with_modules(&level, crate::sim::BallKind::Wood, &modules, false)
+            crate::sim::Sim::with_modules(&level, crate::sim::BallKind::Wood, &modules)
         }
         _ => crate::sim::Sim::new(&level, crate::sim::BallKind::Wood),
     };
@@ -445,7 +445,7 @@ fn run_module_sim(input: &[u8]) {
     }
     let k = usize::from(b) % modules.models.len();
     modules.models[k] = model;
-    let mut sim = crate::sim::Sim::with_modules(level, crate::sim::BallKind::Wood, &modules, false);
+    let mut sim = crate::sim::Sim::with_modules(level, crate::sim::BallKind::Wood, &modules);
     for k in 0..60usize {
         sim.step(
             input

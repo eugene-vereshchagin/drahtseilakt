@@ -27,7 +27,7 @@ mod tests {
         let loaded = data.load(&source).expect("the test level loads");
         let data = data.with_parts(&loaded.level);
         let modules = crate::scene::load_modules(&loaded.level, &data);
-        let mut sim = Sim::with_modules(&loaded.level, kind, &modules, false);
+        let mut sim = Sim::with_modules(&loaded.level, kind, &modules);
         let z = 80.0 + 40.0 * stretch as f32;
         sim.start_from(0, Some(kind), Some(glam::Vec3::new(60.0, 2.05, z)));
         for _ in 0..30 {
@@ -505,7 +505,7 @@ mod tests {
             let loaded = data.load(&source).expect("the level loads");
             let data = data.with_parts(&loaded.level);
             let modules = crate::scene::load_modules(&loaded.level, &data);
-            let sim = Sim::with_modules(&loaded.level, BallKind::Wood, &modules, false);
+            let sim = Sim::with_modules(&loaded.level, BallKind::Wood, &modules);
             for &(i, depth, _) in &sim.start_depths {
                 if depth > 0.05 {
                     let name = loaded
@@ -540,7 +540,7 @@ mod tests {
                 continue;
             };
             let modules = crate::scene::load_modules(&loaded.level, &data);
-            let sim = Sim::with_modules(&loaded.level, BallKind::Wood, &modules, n == 1);
+            let sim = Sim::with_modules(&loaded.level, BallKind::Wood, &modules);
             for &(i, depth, lift) in &sim.start_depths {
                 let name = loaded
                     .level

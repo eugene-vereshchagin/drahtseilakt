@@ -74,7 +74,7 @@ mod tests {
             absent.is_empty(),
             "parts of ours not in the showcase: {absent:?}"
         );
-        let sim = Sim::with_modules(&level, BallKind::Wood, &modules, false);
+        let sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         assert!(sim.sector_count() >= 6, "{} sectors", sim.sector_count());
         assert!(
             level
@@ -155,7 +155,7 @@ mod tests {
         name: &str,
         steps: &[Vec<&str>],
     ) -> (Vec<String>, Vec<String>) {
-        let mut sim = Sim::with_modules(level, BallKind::Wood, modules, false);
+        let mut sim = Sim::with_modules(level, BallKind::Wood, modules);
         sim.set_ball_boxes(crate::scene::BallMeshes::find(balls).boxes);
         sim.set_pieces(crate::pieces::Pieces::find(balls));
         let mut fails = Vec::new();

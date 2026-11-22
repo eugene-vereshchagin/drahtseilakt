@@ -24,12 +24,15 @@ pub struct Rng {
     seed: u32,
 }
 
-/// The physics' random numbers are one sequence for the whole game: by the time a level's objects come into the
-/// physics, the menu's scene and the level's loading have drawn 15 of them (the original's level 1 played from the
-/// start of the game, measured on Ballanced, which runs the original's scripts, 2026-11-22). Its seed then.
-pub const LEVEL_START_SEED: u32 = 1_426_425_251; // 75^15 mod 2^32
+/// The physics' random numbers are one sequence for the whole game, and the sleep test's countdown one for all
+/// units: where they stand when a level's objects come into the physics. Measured on the original (level 1 under
+/// TAS, 2026-11-22): when the ball comes, its objects asleep, the sequence has had 112 draws and the countdown is
+/// 19, and from there the original's sleep tests fall on the same PSIs as ours over whole runs. These two are the
+/// level-start state that our objects' settling turns into that (one of several that do; only the ball's is
+/// measured).
+pub const LEVEL_START_SEED: u32 = 720_909_673; // 75^22 mod 2^32
 /// The sleep test's countdown at the same moment.
-pub const LEVEL_START_SLEEP_COUNTDOWN: u16 = 14;
+pub const LEVEL_START_SLEEP_COUNTDOWN: u16 = 7;
 
 impl Default for Rng {
     fn default() -> Self {
