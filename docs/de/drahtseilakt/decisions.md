@@ -519,6 +519,10 @@ der Lauf des Besitzers 813 und 888 von 1032 (2026-11-22, Lauf 8). Ein Frame brin
 auf den Levels 1 bis 4, 2026-11-22, Lauf 9). Damit behalten die Frame-Enden über einen ganzen Lauf ihren Platz im
 Schrittraster der Physik wie beim Original; das zählt, wenn ein Frame kurz nach einem Schritt endet: ein im nächsten
 Frame gedrückter Pfeil verpasst diesen Schritt (Level 3). Die bisherigen 0,033333331 s wanderten in 2400 Frames um
-0,0005 Schritt. Die Lage des Rasters selbst (die Startphase) ist im Original von Laden zu Laden anders (0,3, 0, 0,4 und
-0,3 Schritt auf den Levels 1 bis 4), ebenso der Zustand der Zufallsfolge beim Levelstart: kein Zustand gibt den Levels
-1 bis 4 die Schlaftests des Originals, daher bleibt unser Startzustand die Messung von Level 1.
+0,0005 Schritt. Die Übereinstimmung von Level 3 braucht einen für dieses Level angepassten
+Startzustand der Zufallsfolge; mit dem des Spiels weicht Level 3 ab Tick 100 ab (1e-3). Die Lage des Rasters selbst (die
+Startphase) ist im Original von Level zu Level anders (0,3, 0, 0,4 und 0,3 Schritt auf den Levels 1 bis 4), aber nicht
+zufällig: die Levels 2 bis 4 wiederholen sich bitgenau bis zu den Ticks 2584 (ganze Aufnahme), 2699 und 2707
+(2026-11-23). Was Phase und Zufallszustand dort bestimmt, ist noch nicht gefunden. Keiner der 4000 probierten
+Startzustände gibt den Levels 1 bis 4 zugleich die Schlaftests des Originals, daher bleibt unser Startzustand vorerst
+die Messung von Level 1.

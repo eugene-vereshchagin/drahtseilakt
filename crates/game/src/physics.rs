@@ -24,10 +24,10 @@ const TICK: f64 = 1.0 / 60.0;
 
 /// The physics time of one frame as the original's physics manager takes it: the frame time in milliseconds as a
 /// float, times the time factor over a thousand in float (the original's level 1 played at 60 frames a second:
-/// 16.666666 ms * 0.002 = 0.033333335 s at time factor 2, one float step over 1/30). Measured on the original
-/// (2026-11-22, calibration runs on levels 1 to 4): with this step the frame ends keep their place on the PSI grid
-/// over a whole run, as the original's do (a key pressed in a frame that ends just after a PSI misses that PSI on
-/// level 3); the smoothed step 0.033333331 drifts by 0.0005 PSI in 2400 frames and gives that PSI the push.
+/// 16.666666 ms * 0.002 = 0.033333335 s at time factor 2, the float nearest 1/30). Inferred from the original
+/// (2026-11-22): with this step level 1's calibration run matches longer, and level 3's, given a level-start random
+/// state fitted to that level (not the game's), matches through its key press: the frame ends keep their place on the
+/// PSI grid, where the smoothed step 0.033333331 drifts by 0.0005 PSI in 2400 frames and gives one PSI more the push.
 fn frame_step(time_factor: f64) -> f64 {
     let frame_ms = (TICK * 1000.0) as f32;
     let factor = time_factor as f32 * 0.001f32;

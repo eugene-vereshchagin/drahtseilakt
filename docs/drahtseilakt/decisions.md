@@ -563,7 +563,10 @@ physics by the frame time in float times the time factor over a thousand: 16.666
 frames a second and time factor 2, one float step over 1/30 (measured on levels 1 to 4, 2026-11-22, run 9). With it
 the frame ends keep their place on the physics' step grid over a whole run as the original's do; that matters when a
 frame ends just after a step, where a key pressed in the next frame misses that step (level 3). The 0.033333331 s we
-had before drifted by 0.0005 of a step in 2400 frames. The place of the grid itself (the start phase) differs from
-load to load in the original (0.3, 0, 0.4 and 0.3 of a step on levels 1 to 4) and so does the random sequence's state
-when a level starts: no one state gives levels 1 to 4 the original's sleep tests, so the one we start with stays the
-level 1 measurement.
+had before drifted by 0.0005 of a step in 2400 frames. The level 3 match needs a level-start
+random state fitted to that level; with the state the game starts with, level 3 parts at tick 100 (1e-3). The place of
+the grid itself (the start phase) differs from level to level in the original (0.3, 0, 0.4 and 0.3 of a step on levels
+1 to 4), but is not random: levels 2 to 4 played twice repeat to the bit up to ticks 2584 (the whole record), 2699 and
+2707 (2026-11-23). What sets the phase and the random sequence's state there is not found yet. None of the 4000
+level-start states tried gives levels 1 to 4 the original's sleep tests at once, so the one we start with stays the
+level 1 measurement for now.
