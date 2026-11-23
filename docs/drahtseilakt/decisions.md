@@ -581,4 +581,5 @@ engine (2026-11-23). A checkpoint is reached when the ball is within 6.5 of its 
 checkpoint the next sector's objects and modules are in place, moving from the tick after. Measured on checkpoint 1 of
 levels 1 to 9, 11 and 12, the same on each; we had taken 44 and 48 ticks from the C game. After a lost ball the
 current sector's objects leave the physics 60 ticks after the ball's box reaches a depth-test cube, its modules 61,
-and both are in place again at 65 (nine levels; we had 62 and 66 from the C game).
+and both are in place again at 65 (nine levels; we had 62 and 66 from the C game). The depth test takes the ball's
+box unturned: turned with the ball, as we had it, it lost the ball on level 9 five ticks before the original.

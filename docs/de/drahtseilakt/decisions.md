@@ -539,4 +539,5 @@ Module einen Tick danach, und 7 Ticks nach dem Checkpoint stehen die Objekte und
 Plätzen und bewegen sich ab dem Tick danach. Gemessen am Checkpoint 1 der Level 1 bis 9, 11 und 12, überall gleich;
 vorher hatten wir 44 und 48 Ticks aus dem C-Spiel. Nach einem verlorenen Ball verlassen die Objekte des aktuellen
 Sektors die Physik 60 Ticks, nachdem die Box des Balls einen Tiefentest-Würfel erreicht hat, seine Module nach 61, und
-nach 65 stehen alle wieder an ihren Plätzen (neun Level; wir hatten 62 und 66 aus dem C-Spiel).
+nach 65 stehen alle wieder an ihren Plätzen (neun Level; wir hatten 62 und 66 aus dem C-Spiel). Der Tiefentest nimmt
+die Box des Balls ungedreht: mit dem Ball gedreht, wie bei uns, verlor sie den Ball auf Level 9 fünf Ticks vor dem Original.

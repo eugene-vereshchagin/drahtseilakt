@@ -1108,7 +1108,10 @@ Box sources (CK2_3D):
     both hierarchies FALSE.
   - `Group Iterator.Loop Out -> In`; `True -> Deactivate Ball.In 0` (the ball has left the level volume);
     `False -> Group Iterator.Loop In` (delay 1).
-  - This is the OBB of each depth-test cube against the OBB of the ball's mesh box.
+  - This is the OBB of each depth-test cube against the OBB of the ball's mesh box. Measured on the original
+    (lost-ball scenes, 2026-11-23), the ball's box behaves as if not turned with the ball: turned, it would reach a
+    cube on level 9 a whole round before the original loses the ball; unturned, it gives the original's tick on
+    all nine levels measured. The port tests the unturned box.
   - `New Ball.output0 -> Group Iterator.In`; `Group Iterator.Out -> In` (delay 1). So one cube is tested a frame,
     in the group's order, and after the last one a frame passes without a test: a round is N + 1 frames, started
     by each new ball. The test runs before the frame's physics, so it sees the ball where the last frame left it.

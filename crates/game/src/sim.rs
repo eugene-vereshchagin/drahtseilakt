@@ -2356,7 +2356,7 @@ impl Sim {
     /// Whether the ball has left the level: its mesh box reaches a depth-test cube (the original's `BallManager`
     /// test), or, on a level without them, it is far below the floors. As the original's Group Iterator, one cube
     /// is tested a tick, in the group's order, with a tick without a test after the last one (N + 1 ticks a round,
-    /// from the new ball on), against the ball where it was at the end of the last tick.
+    /// from the new ball on), against the ball's box, unturned, where the ball was at the end of the last tick.
     fn fell_off(&self) -> bool {
         let cubes = &self.rules.depth_cubes;
         if cubes.is_empty() {
@@ -2368,13 +2368,12 @@ impl Sim {
         let Some(cube) = cubes.get((age % (cubes.len() as u64 + 1)) as usize) else {
             return false;
         };
+        // The ball's box is not turned with the ball: measured on the original (lost-ball scenes of nine levels,
+        // 2026-11-23), the box turned with the ball would reach a cube on level 9 one round (5 ticks) before the
+        // original loses the ball, under any order of the cubes; the unturned box gives the original's tick on all.
         let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
-        let (pos, rot) = self.prev_pose;
-        cube.overlaps(&Obb::from_box(
-            lo,
-            hi,
-            &glam::Mat4::from_rotation_translation(rot, pos),
-        ))
+        let (pos, _) = self.prev_pose;
+        cube.overlaps(&Obb::from_box(lo, hi, &glam::Mat4::from_translation(pos)))
     }
 
     fn die(&mut self) {

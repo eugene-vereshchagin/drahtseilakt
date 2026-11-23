@@ -1624,6 +1624,11 @@ pub fn commands(
                     b.velocity.length(),
                     if b.on_ground { "ground" } else { "air" }
                 );
+                // the ball's orientation too, with DRAHTSEILAKT_TRACE_ROT set (the depth test turns the ball's box)
+                if std::env::var_os("DRAHTSEILAKT_TRACE_ROT").is_some() {
+                    let r = b.rotation;
+                    println!("    ball rot ({:.9} {:.9} {:.9} {:.9})", r.x, r.y, r.z, r.w);
+                }
                 // one body's contact points (its game index, as the loose trace's #), with DRAHTSEILAKT_TRACE_CONTACTS set
                 if let Some(i) = std::env::var("DRAHTSEILAKT_TRACE_CONTACTS")
                     .ok()
