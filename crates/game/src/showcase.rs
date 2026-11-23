@@ -156,7 +156,9 @@ mod tests {
         steps: &[Vec<&str>],
     ) -> (Vec<String>, Vec<String>) {
         let mut sim = Sim::with_modules(level, BallKind::Wood, modules);
-        sim.set_ball_boxes(crate::scene::BallMeshes::find(balls).boxes);
+        let ball_meshes = crate::scene::BallMeshes::find(balls);
+        sim.set_ball_boxes(ball_meshes.boxes);
+        sim.set_paper_hull(&ball_meshes.paper_points);
         sim.set_pieces(crate::pieces::Pieces::find(balls));
         let mut fails = Vec::new();
         let mut notes = Vec::new();

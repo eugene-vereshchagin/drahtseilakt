@@ -196,7 +196,11 @@ Settings (locals 0..3): Convex Count (int, 1), Ball Count (int, 0), Concave Coun
 list Auto Mass Center, Linear Damp and Rot Damp.
 
 - **Player ball** (Gameplay `BallManager/New Ball/physicalize new Ball` and `Trafo Manager/physicalize new Ball`)
-  - Ball Count 1, Convex 0, radius **2**.
+  - A Switch On Parameter picks one Physicalize per kind. Wood and stone: Ball Count 1, Convex 0, radius **2**.
+    Paper: **Convex Count 1**, no ball, Shift 0 with Auto Mass Center FALSE: a convex body, the hull of the ball's
+    mesh with its mass centre at the object's origin (corrected 2026-11-23: transformer scenes showed the original's
+    paper ball rolling off where it lands and resting 0.078 lower than a sphere; the IVP of Ballanced with the hull
+    of `Ball_Paper_Mesh` does the same, and the port now matches the original to 1e-3 through the landing).
   - The other pins are fed from array `Physicalize_GameBall` in `Balls.nmo`:
 
   | Ball | Friction | Elasticity | Mass | Group | Lin damp | Rot damp | *Force* column |

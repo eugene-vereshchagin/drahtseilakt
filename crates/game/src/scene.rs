@@ -81,6 +81,8 @@ pub struct BallMeshes {
     pub sticky: Option<usize>,
     /// The boxes of the meshes (wood, stone, paper, sticky), a sphere's ±2 where a mesh is missing.
     pub boxes: [(Vec3, Vec3); crate::sim::BALL_KINDS.len()],
+    /// The paper ball's mesh vertices, its body's hull (`Sim::set_paper_hull`); empty where the mesh is missing.
+    pub paper_points: Vec<Vec3>,
 }
 
 /// The tint the sticky ball is drawn with on the wooden ball's mesh when the balls in use (the copy's Balls.nmo) have no
@@ -114,11 +116,16 @@ impl BallMeshes {
                 |(lo, hi), p| (lo.min(Vec3::from(*p)), hi.max(Vec3::from(*p))),
             )
         };
+        let paper_points = paper
+            .and_then(|i| balls.meshes.get(i))
+            .map(|m| m.positions.iter().map(|p| Vec3::from(*p)).collect())
+            .unwrap_or_default();
         BallMeshes {
             wood,
             stone,
             paper,
             sticky,
+            paper_points,
             boxes: [
                 bounds(wood),
                 bounds(stone),

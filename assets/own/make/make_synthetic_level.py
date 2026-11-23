@@ -396,7 +396,7 @@ width 6
 sign "P_Modul_26: sacks swing across the lane (levels 9-13)"
 # level 9 (on from its lift), 10, 12, 13: sacks in a row along a lane 5 wide (or rails), 10 apart, hung 2.8 over it
 check sacks : ball wood 0 0 0 ; go 54 0 0 4 900 ; reach 54 0 0 3 ; turned P_Modul_26_01 P_Modul_26_Sack 10 ; kept
-check sacks-paper : ball paper 19 0 0 ; go 21 0 0 2 100 ; wait 400 ; lost
+check sacks-paper : ball paper 19 0 0 ; go 23 0 0 2 200 ; wait 400 ; lost
 sack ahead 21
 sack ahead 31
 sack ahead 41

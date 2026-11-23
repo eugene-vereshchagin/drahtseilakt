@@ -609,4 +609,5 @@ starts in its updraft from the first tick. A third: when contacts or hinges join
 controller list, which decides the order a chain's hinges are solved in (P_Modul_29's bridge now sags as the original's).
 Transformer scenes: the transformation now follows Gameplay's Trafo Manager (the test at 4.3, two more ticks in the
 physics, the spring of `dephysic Ball`, the new ball 149 ticks later where the old one was); the stone ball then
-matches the original to 1e-3 over 900 ticks with the controls.
+matches the original to 1e-3 over 900 ticks with the controls. The paper ball is not a sphere in the original but the
+hull of its mesh (its Physicalize has Convex Count 1); with that it lands and rolls as the original's.

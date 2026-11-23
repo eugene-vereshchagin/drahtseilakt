@@ -314,6 +314,7 @@ impl Game {
         }
         let mut sim = Sim::with_rules(&level.level, start_ball, &modules, format);
         sim.set_ball_boxes(ball_meshes.boxes);
+        sim.set_paper_hull(&ball_meshes.paper_points);
         let pieces = crate::pieces::Pieces::find(&balls.level);
         sim.set_pieces(pieces.clone());
         // a replay recorded before the bursts plays without them, as it was recorded
@@ -937,6 +938,7 @@ impl Game {
     fn fresh_sim(&self, version: u32) -> Sim {
         let mut sim = Sim::with_rules(&self.level.level, self.start_ball, &self.modules, version);
         sim.set_ball_boxes(self.ball_meshes.boxes);
+        sim.set_paper_hull(&self.ball_meshes.paper_points);
         sim.set_pieces(self.pieces.clone());
         sim.bursts = version >= 2;
         sim.pieces_expire = version >= 3;

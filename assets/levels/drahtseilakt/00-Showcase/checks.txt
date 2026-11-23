@@ -258,7 +258,7 @@ kept
 
 check sacks-paper
 ball paper 1550.93 16.40 90.23
-go 1552.93 16.40 90.23 2 100
+go 1554.93 16.40 90.23 2 200
 wait 400
 lost
 

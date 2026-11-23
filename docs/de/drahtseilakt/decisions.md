@@ -570,4 +570,5 @@ Ventilator schiebt einen Ball, der in seinem Aufwind startet, ab dem ersten Tick
 Scharniere Simulationseinheiten vereinen, baut IVP die Liste der Controller neu, und das bestimmt, in welcher Reihenfolge
 die Scharniere einer Kette gelöst werden (die Brücke von P_Modul_29 hängt jetzt durch wie im Original). Transformator-Szenen: Die Verwandlung folgt jetzt dem Trafo Manager des Originals
 (Test bei 4.3, zwei weitere Ticks in der Physik, die Feder von `dephysic Ball`, der neue Ball 149 Ticks später an der
-Stelle des alten); der Steinball stimmt danach mit dem Original auf 1e-3 über 900 Ticks samt Steuerung überein.
+Stelle des alten); der Steinball stimmt danach mit dem Original auf 1e-3 über 900 Ticks samt Steuerung überein. Der Papierball ist im Original keine Kugel, sondern die Hülle seines Meshes
+(sein Physicalize hat Convex Count 1); damit landet und rollt er wie im Original.

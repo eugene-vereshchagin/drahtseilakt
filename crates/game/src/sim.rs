@@ -959,6 +959,9 @@ pub struct Sim {
     module_bodies: Vec<ModuleBody>,
     /// The box of each kind's ball mesh (wood, stone, paper), for the depth-test cubes.
     ball_boxes: [(Vec3, Vec3); BALL_KINDS.len()],
+    /// The shape each kind of ball is physicalized with (`crate::physics::BallShape`): spheres of radius 2 unless the
+    /// app gives the paper ball its hull.
+    ball_shapes: [crate::physics::BallShape; BALL_KINDS.len()],
     /// The balls' pieces (pieces.rs), those lying about now (their kind, piece and body), and for each kind (wood,
     /// stone, paper) the tick they burst and the tick their fade began (20 s on, or the ball was lost).
     pieces: crate::pieces::Pieces,
@@ -1645,6 +1648,7 @@ impl Sim {
             module_sectors,
             module_bodies,
             ball_boxes: [(Vec3::splat(-BALL_RADIUS), Vec3::splat(BALL_RADIUS)); BALL_KINDS.len()],
+            ball_shapes: std::array::from_fn(|_| crate::physics::BallShape::Sphere(BALL_RADIUS)),
             pieces: crate::pieces::Pieces::default(),
             flying: Vec::new(),
             pieces_burst: [None; 3],
@@ -1762,9 +1766,9 @@ impl Sim {
             self.ball.position = p;
             self.ball.velocity = Vec3::ZERO;
             self.ball.spin = Vec3::ZERO;
-            self.world.replace_ball(
+            self.world.replace_ball_shaped(
                 0,
-                BALL_RADIUS,
+                &self.ball_shapes[self.ball.kind as usize],
                 self.ball.material(),
                 p,
                 Rot::Quat(self.ball.rotation),
@@ -1835,9 +1839,9 @@ impl Sim {
         self.respawn();
         if let Some(p) = at {
             self.ball.position = p;
-            self.world.replace_ball(
+            self.world.replace_ball_shaped(
                 0,
-                BALL_RADIUS,
+                &self.ball_shapes[self.ball.kind as usize],
                 self.ball.material(),
                 p,
                 Rot::Quat(self.ball.rotation),
@@ -1859,9 +1863,9 @@ impl Sim {
     fn put_ball(&mut self, pos: Vec3) {
         self.ball.position = pos;
         self.ball.velocity = Vec3::ZERO;
-        self.world.replace_ball(
+        self.world.replace_ball_shaped(
             0,
-            BALL_RADIUS,
+            &self.ball_shapes[self.ball.kind as usize],
             self.ball.material(),
             pos,
             self.ball.rotation,
@@ -2336,9 +2340,9 @@ impl Sim {
                 self.hold = None;
                 self.ball.velocity = Vec3::ZERO;
                 self.ball.spin = Vec3::ZERO;
-                self.world.replace_ball(
+                self.world.replace_ball_shaped(
                     0,
-                    BALL_RADIUS,
+                    &self.ball_shapes[self.ball.kind as usize],
                     self.ball.material(),
                     self.ball.position,
                     self.ball.rotation,
@@ -2594,6 +2598,28 @@ impl Sim {
     /// against the box of the ball's mesh, as the original does.
     pub fn set_ball_boxes(&mut self, boxes: [(Vec3, Vec3); BALL_KINDS.len()]) {
         self.ball_boxes = boxes;
+    }
+
+    /// The paper ball's body: the hull of its mesh's vertices (`crate::physics::BallShape`). A paper ball already in
+    /// the physics is made again with it where it is.
+    pub fn set_paper_hull(&mut self, points: &[Vec3]) {
+        let Some(shape) = crate::physics::BallShape::hull(points) else {
+            return;
+        };
+        let k = BALL_KINDS
+            .iter()
+            .position(|&b| b == BallKind::Paper)
+            .unwrap_or(0);
+        self.ball_shapes[k] = shape;
+        if self.ball.kind == BallKind::Paper && self.world.state(0).is_some() {
+            self.world.replace_ball_shaped(
+                0,
+                &self.ball_shapes[k],
+                self.ball.material(),
+                self.ball.position,
+                Rot::Quat(self.ball.rotation),
+            );
+        }
     }
 
     /// The balls' pieces, for the bursts in the transformers.
@@ -3136,9 +3162,9 @@ impl Sim {
 
     /// The new ball's body at the place it was put, at rest.
     fn make_ball(&mut self) {
-        self.world.replace_ball(
+        self.world.replace_ball_shaped(
             0,
-            BALL_RADIUS,
+            &self.ball_shapes[self.ball.kind as usize],
             self.ball.material(),
             self.ball.position,
             Rot::Quat(self.ball.rotation),

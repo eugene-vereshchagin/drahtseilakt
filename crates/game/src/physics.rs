@@ -19,6 +19,31 @@ pub const GRAVITY: f32 = 20.0;
 /// Elasticity and friction of the level's floors and rails and of PH modules (`Physicalize_Floors`).
 pub const SURFACE_ELASTICITY: f32 = 0.3;
 pub const SURFACE_FRICTION: f32 = 0.7;
+
+/// The shape the player's ball is physicalized with. The game's Physicalize makes the wooden and the stone ball a
+/// sphere of radius 2, but the paper ball a convex body (Gameplay's `Trafo Manager` and `BallManager/New Ball`: Convex
+/// Count 1, no ball pin): the hull of its mesh, mass centre at the object's origin. Measured on the original
+/// (2026-11-23): the paper ball rolls off where it lands and rests 0.078 lower than a sphere would; the IVP of Ballanced
+/// with the hull does the same.
+#[derive(Clone, Debug)]
+pub enum BallShape {
+    Sphere(f32),
+    Hull(std::sync::Arc<Surface>),
+}
+
+impl BallShape {
+    /// The hull of a mesh's vertices (exact duplicates removed, first kept), or None when they span no volume.
+    pub fn hull(points: &[Vec3]) -> Option<BallShape> {
+        let mut seen = std::collections::BTreeSet::new();
+        let pts: Vec<[f64; 3]> = points
+            .iter()
+            .filter(|v| v.is_finite() && seen.insert(v.to_array().map(f32::to_bits)))
+            .map(|&v| vec3_f64(v))
+            .collect();
+        let surface = Surface::compile(vec![ivp::convex::hull(&pts)?])?;
+        Some(BallShape::Hull(std::sync::Arc::new(surface)))
+    }
+}
 /// One tick, in seconds.
 const TICK: f64 = 1.0 / 60.0;
 
@@ -694,12 +719,29 @@ impl World {
         pos: Vec3,
         rot: impl Into<Rot>,
     ) {
+        self.replace_ball_shaped(i, &BallShape::Sphere(radius), m, pos, rot);
+    }
+
+    /// Body `i` made again as a ball of the given shape: a sphere, or a hull with its mass centre at the object's
+    /// origin (the paper ball, see `BallShape`).
+    pub fn replace_ball_shaped(
+        &mut self,
+        i: usize,
+        shape: &BallShape,
+        m: Material,
+        pos: Vec3,
+        rot: impl Into<Rot>,
+    ) {
         if i >= self.handles.len() {
             return;
         }
         let rot = rot.into();
         self.remove(i);
-        // research: the player's ball as it is made (DRAHTSEILAKT_DUMP_PARTS, ivp-oracle)
+        let (body_shape, shift, radius) = match shape {
+            BallShape::Sphere(r) => (Shape::Sphere(*r), None, *r),
+            BallShape::Hull(s) => (Shape::Surface((**s).clone()), Some([0.0; 3]), -1.0),
+        };
+        // research: the player's ball as it is made (DRAHTSEILAKT_DUMP_PARTS, ivp-oracle; radius -1 for a hull)
         if let Ok(path) = std::env::var("DRAHTSEILAKT_DUMP_PARTS")
             && let Ok(mut f) = std::fs::OpenOptions::new()
                 .create(true)
@@ -733,11 +775,12 @@ impl World {
             elasticity: m.elasticity,
             lin_damp: m.lin_damp,
             rot_damp: m.rot_damp,
+            shift,
             ..BodyDesc::default()
         };
         let id = self
             .physics
-            .add_body(desc, Shape::Sphere(radius), vec3_f64(pos), rot.ivp());
+            .add_body(desc, body_shape, vec3_f64(pos), rot.ivp());
         self.handles[i] = Some(id);
         self.bodies[i] = Body {
             pos,
@@ -1325,6 +1368,57 @@ mod tests {
     use crate::collide::Triangle;
 
     /// A flat floor at y = 0, 200 units square.
+    /// A mesh's vertices make a hull ball (repeats dropped); flat ones make none.
+    #[test]
+    fn a_hull_ball_needs_a_volume() {
+        let mut cube = Vec::new();
+        for &x in &[-2.0f32, 2.0] {
+            for &y in &[-2.0f32, 2.0] {
+                for &z in &[-2.0f32, 2.0] {
+                    cube.push(Vec3::new(x, y, z));
+                    cube.push(Vec3::new(x, y, z));
+                }
+            }
+        }
+        assert!(matches!(BallShape::hull(&cube), Some(BallShape::Hull(_))));
+        let flat: Vec<Vec3> = cube.iter().map(|v| Vec3::new(v.x, 0.0, v.z)).collect();
+        assert!(BallShape::hull(&flat).is_none());
+    }
+
+    /// A hull ball rests on the floor on its lowest face: a cube of half size 1.5 at 1.5 (plus the contact gap).
+    #[test]
+    fn a_hull_ball_rests_on_its_face() {
+        let mut w = World::new(&floor());
+        let mut cube = Vec::new();
+        for &x in &[-1.5f32, 1.5] {
+            for &y in &[-1.5f32, 1.5] {
+                for &z in &[-1.5f32, 1.5] {
+                    cube.push(Vec3::new(x, y, z));
+                }
+            }
+        }
+        let shape = BallShape::hull(&cube).expect("a hull");
+        let i = w.reserve_ball(Vec3::new(0.0, 3.0, 0.0), Quat::IDENTITY);
+        w.replace_ball_shaped(
+            i,
+            &shape,
+            Material {
+                mass: 0.2,
+                friction: 0.5,
+                elasticity: 0.4,
+                lin_damp: 1.5,
+                rot_damp: 0.1,
+            },
+            Vec3::new(0.0, 3.0, 0.0),
+            Quat::IDENTITY,
+        );
+        for _ in 0..300 {
+            w.step(None);
+        }
+        let y = w.state(i).expect("in the physics").pos.y;
+        assert!((y - 1.5).abs() < 0.05, "rests at {y}");
+    }
+
     fn floor() -> Vec<StaticMesh> {
         let s = 100.0;
         let p = [

@@ -76,7 +76,9 @@ mod tests {
         let modules = crate::scene::load_modules(level, data);
         let mut sim = Sim::with_modules(level, ball, &modules);
         if let Some(balls) = data.part("3D Entities/Balls.nmo") {
-            sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
+            let ball_meshes = crate::scene::BallMeshes::find(&balls.level);
+            sim.set_ball_boxes(ball_meshes.boxes);
+            sim.set_paper_hull(&ball_meshes.paper_points);
         }
         sim.start_from(sector, Some(ball), Some(at));
         let lives = sim.lives;
@@ -146,7 +148,9 @@ mod tests {
         );
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         if let Some(balls) = data.part("3D Entities/Balls.nmo") {
-            sim.set_ball_boxes(crate::scene::BallMeshes::find(&balls.level).boxes);
+            let ball_meshes = crate::scene::BallMeshes::find(&balls.level);
+            sim.set_ball_boxes(ball_meshes.boxes);
+            sim.set_paper_hull(&ball_meshes.paper_points);
         }
         let mut kinds = Vec::new();
         for _ in 0..60 * 120 {
