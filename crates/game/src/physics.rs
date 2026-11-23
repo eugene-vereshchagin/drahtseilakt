@@ -871,7 +871,11 @@ impl World {
                     f,
                     "PART {} {} {} {} {} {} {} {} {} {} {} {} {} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9}",
                     self.handles.len(),
-                    group_name,
+                    if group_name.is_empty() {
+                        "-"
+                    } else {
+                        group_name
+                    },
                     fixed as u8,
                     frozen as u8,
                     collide as u8,
@@ -971,6 +975,21 @@ impl World {
 
     /// A hinge of body `a` to body `b` at a world anchor about a world axis (Set Physics Hinge).
     pub fn add_hinge(&mut self, a: usize, b: usize, anchor: Vec3, axis: Vec3) -> Option<usize> {
+        // research: the hinge as it is made, next to the parts (DRAHTSEILAKT_DUMP_PARTS, ivp-oracle)
+        if let Ok(path) = std::env::var("DRAHTSEILAKT_DUMP_PARTS") {
+            use std::io::Write as _;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+            {
+                let _ = writeln!(
+                    f,
+                    "HINGE {a} {b} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9}",
+                    anchor.x, anchor.y, anchor.z, axis.x, axis.y, axis.z
+                );
+            }
+        }
         let (ia, ib) = self.pair(a, b)?;
         self.physics
             .hinge_create(Some(ia), Some(ib), p3(anchor), p3(axis))

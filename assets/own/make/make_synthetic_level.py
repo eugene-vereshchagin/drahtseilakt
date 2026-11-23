@@ -350,7 +350,7 @@ sign "P_Modul_34: crate under the stone, from below (level 1)"
 # the stone stands in a slot 5.3 long, on its crate on the floor below; a stone ball rolling across that floor under
 # the slot knocks the crate out (it stays on the broad floor), the stone sinks level with the lane and shuts the
 # way back under it, and the ball goes up a ramp on the floor's far side
-check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 7 -5 7 900 ; wait 60 ; go 36 12 -5 4 600 ; go 26.65 16 -5 4 600 ; go 26.65 22 -5 4 600 ; go 6 22 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; lies P_Modul_34_01 P_Modul_34_Kiste 26.65 8 -5 18 ; kept
+check crate : ball stone 0 0 0 ; go 6 -2 0 4 300 ; go 6 -12 0 4 400 ; go 26.65 -12 -5 4 600 ; go 26.65 6 -5 5 900 ; wait 60 ; go 36 12 -5 4 600 ; go 26.65 16 -5 4 600 ; go 26.65 22 -5 4 600 ; go 6 22 0 4 600 ; go 6 0 0 4 300 ; go 42 0 0 4 900 ; reach 42 0 2 3 ; moved P_Modul_34_01 P_Modul_34_Kiste 4 ; lies P_Modul_34_01 P_Modul_34_Kiste 26.65 8 -5 18 ; kept
 check crate-block : ball stone 0 0 0 ; go 42 0 0 4 600 ; away 42 0 2 6
 floor 6
 mark crate

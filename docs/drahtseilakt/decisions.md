@@ -605,4 +605,5 @@ the order of the inverse square root's products); what decides the rest is the o
 The owner's call (2026-11-23): no x87 emulation; the goal is a world that reacts to play as the original's does, and
 ties in degenerate contacts lie within the original's own spread. Drop scenes (the ball falling onto each module) found
 two more: P_Modul_19's hub had no hull (duplicate vertices and a face flat only to f32), and a fan pushes a ball that
-starts in its updraft from the first tick.
+starts in its updraft from the first tick. A third: when contacts or hinges join simulation units, IVP rebuilds the
+controller list, which decides the order a chain's hinges are solved in (P_Modul_29's bridge now sags as the original's).

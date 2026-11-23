@@ -231,22 +231,33 @@ impl World {
 
     /// Attaches a controller to its cores, merging their units first; a frozen unit is revived when some core is
     /// awake (`ivp_controller_attach_merge`, 0x10011b30).
+    /// The cores are taken from the last (`announce_controller_to_environment`): the last one's unit absorbs the others'
+    /// cores, each core gets the controller, and a unit that absorbed another builds its controller list again.
     fn controller_attach_merge(&mut self, ctrl: usize, cores: &[usize]) {
-        let Some(&first) = cores.first() else { return };
-        let into = self.cores[first].unit;
-        for &c in &cores[1..] {
-            let from = self.cores[c].unit;
-            if from != into {
-                self.sim_unit_merge(into, from);
+        let mut reference: Option<usize> = None;
+        let mut fused = false;
+        let mut acc: i32 = 8;
+        for &c in cores.iter().rev() {
+            acc &= i32::from(self.cores[c].movement_state as u8);
+            let unit = self.cores[c].unit;
+            match reference {
+                Some(r) if r != unit => {
+                    self.unit_throw_cores(r, unit);
+                    fused = true;
+                }
+                None => reference = Some(unit),
+                _ => {}
+            }
+            if !self.cores[c].controllers.contains(&ctrl) {
+                self.core_add_controller(c, ctrl);
             }
         }
-        let mut acc: i32 = 8;
-        for &c in cores {
-            self.core_add_controller(c, ctrl);
-            acc &= i32::from(self.cores[c].movement_state as u8);
+        let Some(r) = reference else { return };
+        if fused {
+            self.unit_calc_redundants(r);
         }
         if acc < 8 {
-            self.revive_sim_unit(into);
+            self.revive_sim_unit(r);
         }
     }
 
@@ -923,5 +934,32 @@ mod tests {
         };
         w.constraint_simulate(j, &ev);
         assert_eq!(w.joints[j].nactive, 3, "three translations locked");
+    }
+
+    /// A chain hinged link by link: each hinge's unit absorbs the next and builds its controller list again as IVP does,
+    /// so the PSI (which runs the list from its end) solves the first hinge of the chain before the second.
+    #[test]
+    fn a_chain_solves_its_hinges_in_the_order_they_were_made() {
+        let mut w = World::new();
+        let a = at(&mut w, 0.0);
+        let b = at(&mut w, 1.0);
+        let c = at(&mut w, 2.0);
+        let z = [0.0, 0.0, 1.0];
+        let j1 = w
+            .hinge_create(Some(b), Some(a), [0.5, 0.0, 0.0], z)
+            .expect("hinge 1");
+        let j2 = w
+            .hinge_create(Some(c), Some(b), [1.5, 0.0, 0.0], z)
+            .expect("hinge 2");
+        let u = w.cores[a].unit;
+        assert!(w.cores[b].unit == u && w.cores[c].unit == u, "one unit");
+        let order: Vec<usize> = w.units[u].entries.iter().rev().map(|e| e.0).collect();
+        let (c1, c2) = (w.joints[j1].ctrl, w.joints[j2].ctrl);
+        let p1 = order.iter().position(|&k| k == c1).expect("hinge 1 runs");
+        let p2 = order.iter().position(|&k| k == c2).expect("hinge 2 runs");
+        assert!(
+            p1 < p2,
+            "run order {order:?}: hinge 1 is {c1}, hinge 2 is {c2}"
+        );
     }
 }

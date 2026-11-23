@@ -566,4 +566,6 @@ Rest entscheidet die erweiterte x87-Genauigkeit des Originals. Entscheidung des 
 x87-Emulation; Ziel ist eine Welt, die auf das Spiel reagiert wie die des Originals, und Gleichstände in entarteten
 Kontakten liegen in der Streuung des Originals selbst. Fallszenen (der Ball fällt auf jedes Modul) fanden zwei weitere:
 die Nabe von P_Modul_19 hatte keine Hülle (doppelte Eckpunkte und eine nur bis auf f32 ebene Fläche), und ein
-Ventilator schiebt einen Ball, der in seinem Aufwind startet, ab dem ersten Tick.
+Ventilator schiebt einen Ball, der in seinem Aufwind startet, ab dem ersten Tick. Eine dritte: Wenn Kontakte oder
+Scharniere Simulationseinheiten vereinen, baut IVP die Liste der Controller neu, und das bestimmt, in welcher Reihenfolge
+die Scharniere einer Kette gelöst werden (die Brücke von P_Modul_29 hängt jetzt durch wie im Original).

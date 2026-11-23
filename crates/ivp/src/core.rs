@@ -418,21 +418,49 @@ impl World {
         }
     }
 
-    /// The cores of `from` join `into`, with their controllers; `from` is deleted (`0x10011720`).
+    /// The cores of `from` join `into`, `from` is deleted, and `into`'s controller list is built again from its cores
+    /// (`IVP_Simulation_Unit::fusion_simulation_unities`, 0x10011720).
     pub fn sim_unit_merge(&mut self, into: usize, from: usize) {
         if into == from {
             return;
         }
+        self.unit_throw_cores(into, from);
+        self.unit_calc_redundants(into);
+    }
+
+    /// The cores of `from` are appended to `into`'s and `from` is deleted; the controller list is left as it is
+    /// (`throw_cores_into_my_sim_unit`).
+    pub(crate) fn unit_throw_cores(&mut self, into: usize, from: usize) {
         let cores = self.units[from].cores.clone();
         for c in cores {
             self.unit_add_core(into, c);
-            let ctrls = self.cores[c].controllers.clone();
-            for k in ctrls {
-                self.unit_add_controller_core(into, k, c);
-            }
         }
         self.unit_list_remove(from);
         self.units[from] = SimUnit::default();
+    }
+
+    /// The unit's controller list built again: its cores from the last, each core's controllers from the last, every
+    /// controller an entry in the order first met, then sorted by priority (`sim_unit_calc_redundants`). The order of
+    /// equal priorities that comes out decides which constraint of a chain is solved first in a PSI: appending the
+    /// absorbed unit's controllers instead let P_Modul_29's plates sag 0.6 less than the original's.
+    pub(crate) fn unit_calc_redundants(&mut self, su: usize) {
+        self.units[su].entries.clear();
+        let cores = self.units[su].cores.clone();
+        for &c in cores.iter().rev() {
+            let ctrls = self.cores[c].controllers.clone();
+            for &k in ctrls.iter().rev() {
+                let entries = &mut self.units[su].entries;
+                match entries.iter().position(|e| e.0 == k) {
+                    Some(i) => {
+                        if !entries[i].1.contains(&c) {
+                            entries[i].1.push(c);
+                        }
+                    }
+                    None => entries.push((k, vec![c])),
+                }
+            }
+        }
+        self.unit_sort(su);
     }
 
     /// Creates a core for an object at `pos` with orientation `q`, in a new frozen unit, attached to gravity

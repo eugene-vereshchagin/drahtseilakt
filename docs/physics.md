@@ -611,6 +611,12 @@ Uses (Min / Max / Sleep / ID):
   the inverse square root's first correction multiplies h·y·y and the later ones y·y·h. A module resting flat on
   another can still land differently: the original builds and normalises its matrices in x87 extended precision, which
   turns the sign of a 1e-23 residual where an edge lies parallel to a face; the port computes in double.
+- Order of a simulation unit's controllers. When a contact or a constraint joins two units, IVP rebuilds the joined
+  unit's controller list (`sim_unit_calc_redundants`): its cores from the last, each core's controllers from the last,
+  then a stable sort by priority. A new constraint takes its cores from the last (`announce_controller_to_environment`).
+  A PSI runs the list from its end, so for a chain of hinges this decides which hinge is solved first. The order matters:
+  appending the absorbed unit's controllers instead made P_Modul_29's bridge sag 0.6 less than the original's (found
+  with the IVP of Ballanced, 2026-11-23; chains of 1 to 9 links now match it to 2e-6).
 
   It is used after every new ball and by Ball Navigation.
 - **Set Physics Globals**
