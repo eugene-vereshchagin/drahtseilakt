@@ -159,28 +159,50 @@ fn hull3d(p: &[V3], eps: f64) -> Option<Vec<Face>> {
         if i == i0 || i == i1 || i == i2 || i == i3 {
             continue;
         }
-        let visible = |f: &Face| f.alive && face_dist(f, p[i]) > eps;
-        if !faces.iter().any(visible) {
+        // the faces the point sees, grown from the one it is farthest above through shared edges only: on nearly
+        // coplanar input (a mesh's flat face off by an f32 rounding) the faces above the tolerance need not touch,
+        // and a horizon taken around all of them is not a loop (P_Modul_19's hub; qhull keeps the region connected)
+        let Some(seed) = (0..faces.len())
+            .filter(|&f| faces[f].alive && face_dist(&faces[f], p[i]) > eps)
+            .max_by(|&a, &b| face_dist(&faces[a], p[i]).total_cmp(&face_dist(&faces[b], p[i])))
+        else {
             continue;
+        };
+        let across = |faces: &[Face], a: usize, b: usize| {
+            faces
+                .iter()
+                .position(|g| g.alive && (0..3).any(|m| g.v[m] == b && g.v[(m + 1) % 3] == a))
+        };
+        let mut seen = vec![false; faces.len()];
+        seen[seed] = true;
+        let mut stack = vec![seed];
+        while let Some(f) = stack.pop() {
+            for k in 0..3 {
+                let (a, b) = (faces[f].v[k], faces[f].v[(k + 1) % 3]);
+                if let Some(g) = across(&faces, a, b)
+                    && !seen[g]
+                    && face_dist(&faces[g], p[i]) > eps
+                {
+                    seen[g] = true;
+                    stack.push(g);
+                }
+            }
         }
-        // the horizon: edges of visible faces whose reverse is not on a visible face
+        // the horizon: edges of the region whose reverse is not in it
         let mut horizon: Vec<(usize, usize)> = Vec::new();
         for (fi, f) in faces.iter().enumerate() {
-            if !visible(f) {
+            if !seen[fi] {
                 continue;
             }
             for k in 0..3 {
                 let (a, b) = (f.v[k], f.v[(k + 1) % 3]);
-                let inner = faces.iter().enumerate().any(|(gi, g)| {
-                    gi != fi && visible(g) && (0..3).any(|m| g.v[m] == b && g.v[(m + 1) % 3] == a)
-                });
-                if !inner {
+                if !across(&faces, a, b).is_some_and(|g| seen[g]) {
                     horizon.push((a, b));
                 }
             }
         }
-        for f in faces.iter_mut() {
-            if visible(f) {
+        for (fi, f) in faces.iter_mut().enumerate() {
+            if seen[fi] {
                 f.alive = false;
             }
         }
@@ -529,6 +551,40 @@ mod tests {
         ];
         let l = hull(&p).expect("a tetrahedron has a hull");
         assert_eq!(l.tris.len(), 4);
+        assert!(twins_are_closed(&l));
+    }
+
+    /// A hexagonal prism whose end faces carry a centre point and are flat only to an f32 rounding (P_Modul_19's hub):
+    /// the hull has the 12 corners and 20 triangles.
+    #[test]
+    fn nearly_flat_faces_with_centre_points_make_a_prism() {
+        let mut p = vec![[0.000713348, 0.000296084, 0.293656081]];
+        let ring = [
+            [1.37873745, 2.387102842],
+            [2.756761551, 0.000296084],
+            [-1.377310872, 2.387102604],
+            [-2.755334854, 0.000295843],
+            [-1.377310395, -2.386510372],
+            [1.378737807, -2.386510134],
+        ];
+        let top = [
+            0.293656558,
+            0.293656081,
+            0.293656558,
+            0.293656081,
+            0.293655604,
+            0.293655604,
+        ];
+        for (r, z) in ring.iter().zip(top) {
+            p.push([r[0], r[1], z]);
+        }
+        for (r, z) in ring.iter().zip(top) {
+            p.push([r[0], r[1], z - 0.566241]);
+        }
+        p.push([0.000713348, 0.00029623, -0.27258563]);
+        let l = hull(&p).expect("the prism has a hull");
+        assert_eq!(l.points.len(), 12);
+        assert_eq!(l.tris.len(), 20);
         assert!(twins_are_closed(&l));
     }
 

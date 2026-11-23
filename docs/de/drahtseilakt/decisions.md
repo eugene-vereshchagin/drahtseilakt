@@ -562,4 +562,8 @@ Das Aufwecken durch ein Skript holt einen schlafenden Teil erst beim nächsten S
 des Schiebers trennt sich noch: wo seine Kante parallel zur Rinne liegt, sind zwei Elemente gleich nah, und die
 Kontaktsuche bleibt bei einem anderen stehen. Drei Regeln der IVP-Arithmetik stimmen jetzt überein (der Kollisions-Cache
 bei einem PSI, Differenzen einfacher Genauigkeit in Kantenlängen, die Reihenfolge der Produkte der inversen Wurzel); den
-Rest entscheidet die erweiterte x87-Genauigkeit des Originals.
+Rest entscheidet die erweiterte x87-Genauigkeit des Originals. Entscheidung des Eigentümers (2026-11-23): keine
+x87-Emulation; Ziel ist eine Welt, die auf das Spiel reagiert wie die des Originals, und Gleichstände in entarteten
+Kontakten liegen in der Streuung des Originals selbst. Fallszenen (der Ball fällt auf jedes Modul) fanden zwei weitere:
+die Nabe von P_Modul_19 hatte keine Hülle (doppelte Eckpunkte und eine nur bis auf f32 ebene Fläche), und ein
+Ventilator schiebt einen Ball, der in seinem Aufwind startet, ab dem ersten Tick.

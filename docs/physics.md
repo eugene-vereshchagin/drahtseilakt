@@ -157,7 +157,10 @@ Settings (locals 0..3): Convex Count (int, 1), Ball Count (int, 0), Concave Coun
       (`FUN_10006f90`/`FUN_1000b820`).
    2. On a miss, build a ledge soup (`FUN_10038290`):
       - Each convex mesh (`FUN_10007260`): vertices with exact duplicates removed, × scale, qhull hull
-        (`FUN_1003ae20`), inserted as one convex ledge.
+        (`FUN_1003ae20`), inserted as one convex ledge. The removal matters: a mesh repeats a vertex once per face
+        (P_Modul_19's hub: 66 vertices on 14 points). The port's hull grows the faces a new point sees from the one it
+        is farthest above, through shared edges, as qhull does, so that faces flat only to an f32 rounding still make
+        one closed hull (without both, the hub had no hull and the ball fell through it).
       - Each concave mesh (`FUN_10006fb0`): **every face becomes its own 3-point ledge**.
    3. Compile the soup (`FUN_100384b0`) and cache it under the name.
    4. With no usable mesh, print `"Error: incorrect mesh for %s"`.

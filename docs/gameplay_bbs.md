@@ -1122,6 +1122,9 @@ Box sources (CK2_3D):
     object); hierarchies FALSE.
   - It runs on `TT Scaleable Proximity.InRange`. Both outputs go to `Binary Switch.In`, which turns the
     physics force on or off.
+  - The fans of the start sector run their tests through the level's start, while the ball hangs at its start: a ball
+    that starts inside an updraft is pushed from its first tick (measured 2026-11-23, a drop scene on level 6: with the
+    force from tick 1 the port's ball matches the original's to 1e-3 over 600 ticks; without it, 0.13 apart by tick 20).
 
 ## Planar Filter
 

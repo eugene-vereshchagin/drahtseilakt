@@ -602,3 +602,7 @@ run on the same bodies, showed the earlier start of its contact tests). The push
 its edge lies parallel to the gutter, two features are equally near and the contact search settles on another one.
 Three rules of IVP's arithmetic now match (the collision cache at a PSI, single-precision differences in edge lengths,
 the order of the inverse square root's products); what decides the rest is the original's x87 extended precision.
+The owner's call (2026-11-23): no x87 emulation; the goal is a world that reacts to play as the original's does, and
+ties in degenerate contacts lie within the original's own spread. Drop scenes (the ball falling onto each module) found
+two more: P_Modul_19's hub had no hull (duplicate vertices and a face flat only to f32), and a fan pushes a ball that
+starts in its updraft from the first tick.

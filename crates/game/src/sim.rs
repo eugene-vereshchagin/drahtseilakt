@@ -1535,6 +1535,16 @@ impl Sim {
                     }
                 }
             }
+            // the start sector's fans test too (their outer and inner proximity, the ball's frame at the start);
+            // the updraft's force itself is made on the ball before its first tick (`fans_at_start`)
+            for u in &mut updrafts {
+                match u.outer.frame(ball.position, u.at.point) {
+                    Some(Range::Enter) => u.inner.switch_on(),
+                    Some(Range::Exit) => u.inner.switch_off(),
+                    _ => {}
+                }
+                u.inner.frame(ball.position, u.at.point);
+            }
             if i < intro {
                 world.run(frame);
             }
@@ -2235,6 +2245,9 @@ impl Sim {
             push * p.force
         };
         self.world.set_push(0, force);
+        if self.tick == 1 {
+            self.fans_at_start();
+        }
         self.prev_pose = (self.ball.position, self.ball.rotation);
         self.world.step(None);
         if let Some(s) = &mut self.scripts {
@@ -2835,6 +2848,28 @@ impl Sim {
 
     /// The fans' updrafts, as module 18's script runs them: the outer proximity switches the inner one on and off;
     /// at each inner test while within it, the ball's box against the fan's volume makes or removes the force.
+    /// The fans that were on before the ball came: the original's ball hangs at the start through the level's start,
+    /// so a fan whose inner test found it within its volume pushes it from its first tick (measured on level 6: the
+    /// ball dropped into an updraft at the start fell slower from tick 1 on).
+    fn fans_at_start(&mut self) {
+        let ball = self.ball.position;
+        let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
+        let ball_box = Obb::from_box(
+            lo,
+            hi,
+            &Mat4::from_rotation_translation(self.ball.rotation, ball),
+        );
+        for u in &mut self.updrafts {
+            if u.force.is_none()
+                && u.inner.on
+                && u.inner.within() == Some(true)
+                && u.at.volume.overlaps(&ball_box)
+            {
+                u.force = self.world.add_force(0, Vec3::Y * u.at.value, ball);
+            }
+        }
+    }
+
     fn check_updrafts(&mut self) {
         let ball = self.ball.position;
         let (lo, hi) = self.ball_boxes[self.ball.kind as usize];

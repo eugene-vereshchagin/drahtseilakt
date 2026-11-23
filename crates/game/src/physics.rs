@@ -841,10 +841,18 @@ impl World {
         shift: [f32; 3],
         active: bool,
     ) -> Option<usize> {
+        // each piece's vertices with exact duplicates removed, first occurrence kept, as the original's Physicalize
+        // does (FUN_10007260): a mesh's vertices repeat once per face they belong to, and the hull builder takes a
+        // set (P_Modul_19's hub, 66 vertices on 14 points, built no hull with them and let the ball through)
         let hulls: Vec<ledge::Ledge> = pieces
             .iter()
             .filter_map(|p| {
-                let pts: Vec<[f64; 3]> = p.iter().map(|&v| vec3_f64(v)).collect();
+                let mut seen = std::collections::BTreeSet::new();
+                let pts: Vec<[f64; 3]> = p
+                    .iter()
+                    .filter(|v| seen.insert(v.to_array().map(f32::to_bits)))
+                    .map(|&v| vec3_f64(v))
+                    .collect();
                 ivp::convex::hull(&pts)
             })
             .collect();

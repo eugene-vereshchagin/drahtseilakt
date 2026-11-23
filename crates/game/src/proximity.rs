@@ -72,6 +72,11 @@ impl Proximity {
         self.on = false;
     }
 
+    /// Whether the last test found the points within the distance (`None` before the first test after switching on).
+    pub fn within(&self) -> Option<bool> {
+        self.within
+    }
+
     /// Frames until the next test (the block's "Last Check"), which it keeps while switched off.
     pub fn countdown(&self) -> u32 {
         self.countdown
