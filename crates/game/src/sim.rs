@@ -161,15 +161,14 @@ const DEATH_SECTOR_END_TICKS: u64 = 60;
 const DEATH_SECTOR_END_MODULE_TICKS: u64 = 61;
 const DEATH_SECTOR_BEGIN_TICKS: u64 = 65;
 
-/// After the ball's box reaches a depth-test cube, the original still pushes the falling ball for 4 frames, takes it
-/// out of the physics 63 frames after the loss (a life goes then), shows the new ball at the reset point 71 frames
-/// after the loss, and makes it a body that rolls and answers the keys 249 frames after it (measured on the original,
-/// level 1, 2026-11-22: the ball's path matches ours to 1e-7 through the fall, the freeze, the new ball and its drop
-/// with these, and parts within a frame of any other value).
-const DEATH_PUSH_TICKS: u64 = 4;
-const DEATH_REMOVE_TICKS: u64 = 63;
-const DEATH_SHOW_TICKS: u64 = 71;
-const DEATH_RESPAWN_TICKS: u64 = 249;
+/// After the ball's box reaches a depth-test cube, the original pushes the ball no more (from that frame on), takes it
+/// out of the physics 59 frames after the loss (a life goes then), shows the new ball at the reset point 67 frames
+/// after the loss, and makes it a body that rolls and answers the keys 245 frames after it (measured on the original,
+/// 2026-11-23: lost-ball scenes of levels 2 to 6, 8, 9, 11 and 12 and the level 1 respawn run, all on the original's
+/// tick; the 4 / 63 / 71 / 249 of 2026-11-22 came from level 1 with the ball's box turned, which lost it 4 ticks early).
+const DEATH_REMOVE_TICKS: u64 = 59;
+const DEATH_SHOW_TICKS: u64 = 67;
+const DEATH_RESPAWN_TICKS: u64 = 245;
 /// The points counter waits while a ball is lost, and goes on this many ticks after the new ball, where it was.
 const POINTS_RESUME_TICKS: u64 = 5;
 
@@ -2241,14 +2240,15 @@ impl Sim {
         // every PSI (66 a second of its time), while the ball is awake. The ball's force is its material's.
         // The physics owns the ball's state; the game only reads it back. Only a new ball (a respawn, the end of a
         // transformer) puts a new body in, as the original does.
-        // A ball that has fallen off is steered for `DEATH_PUSH_TICKS` more frames, then no longer.
-        // Nor is a ball whose navigation is not on yet (see `STEER_DELAY_TICKS`).
+        // The depth test comes before the push, on the ball's place at the end of the last tick: the original's
+        // navigation takes no force on the frame it loses the ball (level 1, run 7, 2026-11-23: the ball slows on
+        // that frame), and none after it. Nor is a ball whose navigation is not on yet steered (`STEER_DELAY_TICKS`).
+        if self.dying.is_none() && self.hold.is_none() && self.fell_off() {
+            self.die();
+        }
         let steering = self.tick >= self.steer_from;
         let push_keys = if steering { push_keys } else { 0 };
-        let lost = self
-            .dying
-            .is_some_and(|d| self.tick >= d + DEATH_PUSH_TICKS);
-        let push = if lost || !steering || turned || switched {
+        let push = if self.dying.is_some() || !steering || turned || switched {
             Vec3::ZERO
         } else {
             push
@@ -2524,8 +2524,6 @@ impl Sim {
                 self.make_ball();
                 self.points_resume = self.tick + POINTS_RESUME_TICKS;
             }
-        } else if self.hold.is_none() && self.fell_off() {
-            self.die();
         }
     }
 
@@ -2548,7 +2546,7 @@ impl Sim {
         // 2026-11-23), the box turned with the ball would reach a cube on level 9 one round (5 ticks) before the
         // original loses the ball, under any order of the cubes; the unturned box gives the original's tick on all.
         let (lo, hi) = self.ball_boxes[self.ball.kind as usize];
-        let (pos, _) = self.prev_pose;
+        let pos = self.ball.position;
         cube.overlaps(&Obb::from_box(lo, hi, &glam::Mat4::from_translation(pos)))
     }
 
