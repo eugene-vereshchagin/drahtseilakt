@@ -587,9 +587,10 @@ run without input (5900 frames of each level) shows the swinging sacks of levels
 module comes in, 180 frames before the ball, the push changing every 91 frames; our sacks were pushed only from the
 ball on, so they met the ball 3.6 away from the original's and with two thirds of its swing. The game now runs the
 level's start frame by frame with the pushes: the sacks meet the ball within 0.07 of the original's, and their swings
-peak on the original's ticks over the whole run. (Level 11's calibration now parts from the original at tick 92, not
-285: the swinging sacks stay among the physics' moving units, and the order in which the sleep test meets them is not
-yet the original's.) A module wakes when its script's proximity test finds the ball near; the original makes a few
+peak on the original's ticks over the whole run. The start sector's modules come into the physics in the same frame
+as its objects, as the original places both on its frame 8 (we had them a frame later, from the C game): with the
+swinging sacks among the moving units, that order is what the sleep test meets them in, and levels 10 to 12's
+calibrations now part from the original at ticks 180, 285 and 293 (134, 285 and 39 before). A module wakes when its script's proximity test finds the ball near; the original makes a few
 copies of each module and gives each placeholder one of them in its PH array, so placeholders of different sectors
 share a copy, and a copy's countdown to its next test stops while it is out of play and goes on where it was. At a
 level's start the countdowns are where the load left them (level 5's pusher wakes 54 frames after it comes in, not at

@@ -1388,9 +1388,10 @@ impl Sim {
         {
             world.activate(b);
         }
-        // The modules come one frame after the sector's objects, then the ball.
+        // The modules come in the same frame as the sector's objects (measured on the original: both are placed on
+        // its frame 8; with the modules a frame later, as the C game, levels 10 to 12 part from the original's
+        // calibration at ticks 134, 92 and 39 instead of 180, 285 and 293), then the ball.
         let frame = 1.0 / 30.0;
-        world.run(frame);
         // The wake-ups on approach and the finish triggers, armed now for the modules that are in the physics from
         // the start.
         let mut wake_triggers: Vec<WakeTrigger> = Vec::new();
@@ -1481,6 +1482,8 @@ impl Sim {
                 finishes.push(t);
             }
         }
+        // the frame they came in, before their scripts push or test
+        world.run(frame);
         // The extra points' small balls start at the module's frames 1..6, around each stand-in.
         let mut extras = Vec::new();
         if let Some((_, file)) = modules.get("P_Extra_Point") {
