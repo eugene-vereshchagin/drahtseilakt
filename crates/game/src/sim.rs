@@ -355,6 +355,10 @@ struct SwingRun {
     since: Option<u64>,
     /// The Sequencer's steps taken (crate::modules::SwingSpec): the step at the last coming in.
     steps: u64,
+    /// Frames the module was in before tick `since` counts from: a module of the start sector comes in during the
+    /// level's start, frames before the ball, and is pushed from then on (as the original's sacks swing before the
+    /// ball comes).
+    pre: u64,
     /// The push on now: its direction (+1 or -1) and the physics' force.
     push: Option<(i8, usize)>,
 }
@@ -367,6 +371,7 @@ impl SwingRun {
             at,
             since: None,
             steps: 1,
+            pre: 0,
             push: None,
         };
         if now {
@@ -377,7 +382,36 @@ impl SwingRun {
 
     fn enter(&mut self, tick: u64) {
         self.since = Some(tick);
+        self.pre = 0;
         self.steps += 1;
+    }
+
+    /// Frames since the module came in, at `tick`.
+    fn age(&self, tick: u64) -> Option<u64> {
+        self.since.map(|s| (tick + self.pre).saturating_sub(s))
+    }
+
+    /// Makes the push its script wants `age` frames after the module came in, for the next physics frame.
+    fn apply(&mut self, world: &mut World, age: u64) {
+        let want = self.wanted(age);
+        if self.push.map(|p| p.0) == Some(want) || (want == 0 && self.push.is_none()) {
+            return;
+        }
+        if let Some((_, f)) = self.push.take() {
+            world.remove_force(f);
+        }
+        if want != 0 {
+            let Some(origin) = world.bodies.get(self.at.body).map(|b| b.pos) else {
+                return;
+            };
+            if want > 0 {
+                world.wake(self.at.body);
+            }
+            if let Some(f) = world.add_force(self.at.body, self.at.force * f32::from(want), origin)
+            {
+                self.push = Some((want, f));
+            }
+        }
     }
 
     /// The push its script wants `age` ticks after the module came in: +1, -1 or none.
@@ -396,11 +430,12 @@ impl SwingRun {
     }
 
     fn stop(&mut self, world: &mut World, tick: u64) {
-        if let Some(since) = self.since.take()
+        if let Some(age) = self.age(tick)
             && !self.at.pauses
         {
-            self.steps += tick.saturating_sub(since + self.at.start) / self.at.phase.max(1);
+            self.steps += age.saturating_sub(self.at.start) / self.at.phase.max(1);
         }
+        self.since = None;
         if let Some((_, f)) = self.push.take() {
             world.remove_force(f);
         }
@@ -1427,7 +1462,20 @@ impl Sim {
                 }
             }
         }
-        world.run(START_OBJECTS_SECONDS - frame);
+        // The rest of the level's start, frame by frame: the start sector's swings and sacks are pushed from the
+        // frame their module came in (measured on the original, levels 11 and 12: the sacks' pushes change 91
+        // frames after the module comes in, 180 frames before the ball, and every 91 frames on).
+        let intro = (START_OBJECTS_SECONDS / frame).round() as u64 - 1;
+        for i in 0..intro {
+            for w in swings.iter_mut().filter(|w| w.since.is_some()) {
+                w.apply(&mut world, i);
+            }
+            world.run(frame);
+        }
+        for w in swings.iter_mut().filter(|w| w.since.is_some()) {
+            w.pre = intro;
+            w.apply(&mut world, intro);
+        }
         world.replace_ball(
             0,
             BALL_RADIUS,
@@ -2694,27 +2742,8 @@ impl Sim {
     fn run_swings(&mut self) {
         let tick = self.tick;
         for w in &mut self.swings {
-            let Some(since) = w.since else { continue };
-            let want = w.wanted(tick - since);
-            if w.push.map(|p| p.0) == Some(want) || (want == 0 && w.push.is_none()) {
-                continue;
-            }
-            if let Some((_, f)) = w.push.take() {
-                self.world.remove_force(f);
-            }
-            if want != 0 {
-                let Some(origin) = self.world.bodies.get(w.at.body).map(|b| b.pos) else {
-                    continue;
-                };
-                if want > 0 {
-                    self.world.wake(w.at.body);
-                }
-                if let Some(f) =
-                    self.world
-                        .add_force(w.at.body, w.at.force * f32::from(want), origin)
-                {
-                    w.push = Some((want, f));
-                }
+            if let Some(age) = w.age(tick) {
+                w.apply(&mut self.world, age);
             }
         }
     }

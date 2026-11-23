@@ -582,4 +582,9 @@ checkpoint the next sector's objects and modules are in place, moving from the t
 levels 1 to 9, 11 and 12, the same on each; we had taken 44 and 48 ticks from the C game. After a lost ball the
 current sector's objects leave the physics 60 ticks after the ball's box reaches a depth-test cube, its modules 61,
 and both are in place again at 65 (nine levels; we had 62 and 66 from the C game). The depth test takes the ball's
-box unturned: turned with the ball, as we had it, it lost the ball on level 9 five ticks before the original.
+box unturned: turned with the ball, as we had it, it lost the ball on level 9 five ticks before the original. A long
+run without input (5900 frames of each level) shows the swinging sacks of levels 11 and 12 pushed from the frame their
+module comes in, 180 frames before the ball, the push changing every 91 frames; our sacks were pushed only from the
+ball on, so they met the ball 3.6 away from the original's and with two thirds of its swing. The game now runs the
+level's start frame by frame with the pushes: the sacks meet the ball within 0.07 of the original's, and their swings
+peak on the original's ticks over the whole run.

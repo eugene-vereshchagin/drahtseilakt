@@ -540,4 +540,9 @@ Plätzen und bewegen sich ab dem Tick danach. Gemessen am Checkpoint 1 der Level
 vorher hatten wir 44 und 48 Ticks aus dem C-Spiel. Nach einem verlorenen Ball verlassen die Objekte des aktuellen
 Sektors die Physik 60 Ticks, nachdem die Box des Balls einen Tiefentest-Würfel erreicht hat, seine Module nach 61, und
 nach 65 stehen alle wieder an ihren Plätzen (neun Level; wir hatten 62 und 66 aus dem C-Spiel). Der Tiefentest nimmt
-die Box des Balls ungedreht: mit dem Ball gedreht, wie bei uns, verlor sie den Ball auf Level 9 fünf Ticks vor dem Original.
+die Box des Balls ungedreht: mit dem Ball gedreht, wie bei uns, verlor sie den Ball auf Level 9 fünf Ticks vor dem Original. Ein langer Lauf ohne
+Eingabe (5900 Frames je Level) zeigt, dass die schwingenden Säcke der Level 11 und 12 ab dem Frame angestoßen werden, in
+dem ihr Modul kommt, 180 Frames vor dem Ball, und der Stoß alle 91 Frames wechselt; unsere Säcke wurden erst ab dem Ball
+angestoßen und trafen den Ball daher 3,6 vom Original entfernt und mit zwei Dritteln seines Ausschlags. Das Spiel lässt den
+Levelstart jetzt Frame für Frame mit den Stößen laufen: die Säcke treffen den Ball bis auf 0,07 wie im Original, und ihre
+Schwünge erreichen den Scheitel über den ganzen Lauf auf den Ticks des Originals.
