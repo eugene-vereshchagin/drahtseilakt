@@ -144,10 +144,13 @@ const TRAFO_PULL: f32 = 0.23;
 const SECTOR_END_TICKS: u64 = 2;
 const SECTOR_END_MODULE_TICKS: u64 = 3;
 const SECTOR_BEGIN_TICKS: u64 = 7;
-/// After a lost ball, the current sector's objects leave the physics one frame after the ball and come back at their
-/// places four frames later.
-const DEATH_SECTOR_END_TICKS: u64 = 62;
-const DEATH_SECTOR_BEGIN_TICKS: u64 = 66;
+/// After a lost ball (the tick its box reaches a depth-test cube), the original takes the current sector's objects
+/// out of the physics 60 ticks later and its modules 61 ticks later, and makes both again at their places 65 ticks
+/// later (moving from the tick after): measured on levels 2 to 6, 8, 9, 11 and 12 (TAS scenes, 2026-11-23; the C
+/// game's 62 and 66, modules 67, were not the original's).
+const DEATH_SECTOR_END_TICKS: u64 = 60;
+const DEATH_SECTOR_END_MODULE_TICKS: u64 = 61;
+const DEATH_SECTOR_BEGIN_TICKS: u64 = 65;
 
 /// After the ball's box reaches a depth-test cube, the original still pushes the falling ball for 4 frames, takes it
 /// out of the physics 63 frames after the loss (a life goes then), shows the new ball at the reset point 71 frames
@@ -2387,13 +2390,13 @@ impl Sim {
         // The current sector starts again: its objects leave the physics and are made again at their places.
         self.sector_change(
             DEATH_SECTOR_END_TICKS,
-            DEATH_SECTOR_END_TICKS,
+            DEATH_SECTOR_END_MODULE_TICKS,
             self.sector,
             false,
         );
         self.sector_change(
             DEATH_SECTOR_BEGIN_TICKS,
-            DEATH_SECTOR_BEGIN_TICKS + 1,
+            DEATH_SECTOR_BEGIN_TICKS,
             self.sector,
             true,
         );

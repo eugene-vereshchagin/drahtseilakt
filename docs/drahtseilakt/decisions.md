@@ -579,4 +579,6 @@ objects moved in its file (the start before a checkpoint, a module beside it), p
 engine (2026-11-23). A checkpoint is reached when the ball is within 6.5 of its big flame, 1.495 above the checkpoint;
 2 ticks later the passed sector's objects leave the physics, its modules 1 tick after them, and 7 ticks after the
 checkpoint the next sector's objects and modules are in place, moving from the tick after. Measured on checkpoint 1 of
-levels 1 to 9, 11 and 12, the same on each; we had taken 44 and 48 ticks from the C game.
+levels 1 to 9, 11 and 12, the same on each; we had taken 44 and 48 ticks from the C game. After a lost ball the
+current sector's objects leave the physics 60 ticks after the ball's box reaches a depth-test cube, its modules 61,
+and both are in place again at 65 (nine levels; we had 62 and 66 from the C game).

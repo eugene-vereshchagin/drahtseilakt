@@ -244,7 +244,8 @@ list Auto Mass Center, Linear Damp and Rot Damp.
     leave 2 frames later, its modules 3, and the next sector's objects and modules are placed 7 frames later.
   - Lost ball: one frame after the ball is taken out of the physics (61 frames after its box reaches a depth-test
     cube; a life goes then), the current sector's objects are unphysicalized, and 4 frames later physicalized again
-    at their places. The new ball is shown at the reset point 71 frames after the loss and physicalized 245 frames
+    at their places. On the original (TAS scenes, 2026-11-23) the sector's objects leave 60 frames after the box
+    reaches the cube, its modules 61, and both are placed again 65 frames after it; the game follows the original. The new ball is shown at the reset point 71 frames after the loss and physicalized 245 frames
     after it (level 2: lost at 331, the new ball falling from 577). The points counter (Energy: 1000, one point every
     500 ms, first at frame 32 of the ball) waits from the loss until 5 frames after the new ball, where it was; it
     stops at the finish. The end screen's score is the points left ("Time Points"), the level table's LevelBonus
