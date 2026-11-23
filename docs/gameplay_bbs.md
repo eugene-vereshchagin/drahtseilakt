@@ -1210,6 +1210,14 @@ Game usage: `Gameplay.nmo` id 6129, `Trafo Manager`.
 - Group = `Trafo Group`, Position (0,0,0), Referential = `ActiveBall`: the nearest transformer to the
   ball's origin.
 - `Out -> Test.In`; `Test.False -> In` (delay 1).
+- The test is Distance `<` 4.3. True goes through `Ist Trafo != Ball?`, then `Send Message`, then (delay 2)
+  `starte Trafo` (the transformer's animation script) and `dephysic Ball`, whose TT Set Dynamic Position pulls the
+  old ball to the transformer's (0, 3, 0) (force 2, damping 0.7; its first frame only records). A Delayer of 1000 ms,
+  `start Explosion` and a second Delayer lead to `set new Ball`, which physicalizes the new kind at the old ball's
+  matrix.
+- Measured on the original (transformer scenes on levels 1 and 3, 2026-11-23): the ball falls freely two ticks after
+  the test, stands one tick, then follows the spring (the port matches it to 1e-5); the new ball is there 149 ticks
+  after the old one left the physics, where the spring left the old one. The port does the same.
 
 ## Set Parent
 

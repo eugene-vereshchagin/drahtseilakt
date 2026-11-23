@@ -273,6 +273,56 @@ impl World {
             script_statics: Vec::new(),
             baked_info: std::collections::BTreeMap::new(),
         };
+        // research: the level's fixed meshes near a point (DRAHTSEILAKT_DUMP_NEAR=x,y,z,r), one 3-point piece per face
+        // as the original's concave Physicalize makes them, next to the parts (DRAHTSEILAKT_DUMP_PARTS, ivp-oracle)
+        if let (Ok(path), Ok(near)) = (
+            std::env::var("DRAHTSEILAKT_DUMP_PARTS"),
+            std::env::var("DRAHTSEILAKT_DUMP_NEAR"),
+        ) {
+            let v: Vec<f32> = near.split(',').filter_map(|x| x.parse().ok()).collect();
+            if let (Some(&r), Ok(mut f)) = (
+                v.get(3),
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path),
+            ) {
+                use std::io::Write as _;
+                let c = Vec3::new(v[0], v[1], v[2]);
+                for (k, mesh) in statics.iter().enumerate() {
+                    if !mesh.world_triangles().any(|t| {
+                        (t.a - c).length() < r || (t.b - c).length() < r || (t.c - c).length() < r
+                    }) {
+                        continue;
+                    }
+                    let q = mesh.rot.quat();
+                    let g = if mesh.group.is_empty() {
+                        "-"
+                    } else {
+                        mesh.group
+                    };
+                    let _ = writeln!(
+                        f,
+                        "PART {} {g} 1 0 1 1 {SURFACE_FRICTION} {SURFACE_ELASTICITY} 0 0 0 0 0 {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9}",
+                        100_000 + k,
+                        mesh.pos.x,
+                        mesh.pos.y,
+                        mesh.pos.z,
+                        q.x,
+                        q.y,
+                        q.z,
+                        q.w
+                    );
+                    for t in &mesh.triangles {
+                        let _ = writeln!(
+                            f,
+                            "PIECE {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9}",
+                            t.a.x, t.a.y, t.a.z, t.b.x, t.b.y, t.b.z, t.c.x, t.c.y, t.c.z
+                        );
+                    }
+                }
+            }
+        }
         for mesh in statics {
             let ledges: Vec<ledge::Ledge> = mesh
                 .triangles
@@ -649,6 +699,32 @@ impl World {
         }
         let rot = rot.into();
         self.remove(i);
+        // research: the player's ball as it is made (DRAHTSEILAKT_DUMP_PARTS, ivp-oracle)
+        if let Ok(path) = std::env::var("DRAHTSEILAKT_DUMP_PARTS")
+            && let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+        {
+            use std::io::Write as _;
+            let q = rot.quat();
+            let _ = writeln!(
+                f,
+                "BALL {i} {radius} {} {} {} {} {} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9}",
+                m.mass,
+                m.friction,
+                m.elasticity,
+                m.lin_damp,
+                m.rot_damp,
+                pos.x,
+                pos.y,
+                pos.z,
+                q.x,
+                q.y,
+                q.z,
+                q.w
+            );
+        }
         let desc = BodyDesc {
             entity: i as u32 + 1,
             group: group(GROUP_BALL),

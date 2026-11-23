@@ -129,14 +129,23 @@ struct Params {
 /// The camera's heading at the start and after a respawn, in quarter turns (see `Sim::new`).
 const START_QUARTER: i32 = 1;
 
-/// Ticks the ball spends out of the physics in a transformer: the C game removes the old ball's body three frames
-/// after the transformer is under it and makes the new one 149 frames later.
+/// Ticks from the ball leaving the physics in a transformer to the new ball (measured on levels 1 and 3, 2026-11-23:
+/// the new ball is there 149 ticks after the old one stopped, where the spring left the old one).
 const TRAFO_TICKS: u64 = 149;
-/// Where a transformer holds the ball: its own (0, 3, 0), where the C game makes the new ball.
+/// Where a transformer holds the ball: its own (0, 3, 0) (`dephysic Ball`'s TT Set Dynamic Position aims at the
+/// transformer less an offset of (0, -3, 0), in the transformer's frame).
 const TRAFO_HOLD: Vec3 = Vec3::new(0.0, 3.0, 0.0);
-/// How fast the held ball is pulled to the hold point: a critically damped spring of this rate (per tick), as the C
-/// game's ball moves (half way in 7 frames, 90% in 17).
-const TRAFO_PULL: f32 = 0.23;
+/// Gameplay's Trafo Manager: the ball's origin nearer than this to the nearest transformer (Get Nearest In Group, Test
+/// `<` 4.3) starts the transformation.
+pub const TRAFO_REACH: f32 = 4.3;
+/// The ball stays in the physics for this many ticks after the test (Send Message, then `starte Trafo` two frames
+/// later, then `dephysic Ball`): measured on level 3, the ball fell freely two more ticks.
+const TRAFO_DEPHYS_TICKS: u64 = 2;
+/// `dephysic Ball`'s TT Set Dynamic Position: force 2 per second and damping 0.7 on each axis, switched on as the ball
+/// leaves the physics (its first frame only records where the ball is) and off 1350 ms later.
+const TRAFO_SPRING_FORCE: f32 = 2.0;
+const TRAFO_SPRING_DAMPING: f32 = 0.7;
+const TRAFO_SPRING_TICKS: u64 = 81;
 /// After the ball reaches a checkpoint (the tick it is first within the gate), the original takes the passed sector's
 /// objects out of the physics 2 ticks later and its modules 3 ticks later, and makes the next sector's objects and
 /// modules 7 ticks later (moving from the tick after): measured on checkpoint 1 of levels 1 to 9, 11 and 12 (TAS
@@ -841,11 +850,12 @@ fn module_parts(
 /// The ball inside a transformer: out of the physics until `release`, then a new ball of its new kind at `at`.
 #[derive(Clone, Copy, Debug)]
 struct TrafoHold {
+    /// The tick the ball left the physics.
     start: u64,
+    /// The spring's last position (its "Old Position").
+    last: Vec3,
     release: u64,
     at: Vec3,
-    /// Where the ball was taken.
-    from: Vec3,
     /// The kind it was, drawn until the new ball comes.
     old: BallKind,
 }
@@ -918,6 +928,9 @@ pub struct Sim {
     pub script_cursor: Option<bool>,
     /// The ball inside a transformer, if it is in one.
     hold: Option<TrafoHold>,
+    /// A transformer that has taken the ball, which is still in the physics until the tick given (`TRAFO_DEPHYS_TICKS`):
+    /// the transformer's position, the kind it makes, its matrix.
+    trafo_pending: Option<(u64, Vec3, BallKind, Mat4)>,
     /// The transformer animation playing, if one is.
     trafo_anim: Option<TrafoAnim>,
     /// The tick the ball fell off the level, until the new ball is in.
@@ -1004,7 +1017,6 @@ struct SectorChange {
 
 const PICK_RADIUS: f32 = 3.5;
 /// How near a transformer takes the ball.
-pub const TRAFO_REACH: f32 = PICK_RADIUS + 1.0;
 /// Physics time from the level's load to its first sector's objects: 594 frames at time factor 1 (the C game,
 /// level 1).
 const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
@@ -1618,6 +1630,7 @@ impl Sim {
             playback_pauses: None,
             script_cursor: None,
             hold: None,
+            trafo_pending: None,
             trafo_anim: None,
             dying: None,
             push_keys: 0,
@@ -2306,19 +2319,28 @@ impl Sim {
             {
                 self.burst(h.old, self.ball.position);
             }
-            // Out of the physics, the ball is drawn moving to the transformer's hold point.
-            let t = (self.tick - h.start) as f32 * TRAFO_PULL;
-            self.ball.position = h.at + (h.from - h.at) * (1.0 + t) * (-t).exp();
+            // Out of the physics, the ball follows the spring to the transformer's hold point: the first frame records
+            // where it is, the next ones move it (next = now + last move × damping + (aim − now) × force × dt)
+            let k = self.tick - h.start;
+            let x = self.ball.position;
+            if (2..=1 + TRAFO_SPRING_TICKS).contains(&k) {
+                self.ball.position = x
+                    + (x - h.last) * TRAFO_SPRING_DAMPING
+                    + (h.at - x) * TRAFO_SPRING_FORCE * TICK;
+            }
+            if let Some(hh) = self.hold.as_mut() {
+                hh.last = x;
+            }
             if self.tick >= h.release {
+                // `set new Ball` puts the new ball at the old one's matrix (BallMatrix): where the spring left it
                 self.hold = None;
-                self.ball.position = h.at;
                 self.ball.velocity = Vec3::ZERO;
                 self.ball.spin = Vec3::ZERO;
                 self.world.replace_ball(
                     0,
                     BALL_RADIUS,
                     self.ball.material(),
-                    h.at,
+                    self.ball.position,
                     self.ball.rotation,
                 );
                 self.drop_ball_forces();
@@ -2399,28 +2421,38 @@ impl Sim {
             }
         }
         for &(_, q, kind, at) in &self.rules.trafos {
-            if self.hold.is_none() && self.ball.kind != kind && near(q, TRAFO_REACH) {
-                // The original takes the ball out of the physics and, after a while, makes a ball of the new kind at
-                // rest above the transformer.
-                let old = self.ball.kind;
-                self.ball.kind = kind;
-                self.world.remove(0);
-                self.ball.velocity = Vec3::ZERO;
-                self.ball.spin = Vec3::ZERO;
-                self.hold = Some(TrafoHold {
-                    start: self.tick,
-                    release: self.tick + TRAFO_TICKS,
-                    at: q + TRAFO_HOLD,
-                    from: p,
-                    old,
-                });
-                self.trafo_anim = Some(TrafoAnim {
-                    at,
-                    start: self.tick,
-                    kind,
-                });
+            if self.hold.is_none()
+                && self.trafo_pending.is_none()
+                && self.ball.kind != kind
+                && near(q, TRAFO_REACH)
+            {
+                self.trafo_pending = Some((self.tick + TRAFO_DEPHYS_TICKS, q, kind, at));
                 self.events.push((self.tick, Event::Transform(kind)));
             }
+        }
+        // The original takes the ball out of the physics two ticks after its test, starts the transformer's animation
+        // and, after a while, makes a ball of the new kind at rest above the transformer.
+        if let Some((when, _, kind, at)) = self.trafo_pending
+            && self.tick >= when
+        {
+            self.trafo_pending = None;
+            let old = self.ball.kind;
+            self.ball.kind = kind;
+            self.world.remove(0);
+            self.ball.velocity = Vec3::ZERO;
+            self.ball.spin = Vec3::ZERO;
+            self.hold = Some(TrafoHold {
+                start: self.tick,
+                last: p,
+                release: self.tick + TRAFO_TICKS,
+                at: at.transform_point3(TRAFO_HOLD),
+                old,
+            });
+            self.trafo_anim = Some(TrafoAnim {
+                at,
+                start: self.tick,
+                kind,
+            });
         }
         // Checkpoints in order: reaching the next one opens the next sector.
         if let Some(&(c, q)) = self.checkpoints().get(self.sector)
@@ -3134,6 +3166,7 @@ impl Sim {
         self.ball.velocity = Vec3::ZERO;
         self.ball.spin = Vec3::ZERO;
         self.hold = None;
+        self.trafo_pending = None;
         self.trafo_anim = None;
         // The rig comes back as it was at the start (TT Restore IC on Cam_MF, put at the reset point): the start
         // heading, not lifted, the look-at point at the ball; InGameCam springs there from where it was, its speed
@@ -4194,6 +4227,11 @@ pub(crate) mod tests {
         let mut sim = Sim::new(&level, BallKind::Wood);
         sim.step(0);
         assert!(sim.events.contains(&(1, Event::Transform(BallKind::Stone))));
+        // the original's ball stays in the physics two more ticks (`starte Trafo`, then `dephysic Ball`)
+        assert!(sim.world.state(0).is_some(), "still in the physics");
+        for _ in 0..TRAFO_DEPHYS_TICKS {
+            sim.step(0);
+        }
         assert!(sim.world.state(0).is_none(), "the ball left the physics");
         // The old wooden ball is drawn until a tick before the new one, and the animation plays from the next tick.
         assert_eq!(sim.drawn_ball(), Some(BallKind::Wood));

@@ -607,3 +607,6 @@ ties in degenerate contacts lie within the original's own spread. Drop scenes (t
 two more: P_Modul_19's hub had no hull (duplicate vertices and a face flat only to f32), and a fan pushes a ball that
 starts in its updraft from the first tick. A third: when contacts or hinges join simulation units, IVP rebuilds the
 controller list, which decides the order a chain's hinges are solved in (P_Modul_29's bridge now sags as the original's).
+Transformer scenes: the transformation now follows Gameplay's Trafo Manager (the test at 4.3, two more ticks in the
+physics, the spring of `dephysic Ball`, the new ball 149 ticks later where the old one was); the stone ball then
+matches the original to 1e-3 over 900 ticks with the controls.
