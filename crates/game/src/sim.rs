@@ -137,10 +137,13 @@ const TRAFO_HOLD: Vec3 = Vec3::new(0.0, 3.0, 0.0);
 /// How fast the held ball is pulled to the hold point: a critically damped spring of this rate (per tick), as the C
 /// game's ball moves (half way in 7 frames, 90% in 17).
 const TRAFO_PULL: f32 = 0.23;
-/// After a checkpoint, the C game takes the passed sector's objects out of the physics 44 frames later and makes the
-/// next sector's 4 frames after that.
-const SECTOR_END_TICKS: u64 = 44;
-const SECTOR_BEGIN_TICKS: u64 = 48;
+/// After the ball reaches a checkpoint (the tick it is first within the gate), the original takes the passed sector's
+/// objects out of the physics 2 ticks later and its modules 3 ticks later, and makes the next sector's objects and
+/// modules 7 ticks later (moving from the tick after): measured on checkpoint 1 of levels 1 to 9, 11 and 12 (TAS
+/// scenes, 2026-11-23; the C game's 44 and 48 were not the original's).
+const SECTOR_END_TICKS: u64 = 2;
+const SECTOR_END_MODULE_TICKS: u64 = 3;
+const SECTOR_BEGIN_TICKS: u64 = 7;
 /// After a lost ball, the current sector's objects leave the physics one frame after the ball and come back at their
 /// places four frames later.
 const DEATH_SECTOR_END_TICKS: u64 = 62;
@@ -278,6 +281,8 @@ struct Rules {
     /// The checkpoints in the order their group lists them, as replays of formats 1 to 3 were recorded (sim.rs
     /// `checkpoints_by_name`).
     checkpoints_listed: Vec<(usize, Vec3)>,
+    /// Each checkpoint's gate point (its big flame), by level object.
+    gates: Vec<(usize, Vec3)>,
     resets: Vec<Vec3>,
     /// Each reset point's turn (its matrix without scale): a new ball takes its reset point's whole matrix.
     reset_turns: Vec<Mat3>,
@@ -961,6 +966,11 @@ const LEVEL_INTRO_SECONDS: f64 = 594.0 / 60.0;
 /// ball, and our game has no tutorial to stop for.
 const START_OBJECTS_SECONDS: f64 = 180.0 / 30.0;
 const GATE_RADIUS: f32 = 7.0;
+/// A checkpoint is reached when the ball is within 6.5 of its big flame, (0, 1.495, 0) in the checkpoint's frame
+/// (PC_TwoFlames_MF Script: TT Scaleable Proximity, all three axes, to PC_TwoFlames_Flame_Big; tested every frame
+/// within 20, which the ball cannot cross in a frame, so testing every tick is the same).
+const CHECKPOINT_RADIUS: f32 = 6.5;
+const CHECKPOINT_FLAME: Vec3 = Vec3::new(0.0, 1.495, 0.0);
 /// The points a level starts with (the Energy array's StartPoints), and the counter that takes one every half
 /// second (its Timefactor, 500 ms): measured in the C game on level 2, the points go down at ticks 32, 62, 92...
 pub(crate) const START_POINTS: i64 = 1000;
@@ -1054,6 +1064,13 @@ impl Sim {
                 });
                 c
             },
+            gates: level
+                .members("PC_Checkpoints")
+                .map(|(i, o)| {
+                    let m = Mat4::from_cols_array_2d(&o.matrix);
+                    (i, m.transform_point3(CHECKPOINT_FLAME))
+                })
+                .collect(),
             resets: sorted_by_name(level, "PR_Resetpoints"),
             reset_turns: sorted_turns_by_name(level, "PR_Resetpoints"),
             resets_listed: by_bytes(level, "PR_Resetpoints")
@@ -2263,16 +2280,28 @@ impl Sim {
             }
         }
         // Checkpoints in order: reaching the next one opens the next sector.
-        if let Some(&(_, q)) = self.checkpoints().get(self.sector)
-            && near(q, GATE_RADIUS)
+        if let Some(&(c, q)) = self.checkpoints().get(self.sector)
+            && near(
+                self.rules
+                    .gates
+                    .iter()
+                    .find(|g| g.0 == c)
+                    .map_or(q, |g| g.1),
+                CHECKPOINT_RADIUS,
+            )
         {
             self.sector += 1;
             self.events
                 .push((self.tick, Event::Checkpoint(self.sector)));
-            // The passed sector's objects leave the physics, then the next sector's are made at their places, its
-            // modules one frame later.
-            self.sector_change(SECTOR_END_TICKS, self.sector - 1, false);
-            self.sector_change(SECTOR_BEGIN_TICKS, self.sector, true);
+            // The passed sector's objects leave the physics, then its modules, then the next sector's objects and
+            // modules are made at their places.
+            self.sector_change(
+                SECTOR_END_TICKS,
+                SECTOR_END_MODULE_TICKS,
+                self.sector - 1,
+                false,
+            );
+            self.sector_change(SECTOR_BEGIN_TICKS, SECTOR_BEGIN_TICKS, self.sector, true);
             // the next sector's transformers are drawn from the checkpoint on (their pads stood in the way the ball
             // takes at once; one popping up 0.8 s later, as the ball reaches it, looked like a glitch)
             self.show_trafos_of(self.sector);
@@ -2356,22 +2385,31 @@ impl Sim {
         }
         self.dying = Some(self.tick);
         // The current sector starts again: its objects leave the physics and are made again at their places.
-        self.sector_change(DEATH_SECTOR_END_TICKS, self.sector, false);
-        self.sector_change(DEATH_SECTOR_BEGIN_TICKS, self.sector, true);
+        self.sector_change(
+            DEATH_SECTOR_END_TICKS,
+            DEATH_SECTOR_END_TICKS,
+            self.sector,
+            false,
+        );
+        self.sector_change(
+            DEATH_SECTOR_BEGIN_TICKS,
+            DEATH_SECTOR_BEGIN_TICKS + 1,
+            self.sector,
+            true,
+        );
     }
 
-    /// Schedules a sector's objects to enter or leave the physics `after` ticks from now, and its modules with them
-    /// (entering one tick later).
-    fn sector_change(&mut self, after: u64, sector: usize, enter: bool) {
-        let tick = self.tick + after;
+    /// Schedules a sector's objects to enter or leave the physics `objects` ticks from now, and its modules
+    /// `modules` ticks from now.
+    fn sector_change(&mut self, objects: u64, modules: u64, sector: usize, enter: bool) {
         self.sector_changes.push(SectorChange {
-            tick,
+            tick: self.tick + objects,
             sector,
             enter,
             modules: false,
         });
         self.sector_changes.push(SectorChange {
-            tick: if enter { tick + 1 } else { tick },
+            tick: self.tick + modules,
             sector,
             enter,
             modules: true,

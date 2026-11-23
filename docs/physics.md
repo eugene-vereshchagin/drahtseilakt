@@ -238,7 +238,10 @@ list Auto Mass Center, Linear Damp and Rot Damp.
   - Level start: the physics runs at time factor 1 with the level's geometry only; at 9.90 s of its time the first
     sector's objects are physicalized, at 9.9667 s (four frames later) the player ball.
   - Checkpoint: 44 frames after the ball reaches it, the passed sector's objects are unphysicalized; 4 frames later
-    the next sector's are physicalized at their places in the level.
+    the next sector's are physicalized at their places in the level. Measured on the original (TAS scenes,
+    2026-11-23) it is quicker, and the game follows the original: the ball reaches a checkpoint within 6.5 of
+    PC_TwoFlames_Flame_Big (1.495 above the checkpoint, the MF script's proximity test); the passed sector's objects
+    leave 2 frames later, its modules 3, and the next sector's objects and modules are placed 7 frames later.
   - Lost ball: one frame after the ball is taken out of the physics (61 frames after its box reaches a depth-test
     cube; a life goes then), the current sector's objects are unphysicalized, and 4 frames later physicalized again
     at their places. The new ball is shown at the reset point 71 frames after the loss and physicalized 245 frames

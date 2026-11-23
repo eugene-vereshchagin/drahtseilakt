@@ -1558,8 +1558,9 @@ transformer's own `P_Trafo_*_MF` and `_Shadow`, hidden in their module file, are
 stay shown throughout.
 
 Port note (visual only): the next sector's transformers are drawn from the checkpoint tick, not with the rest of the sector
-48 ticks later, and stay drawn when a lost ball restarts the sector (Beginners Happiness: the first transformer of sector 2
-lies 17 units past the checkpoint and popped up as the ball reached it). Physics timing is unchanged.
+7 ticks later (48 when this was written, from the C game), and stay drawn when a lost ball restarts the sector (Beginners
+Happiness: the first transformer of sector 2 lies 17 units past the checkpoint and popped up as the ball reached it).
+Physics timing is unchanged.
 
 ## TT Scaleable Proximity (as the port runs it)
 

@@ -1609,7 +1609,8 @@ pub fn commands(
             if let Some(n) = o.trace.filter(|&n| n > 0 && game.sim.tick % n == 0) {
                 let b = &game.sim.ball;
                 let _ = n;
-                // more digits with DRAHTSEILAKT_TRACE_DIGITS (comparisons with the original's traces need ~1e-6)
+                // more digits with DRAHTSEILAKT_TRACE_DIGITS, for the ball and the loose trace (the original's traces
+                // carry every bit of a float: 1e-7 units)
                 let d = std::env::var("DRAHTSEILAKT_TRACE_DIGITS")
                     .ok()
                     .and_then(|v| v.parse::<usize>().ok())
@@ -1661,7 +1662,7 @@ pub fn commands(
                                 .get(o)
                                 .map_or("?", |ob| ob.name.as_str());
                             println!(
-                                "    {name} ({:8.2} {:8.2} {:8.2})",
+                                "    {name} ({:8.d$} {:8.d$} {:8.d$})",
                                 st.pos.x, st.pos.y, st.pos.z
                             );
                         }
@@ -1675,8 +1676,19 @@ pub fn commands(
                             let (o, p) = (&m.object, st.pos);
                             let (r, w) = (st.rot, st.spin);
                             println!(
-                                "    {o} #{} ({:8.2} {:8.2} {:8.2}) rot ({:.3} {:.3} {:.3} {:.3}) spin ({:.2} {:.2} {:.2})",
-                                m.body, p.x, p.y, p.z, r.x, r.y, r.z, r.w, w.x, w.y, w.z
+                                "    {o} #{} ({:8.d$} {:8.d$} {:8.d$}) rot ({:.r$} {:.r$} {:.r$} {:.r$}) spin ({:.d$} {:.d$} {:.d$})",
+                                m.body,
+                                p.x,
+                                p.y,
+                                p.z,
+                                r.x,
+                                r.y,
+                                r.z,
+                                r.w,
+                                w.x,
+                                w.y,
+                                w.z,
+                                r = d.max(3)
                             );
                         }
                     }

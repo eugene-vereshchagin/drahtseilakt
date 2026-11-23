@@ -531,3 +531,10 @@ Original selbst nimmt nicht immer denselben Weg: acht Läufe der Levels 2, 3 und
 die sich schon bei den Ticks 30, 88 und 142 trennen, und die wiederholte Kalibrierung von Level 1 trennt sich von Lauf 8
 bei Tick 144. Eine Übereinstimmung gilt also immer einem der Wege des Originals, die Zahlen zu Level 1 oben denen der
 Läufe 7 und 8.
+Weil der Ball einen Weg nicht genau wiederholt, nutzen die nächsten Messungen kurze Szenen: ein Level des Originals, in
+dessen Datei einige Objekte versetzt sind (der Start vor einem Checkpoint, ein Modul daneben), gespielt auf dem
+Original und auf unserer Engine (2026-11-23). Ein Checkpoint ist erreicht, wenn der Ball näher als 6,5 an seiner großen
+Flamme ist, 1,495 über dem Checkpoint; 2 Ticks später verlassen die Objekte des passierten Sektors die Physik, seine
+Module einen Tick danach, und 7 Ticks nach dem Checkpoint stehen die Objekte und Module des nächsten Sektors an ihren
+Plätzen und bewegen sich ab dem Tick danach. Gemessen am Checkpoint 1 der Level 1 bis 9, 11 und 12, überall gleich;
+vorher hatten wir 44 und 48 Ticks aus dem C-Spiel.

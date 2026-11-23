@@ -574,3 +574,9 @@ all twelve. The original
 itself does not always take the same path: eight plays of levels 2, 3 and 4 gave 2, 3 and 2 different paths, parting
 as early as ticks 30, 88 and 142, and level 1's calibration played again parts from run 8's at tick 144. So a match is
 always one with one of the original's paths, and the level 1 figures above are against run 7's and 8's.
+Because the ball does not repeat a path exactly, the next measurements use short scenes: an original level with a few
+objects moved in its file (the start before a checkpoint, a module beside it), played on the original and on our
+engine (2026-11-23). A checkpoint is reached when the ball is within 6.5 of its big flame, 1.495 above the checkpoint;
+2 ticks later the passed sector's objects leave the physics, its modules 1 tick after them, and 7 ticks after the
+checkpoint the next sector's objects and modules are in place, moving from the tick after. Measured on checkpoint 1 of
+levels 1 to 9, 11 and 12, the same on each; we had taken 44 and 48 ticks from the C game.
