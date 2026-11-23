@@ -1397,7 +1397,7 @@ mod tests {
                 }
             }
         }
-        let shape = BallShape::hull(&cube).expect("a hull");
+        let shape = BallShape::hull(&cube).unwrap();
         let i = w.reserve_ball(Vec3::new(0.0, 3.0, 0.0), Quat::IDENTITY);
         w.replace_ball_shaped(
             i,
@@ -1415,7 +1415,7 @@ mod tests {
         for _ in 0..300 {
             w.step(None);
         }
-        let y = w.state(i).expect("in the physics").pos.y;
+        let y = w.state(i).unwrap().pos.y;
         assert!((y - 1.5).abs() < 0.05, "rests at {y}");
     }
 
