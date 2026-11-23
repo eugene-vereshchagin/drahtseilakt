@@ -207,8 +207,12 @@ pub fn rsqrt_steps(n: f64, steps: u32) -> f64 {
     let hi = (n.to_bits() >> 32) as u32;
     let guess_hi = (0x7ff0_0000u32.wrapping_sub(hi)) / 2 + 0x1ff0_0000u32;
     let mut y = f64::from_bits(u64::from(guess_hi) << 32);
-    for _ in 0..steps {
-        y = (0.5 - 0.5 * n * y * y + 1.0) * y;
+    let h = n * 0.5;
+    for k in 0..steps {
+        // the first correction multiplies h * y * y, the later ones y * y * h (the original's 0x1000dae0 / db80; the
+        // last bits decide near ties, as between two equally steep edges of a contact search)
+        let t = if k == 0 { h * y * y } else { y * y * h };
+        y *= 1.0 + (0.5 - t);
     }
     y
 }

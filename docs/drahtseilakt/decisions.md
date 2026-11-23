@@ -600,3 +600,5 @@ where we woke it 58 frames earlier). What still parts there is the pusher's firs
 A script's wake-up brings a sleeping part back at the next step of the physics, not at once (the IVP of Ballanced,
 run on the same bodies, showed the earlier start of its contact tests). The pusher's first contact still parts: where
 its edge lies parallel to the gutter, two features are equally near and the contact search settles on another one.
+Three rules of IVP's arithmetic now match (the collision cache at a PSI, single-precision differences in edge lengths,
+the order of the inverse square root's products); what decides the rest is the original's x87 extended precision.

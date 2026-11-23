@@ -192,8 +192,8 @@ impl World {
         if stale {
             let (r, vv, pos) = match self.cores.get(obj) {
                 Some(c) => {
-                    let m = c.object_pose_at(now);
-                    (m.r, m.vv, core_pos_at(c, now))
+                    let (m, pos) = c.cache_pose_at(now);
+                    (m.r, m.vv, pos)
                 }
                 None => (
                     [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],

@@ -602,6 +602,12 @@ Uses (Min / Max / Sleep / ID):
   - That is the object's ensure_in_simulation: a sleeping core goes on the revive list and comes back at the start of
     the next PSI, not at once (compared with the IVP of Ballanced on level 5's pusher, 2026-11-23: reviving at once
     started the module's mindists a PSI early). The port does so for the scripts' wake-ups (`World::wake_script`).
+- Three details of IVP's arithmetic that decide near ties in the contact search (compared with the IVP of Ballanced,
+  2026-11-23): an object's collision cache takes the core's quaternion as it is at the time of its last PSI and
+  interpolates only between PSIs; `IVP_U_Float_Point::quad_distance_to` takes each difference in single precision;
+  the inverse square root's first correction multiplies h·y·y and the later ones y·y·h. A module resting flat on
+  another can still land differently: the original builds and normalises its matrices in x87 extended precision, which
+  turns the sign of a 1e-23 residual where an edge lies parallel to a face; the port computes in double.
 
   It is used after every new ball and by Ball Navigation.
 - **Set Physics Globals**

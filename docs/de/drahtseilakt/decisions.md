@@ -560,4 +560,6 @@ die Schieber von Level 5 am Start und nach einem Checkpoint auf dem Frame des Or
 Das Aufwecken durch ein Skript holt einen schlafenden Teil erst beim nächsten Schritt der Physik zurück, nicht sofort
 (das zeigte das IVP von Ballanced mit denselben Körpern: bei uns begannen die Kontakttests früher). Die erste Berührung
 des Schiebers trennt sich noch: wo seine Kante parallel zur Rinne liegt, sind zwei Elemente gleich nah, und die
-Kontaktsuche bleibt bei einem anderen stehen.
+Kontaktsuche bleibt bei einem anderen stehen. Drei Regeln der IVP-Arithmetik stimmen jetzt überein (der Kollisions-Cache
+bei einem PSI, Differenzen einfacher Genauigkeit in Kantenlängen, die Reihenfolge der Produkte der inversen Wurzel); den
+Rest entscheidet die erweiterte x87-Genauigkeit des Originals.

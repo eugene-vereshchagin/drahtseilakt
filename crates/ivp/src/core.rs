@@ -115,6 +115,38 @@ pub struct Core {
 impl Core {
     /// The pose of the object at time `t` (`ivp_body_m_world_f_object_at`, phys_core.c 333): the core's rotation
     /// slerped from the last PSI, its position, and the object's shift rotated into the world.
+    /// The object's pose as its collision cache takes it (`IVP_Cache_Object::update_cache_object`): at the time of the
+    /// core's last PSI its quaternion as it is, else interpolated (and normalised again) to `t`, then the matrix.
+    /// Interpolating at the PSI as well changed the last bits of a woken module's matrix, enough to turn the sign of
+    /// a contact test where one of its edges lies parallel to a face (level 5's pusher landed on its other end).
+    pub fn cache_pose_at(&self, t: f64) -> (Matrix, [f64; 3]) {
+        let dt = t - self.time_of_last_psi;
+        if dt != 0.0 {
+            let m = self.object_pose_at(t);
+            let mut core_pos = [0.0; 3];
+            for k in 0..3 {
+                core_pos[k] = self.pos_last[k] + f64::from(self.delta_pos[k]) * dt;
+            }
+            return (m, core_pos);
+        }
+        let r = math::quat_to_matrix(&self.q_last);
+        let mut vv = self.pos_last;
+        if self.shift != [0.0; 3] {
+            let s = math::rmul(
+                &r,
+                &[
+                    f64::from(self.shift[0]),
+                    f64::from(self.shift[1]),
+                    f64::from(self.shift[2]),
+                ],
+            );
+            for k in 0..3 {
+                vv[k] += s[k];
+            }
+        }
+        (Matrix { r, vv }, self.pos_last)
+    }
+
     pub fn object_pose_at(&self, t: f64) -> Matrix {
         let dt = t - self.time_of_last_psi;
         let q = math::quat_slerp(

@@ -42,9 +42,15 @@ fn fsub_d(a: P3, b: P3) -> V3 {
     ]
 }
 
-/// `|q - p|^2` of two f32 points, summed in f64 and stored f32 (`flen2`).
+/// `|q - p|^2` of two f32 points as IVP_U_Float_Point::quad_distance_to takes it: each difference in f32, squared
+/// and summed in f64, stored f32 (`flen2`). The f32 difference decides near ties between the edges a contact search
+/// can walk to (measured against the IVP of Ballanced, x87 build, on level 5's pusher).
 fn flen2(q: P3, p: P3) -> f32 {
-    let d = fsub_d(q, p);
+    let d = [
+        f64::from(q[0] - p[0]),
+        f64::from(q[1] - p[1]),
+        f64::from(q[2] - p[2]),
+    ];
     (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) as f32
 }
 
