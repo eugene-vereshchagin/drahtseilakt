@@ -1436,6 +1436,17 @@ impl Sim {
                     .map_or("", |o| o.name.as_str());
                 let copy = match pool.iter().find(|c| c.0 == name) {
                     Some(&(_, k, countdown)) => {
+                        // research (scenes that move a module into another sector change its copy's load history):
+                        // DRAHTSEILAKT_WAKE_COUNTDOWN=<placeholder>=<frames>,... as measured on the original's scene
+                        let countdown = std::env::var("DRAHTSEILAKT_WAKE_COUNTDOWN")
+                            .ok()
+                            .and_then(|v| {
+                                v.split(',').find_map(|e| {
+                                    let (n, f) = e.split_once('=')?;
+                                    (n == name).then(|| f.parse::<u8>().ok()).flatten()
+                                })
+                            })
+                            .unwrap_or(countdown);
                         let module = module_of(level, inst.object).unwrap_or("").to_string();
                         match copy_slots.iter().position(|s| s.0 == module && s.1 == k) {
                             Some(slot) => slot,
