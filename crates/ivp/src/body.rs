@@ -217,6 +217,22 @@ impl World {
         self.ensure_in_simulation(c);
     }
 
+    /// The object's ensure_in_simulation as a script's Physics WakeUp calls it: a sleeping core goes on the revive
+    /// list and comes back at the start of the next PSI; an awake one gets fresh sleep timers (its own core only).
+    /// Reviving a woken module at once made its mindists start a PSI early (measured against the IVP of Ballanced on
+    /// level 5's pusher: its first contact then took the other end of the pusher).
+    pub fn wake_body_next_psi(&mut self, c: usize) {
+        if self.cores[c].unmovable {
+            return;
+        }
+        if self.cores[c].movement_state != crate::core::MT_NOT_SIM {
+            self.reset_freeze_check_values(c);
+        } else if !self.cores[c].in_revive_list {
+            self.cores[c].in_revive_list = true;
+            self.revive.push(c);
+        }
+    }
+
     /// The object's pose at the current time: its origin and its rotation (the game's convention).
     pub fn body_pose(&self, c: usize) -> (V3, Quat) {
         let m = self.cores[c].object_pose_at(self.env.current_time);

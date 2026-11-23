@@ -599,6 +599,9 @@ Uses (Min / Max / Sleep / ID):
 - **Physics WakeUp** (`Execute` `FUN_10004de0`, no pins) calls `FUN_1000a460`:
   - if the object state `+0x80` is not 8, it re-activates the core (`FUN_1000cec0`);
   - otherwise it calls `FUN_1000b540`.
+  - That is the object's ensure_in_simulation: a sleeping core goes on the revive list and comes back at the start of
+    the next PSI, not at once (compared with the IVP of Ballanced on level 5's pusher, 2026-11-23: reviving at once
+    started the module's mindists a PSI early). The port does so for the scripts' wake-ups (`World::wake_script`).
 
   It is used after every new ball and by Ball Navigation.
 - **Set Physics Globals**

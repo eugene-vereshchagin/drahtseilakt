@@ -597,3 +597,6 @@ level's start the countdowns are where the load left them (level 5's pusher wake
 once). Both were read on the original for levels 1 to 12 (`wakepool.rs`, by the source hash as the start phase); with
 them the pushers of level 5 wake on the original's frame at the start and after a checkpoint (frame 427 of the scene,
 where we woke it 58 frames earlier). What still parts there is the pusher's first contact with its gutter.
+A script's wake-up brings a sleeping part back at the next step of the physics, not at once (the IVP of Ballanced,
+run on the same bodies, showed the earlier start of its contact tests). The pusher's first contact still parts: where
+its edge lies parallel to the gutter, two features are equally near and the contact search settles on another one.

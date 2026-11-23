@@ -407,7 +407,7 @@ impl SwingRun {
                 return;
             };
             if want > 0 {
-                world.wake(self.at.body);
+                world.wake_script(self.at.body);
             }
             if let Some(f) = world.add_force(self.at.body, self.at.force * f32::from(want), origin)
             {
@@ -1529,7 +1529,7 @@ impl Sim {
                     if let Some(b) = w.then.and_then(|k| breaks.get_mut(k)) {
                         b.at.prox.switch_on();
                     }
-                    world.wake(w.body);
+                    world.wake_script(w.body);
                     for f in &w.forces {
                         world.add_force(f.body, f.force, f.point);
                     }
@@ -2796,7 +2796,7 @@ impl Sim {
                 if let Some(b) = w.then.and_then(|i| self.breaks.get_mut(i)) {
                     b.at.prox.switch_on();
                 }
-                self.world.wake(w.body);
+                self.world.wake_script(w.body);
                 for f in &w.forces {
                     self.world.add_force(f.body, f.force, f.point);
                 }

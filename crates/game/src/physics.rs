@@ -706,6 +706,13 @@ impl World {
         }
     }
 
+    /// A script's Physics WakeUp: the body comes back at the next step of the physics (ivp `wake_body_next_psi`).
+    pub fn wake_script(&mut self, i: usize) {
+        if let Some(&Some(id)) = self.handles.get(i) {
+            self.physics.wake_body_next_psi(id);
+        }
+    }
+
     /// A box with the given half sizes: the hull of its eight corners (tests).
     #[cfg(test)]
     #[allow(clippy::expect_used)]
@@ -841,12 +848,56 @@ impl World {
                 ivp::convex::hull(&pts)
             })
             .collect();
+        let rot: Rot = rot.into();
+        // research: every convex part as it is made (its pieces' points, pose and settings), for running the same
+        // bodies on the IVP of Ballanced (drahtseilakt-tools research/ivp-oracle)
+        if let Ok(path) = std::env::var("DRAHTSEILAKT_DUMP_PARTS") {
+            use std::io::Write as _;
+            let q = rot.quat();
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+            {
+                let _ = writeln!(
+                    f,
+                    "PART {} {} {} {} {} {} {} {} {} {} {} {} {} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9} {:.9}",
+                    self.handles.len(),
+                    group_name,
+                    fixed as u8,
+                    frozen as u8,
+                    collide as u8,
+                    m.mass,
+                    m.friction,
+                    m.elasticity,
+                    m.lin_damp,
+                    m.rot_damp,
+                    shift[0],
+                    shift[1],
+                    shift[2],
+                    pos.x,
+                    pos.y,
+                    pos.z,
+                    q.x,
+                    q.y,
+                    q.z,
+                    q.w
+                );
+                for p in pieces {
+                    let pts: Vec<String> = p
+                        .iter()
+                        .map(|v| format!("{:.9} {:.9} {:.9}", v.x, v.y, v.z))
+                        .collect();
+                    let _ = writeln!(f, "PIECE {}", pts.join(" "));
+                }
+            }
+        }
         let surface = Surface::compile(hulls)?;
         let spawn = Spawn {
             shape: Shape::Surface(surface),
             m,
             pos,
-            rot: rot.into(),
+            rot,
             shift: Some(shift),
             group: group(group_name),
             fixed,

@@ -557,3 +557,7 @@ Zähler, wo das Laden sie ließ (der Schieber von Level 5 wacht 54 Frames nach s
 wurde für die Level 1 bis 12 am Original gelesen (`wakepool.rs`, über den Quell-Hash wie die Startphase); damit wachen
 die Schieber von Level 5 am Start und nach einem Checkpoint auf dem Frame des Originals auf (Frame 427 der Szene, wo wir
 58 Frames früher weckten). Dort trennt sich noch die erste Berührung des Schiebers mit seiner Rinne.
+Das Aufwecken durch ein Skript holt einen schlafenden Teil erst beim nächsten Schritt der Physik zurück, nicht sofort
+(das zeigte das IVP von Ballanced mit denselben Körpern: bei uns begannen die Kontakttests früher). Die erste Berührung
+des Schiebers trennt sich noch: wo seine Kante parallel zur Rinne liegt, sind zwei Elemente gleich nah, und die
+Kontaktsuche bleibt bei einem anderen stehen.
