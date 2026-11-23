@@ -303,6 +303,15 @@ impl Game {
         {
             level.level.settings.source_hash = Some(r.level_hash);
         }
+        // research: a scene made from an original level (an object moved in its file) plays as that level, its start
+        // phase and module copies included (DRAHTSEILAKT_AS_ORIGINAL=<the original file's hash>; not the game as it
+        // ships)
+        if let Some(h) = std::env::var("DRAHTSEILAKT_AS_ORIGINAL")
+            .ok()
+            .and_then(|v| u64::from_str_radix(v.trim_start_matches("0x"), 16).ok())
+        {
+            level.level.settings.source_hash = Some(h);
+        }
         let mut sim = Sim::with_rules(&level.level, start_ball, &modules, format);
         sim.set_ball_boxes(ball_meshes.boxes);
         let pieces = crate::pieces::Pieces::find(&balls.level);

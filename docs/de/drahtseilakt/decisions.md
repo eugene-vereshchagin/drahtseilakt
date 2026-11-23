@@ -545,4 +545,13 @@ Eingabe (5900 Frames je Level) zeigt, dass die schwingenden Säcke der Level 11 
 dem ihr Modul kommt, 180 Frames vor dem Ball, und der Stoß alle 91 Frames wechselt; unsere Säcke wurden erst ab dem Ball
 angestoßen und trafen den Ball daher 3,6 vom Original entfernt und mit zwei Dritteln seines Ausschlags. Das Spiel lässt den
 Levelstart jetzt Frame für Frame mit den Stößen laufen: die Säcke treffen den Ball bis auf 0,07 wie im Original, und ihre
-Schwünge erreichen den Scheitel über den ganzen Lauf auf den Ticks des Originals.
+Schwünge erreichen den Scheitel über den ganzen Lauf auf den Ticks des Originals. (Die Kalibrierung von Level 11 trennt
+sich jetzt bei Tick 92 vom Original, nicht bei 285: die schwingenden Säcke bleiben unter den bewegten Einheiten der
+Physik, und die Reihenfolge, in der der Schlaftest sie trifft, ist noch nicht die des Originals.) Ein Modul wacht auf,
+wenn der Näherungstest seines Skripts den Ball nahe findet; das Original macht einige Kopien jedes Moduls und gibt jedem
+Platzhalter im PH-Array eine davon, sodass Platzhalter verschiedener Sektoren eine Kopie teilen, und der Zähler einer
+Kopie bis zum nächsten Test steht, solange sie nicht im Spiel ist, und läuft dann weiter. Am Levelstart stehen die
+Zähler, wo das Laden sie ließ (der Schieber von Level 5 wacht 54 Frames nach seinem Kommen auf, nicht sofort). Beides
+wurde für die Level 1 bis 12 am Original gelesen (`wakepool.rs`, über den Quell-Hash wie die Startphase); damit wachen
+die Schieber von Level 5 am Start und nach einem Checkpoint auf dem Frame des Originals auf (Frame 427 der Szene, wo wir
+58 Frames früher weckten). Dort trennt sich noch die erste Berührung des Schiebers mit seiner Rinne.

@@ -72,6 +72,7 @@ mod trafo;
 pub mod ui;
 mod userreplay;
 mod volume;
+mod wakepool;
 mod watch;
 pub use gamedata::assets;
 

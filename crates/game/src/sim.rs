@@ -307,6 +307,8 @@ struct Rules {
 /// A placed module's physics: its parts' bodies and its joints, in world terms.
 #[derive(Clone, Debug, Default)]
 struct ModuleInst {
+    /// The placeholder it was made at (a level object).
+    object: usize,
     parts: Vec<usize>,
     joints: Vec<JointInst>,
     /// The part woken when the ball comes near: its body, the point measured from, and the distance.
@@ -529,6 +531,12 @@ impl FinishTrigger {
 #[derive(Clone, Debug)]
 struct WakeTrigger {
     sector: Option<usize>,
+    /// The module copy whose test this is (`wake_copies`, crate::wakepool): placeholders sharing a copy share
+    /// its countdown.
+    copy: usize,
+    /// The first tick it tests after coming in, and the tick it stops after its module left.
+    from: u64,
+    off_at: Option<u64>,
     body: usize,
     /// The break it switches on when it fires (an index into the breaks).
     then: Option<usize>,
@@ -922,6 +930,8 @@ pub struct Sim {
     module_sectors: Vec<Vec<ModuleInst>>,
     /// The modules' wake-ups on approach.
     wake_triggers: Vec<WakeTrigger>,
+    /// The countdowns of the module copies' wake-up tests while no placeholder of theirs is in play.
+    wake_copies: Vec<u32>,
     /// The finish's triggers (the balloon's); the level's end gate counts only when there is none.
     finishes: Vec<FinishTrigger>,
     /// The fans' updrafts.
@@ -1349,7 +1359,7 @@ impl Sim {
             else {
                 continue;
             };
-            let Some(inst) = module_parts(
+            let Some(mut inst) = module_parts(
                 &mut world,
                 level,
                 i,
@@ -1360,6 +1370,7 @@ impl Sim {
             ) else {
                 continue;
             };
+            inst.object = i;
             match sector_of(i) {
                 Some(n) => {
                     if module_sectors.len() <= n {
@@ -1382,7 +1393,11 @@ impl Sim {
         world.run(frame);
         // The wake-ups on approach and the finish triggers, armed now for the modules that are in the physics from
         // the start.
-        let mut wake_triggers = Vec::new();
+        let mut wake_triggers: Vec<WakeTrigger> = Vec::new();
+        // the original's pooled copies: (module, copy) -> slot, each slot's countdown
+        let pool = crate::wakepool::copies(level.settings.source_hash);
+        let mut copy_slots: Vec<(String, u8)> = Vec::new();
+        let mut wake_copies: Vec<u32> = Vec::new();
         let mut finishes = Vec::new();
         let mut updrafts = Vec::new();
         let mut swings = Vec::new();
@@ -1414,11 +1429,37 @@ impl Sim {
                 breaks.len() - 1
             });
             if let Some((body, near, mut prox)) = inst.wake {
+                let name = level
+                    .objects
+                    .get(inst.object)
+                    .map_or("", |o| o.name.as_str());
+                let copy = match pool.iter().find(|c| c.0 == name) {
+                    Some(&(_, k, countdown)) => {
+                        let module = module_of(level, inst.object).unwrap_or("").to_string();
+                        match copy_slots.iter().position(|s| s.0 == module && s.1 == k) {
+                            Some(slot) => slot,
+                            None => {
+                                copy_slots.push((module, k));
+                                wake_copies.push(u32::from(countdown));
+                                wake_copies.len() - 1
+                            }
+                        }
+                    }
+                    None => {
+                        copy_slots.push((String::new(), 0));
+                        wake_copies.push(0);
+                        wake_copies.len() - 1
+                    }
+                };
                 if now {
                     prox.switch_on();
+                    prox.set_countdown(wake_copies.get(copy).copied().unwrap_or(0));
                 }
                 wake_triggers.push(WakeTrigger {
                     sector,
+                    copy,
+                    from: 0,
+                    off_at: None,
                     body,
                     then,
                     forces: inst.forces.clone(),
@@ -1466,11 +1507,34 @@ impl Sim {
         // frame their module came in (measured on the original, levels 11 and 12: the sacks' pushes change 91
         // frames after the module comes in, 180 frames before the ball, and every 91 frames on).
         let intro = (START_OBJECTS_SECONDS / frame).round() as u64 - 1;
-        for i in 0..intro {
-            for w in swings.iter_mut().filter(|w| w.since.is_some()) {
-                w.apply(&mut world, i);
+        // the original's blocks run before a frame's physics, so the wake-ups test once more before the ball's
+        // first tick (that frame's blocks); ours test after each tick's physics from then on
+        for i in 0..=intro {
+            if i < intro {
+                for w in swings.iter_mut().filter(|w| w.since.is_some()) {
+                    w.apply(&mut world, i);
+                }
             }
-            world.run(frame);
+            // the start sector's wake-ups test from the frame after their modules came in, with the ball's frame
+            // at the start already (measured: level 5's pusher wakes 54 frames in, level 8's seesaw 56)
+            for w in &mut wake_triggers {
+                if w.prox.frame(ball.position, w.near) == Some(Range::Enter) {
+                    w.prox.switch_off();
+                    if let Some(slot) = wake_copies.get_mut(w.copy) {
+                        *slot = w.prox.countdown();
+                    }
+                    if let Some(b) = w.then.and_then(|k| breaks.get_mut(k)) {
+                        b.at.prox.switch_on();
+                    }
+                    world.wake(w.body);
+                    for f in &w.forces {
+                        world.add_force(f.body, f.force, f.point);
+                    }
+                }
+            }
+            if i < intro {
+                world.run(frame);
+            }
         }
         for w in swings.iter_mut().filter(|w| w.since.is_some()) {
             w.pre = intro;
@@ -1535,6 +1599,7 @@ impl Sim {
             push_keys: 0,
             sectors,
             wake_triggers,
+            wake_copies,
             finishes,
             updrafts,
             swings,
@@ -2705,9 +2770,26 @@ impl Sim {
     /// The modules' wake-ups on approach: a part is woken, once, when the ball comes within its distance.
     fn check_wake_triggers(&mut self) {
         let ball = self.ball.position;
+        let tick = self.tick;
         for w in &mut self.wake_triggers {
+            if w.off_at == Some(tick) {
+                w.off_at = None;
+                if w.prox.on {
+                    w.prox.switch_off();
+                    if let Some(slot) = self.wake_copies.get_mut(w.copy) {
+                        *slot = w.prox.countdown();
+                    }
+                }
+                continue;
+            }
+            if tick < w.from {
+                continue;
+            }
             if w.prox.frame(ball, w.near) == Some(Range::Enter) {
                 w.prox.switch_off();
+                if let Some(slot) = self.wake_copies.get_mut(w.copy) {
+                    *slot = w.prox.countdown();
+                }
                 if let Some(b) = w.then.and_then(|i| self.breaks.get_mut(i)) {
                     b.at.prox.switch_on();
                 }
@@ -2863,10 +2945,17 @@ impl Sim {
                     .iter_mut()
                     .filter(|w| w.sector == Some(c.sector))
                 {
+                    // the copy goes on with the countdown it had. The original's block runs before the frame's
+                    // physics, ours after the tick's, so its first test after the copy is placed (the frame after)
+                    // is this tick's, and it stops on the tick its module leaves.
                     if c.enter {
                         w.prox.switch_on();
+                        w.prox
+                            .set_countdown(self.wake_copies.get(w.copy).copied().unwrap_or(0));
+                        w.from = tick;
+                        w.off_at = None;
                     } else {
-                        w.prox.switch_off();
+                        w.off_at = Some(tick);
                     }
                 }
                 for w in self
@@ -5083,7 +5172,8 @@ pub(crate) mod tests {
     #[test]
     fn a_module_is_made_of_its_parts_at_its_stand_in_and_its_stone_slides() {
         // Module 34 as a file: a box and a stone (cubes of half size 1) one above the other, and the slider's frames
-        // on a vertical axis through the stone. Its stand-in in sector 1, turned a quarter about y, 20 along x.
+        // on a vertical axis through the stone. Its stand-in in sector 1, turned a quarter about y, 80 along x (beyond
+        // its wake-up's 50 from the start, so the level's start leaves it as it was made).
         let mut file = flat_level();
         file.objects.clear();
         file.groups.clear();
@@ -5119,7 +5209,7 @@ pub(crate) mod tests {
             [0.0, 0.0, -1.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [1.0, 0.0, 0.0, 0.0],
-            [20.0, 0.0, 0.0, 1.0],
+            [80.0, 0.0, 0.0, 1.0],
         ];
         let mut modules = Modules::default();
         modules.models.push(file);
@@ -5127,14 +5217,21 @@ pub(crate) mod tests {
         let mut sim = Sim::with_modules(&level, BallKind::Wood, &modules);
         let parts = sim.module_bodies().to_vec();
         assert_eq!(parts.len(), 2);
-        // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 20
+        // the stand-in's matrix times the part's: (-7, 1, 0) turned a quarter about y is (0, 1, 7), moved to x = 80
         let k = sim.world.state(parts[0].body).expect("the box is made").pos;
         assert!(
-            (k - Vec3::new(20.0, 1.0, 7.0)).length() < 1e-4,
+            (k - Vec3::new(80.0, 1.0, 7.0)).length() < 1e-4,
             "box at {k:?}"
         );
-        // the ball is within 50 of the stone: the module's script wakes it, once
-        sim.step(0);
+        assert_eq!(sim.world.movement_state(parts[1].body), Some(8));
+        // the ball comes within 50 of the stone: the module's script wakes it at its next test, once
+        sim.put_ball(Vec3::new(80.0, 1.0, 0.0));
+        for _ in 0..60 {
+            sim.step(0);
+            if sim.world.movement_state(parts[1].body) != Some(8) {
+                break;
+            }
+        }
         assert_ne!(
             sim.world.movement_state(parts[1].body),
             Some(8),
@@ -5147,7 +5244,7 @@ pub(crate) mod tests {
         }
         let st = sim.world.state(parts[1].body).unwrap().pos;
         assert!(
-            (st - Vec3::new(20.0, 1.0, 7.0)).length() < 0.05,
+            (st - Vec3::new(80.0, 1.0, 7.0)).length() < 0.05,
             "stone at {st:?}"
         );
     }

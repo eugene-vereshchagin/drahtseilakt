@@ -72,6 +72,15 @@ impl Proximity {
         self.on = false;
     }
 
+    /// Frames until the next test (the block's "Last Check"), which it keeps while switched off.
+    pub fn countdown(&self) -> u32 {
+        self.countdown
+    }
+
+    pub fn set_countdown(&mut self, frames: u32) {
+        self.countdown = frames;
+    }
+
     /// One frame with `a` and `b` where they are: the result if it tested this frame.
     pub fn frame(&mut self, a: Vec3, b: Vec3) -> Option<Range> {
         if !self.on {
